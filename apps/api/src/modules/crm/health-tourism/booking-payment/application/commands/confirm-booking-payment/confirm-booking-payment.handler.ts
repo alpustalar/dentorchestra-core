@@ -13,16 +13,21 @@ import {
 import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment.entity';
 import {
   BookingPaymentProviderValue,
+  FlightInstantBookingIntent,
   HotelBookingIntent,
   TransferBookingIntent,
 } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
 import { BookingPaymentNotFoundException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 import { BookHotelCommand } from '@modules/crm/health-tourism/hotel/application/commands/book-hotel/book-hotel.command';
 import { BookTransferCommand } from '@modules/crm/health-tourism/transfer/application/commands/book-transfer/book-transfer.command';
+import { BookFlightCommand } from '@modules/crm/health-tourism/flight/application/commands/book-flight/book-flight.command';
+import { PayHeldFlightCommand } from '@modules/crm/health-tourism/flight/application/commands/pay-held-flight/pay-held-flight.command';
 import {
+  BookFlightDto,
   BookHotelDto,
   BookTransferDto,
 } from '@shared/modules/health-tourism/dto/commands';
+import { assertNever } from '@common/utils';
 import { ClientProxy } from '@nestjs/microservices';
 import {
   BookingConfirmedEventPayload,
@@ -344,24 +349,81 @@ export class ConfirmBookingPaymentHandler
 
   private buildSummary(bp: BookingPayment): string {
     const intent = bp.bookingIntent;
-    return intent.type === BookingPaymentTypeSchema.enum.HOTEL
-      ? `${intent.hotelName} (${intent.checkIn} → ${intent.checkOut})`
-      : `${intent.vehicleName} transferi`;
+
+    switch (intent.type) {
+      case BookingPaymentTypeSchema.enum.HOTEL:
+        return `${intent.hotelName} (${intent.checkIn} → ${intent.checkOut})`;
+      case BookingPaymentTypeSchema.enum.TRANSFER:
+        return `${intent.vehicleName} transferi`;
+      case BookingPaymentTypeSchema.enum.FLIGHT:
+        return intent.summary;
+      default:
+        return assertNever(
+          intent,
+          'Özeti üretilemeyen rezervasyon niyeti türü.'
+        );
+    }
   }
 
-  /** intent'e göre BookHotel/BookTransfer dispatch eder; dönen dahili rezervasyon id'sini verir. */
+  /**
+   * intent'e göre ilgili book command'ini dispatch eder; dönen dahili rezervasyon
+   * id'sini verir.
+   *
+   * **`switch` + `assertNever` bilinçli**: burası daha önce `if (HOTEL) … else …`
+   * idi ve birleşime yeni bir tür eklendiğinde o tür sessizce transfer dalına
+   * düşüyordu (TypeScript `else`'i kalan üyelere daraltıyor, `as` cast'i de şekil
+   * uyuşmazlığını yutuyordu). Artık kapsanmayan her yeni tür DERLEME hatasıdır.
+   */
   private async book(bp: BookingPayment): Promise<string> {
     const ctx = this.buildSystemContext(bp);
     const intent = bp.bookingIntent;
 
-    if (intent.type === BookingPaymentTypeSchema.enum.HOTEL) {
-      return this.commandBus.execute(
-        new BookHotelCommand(this.toHotelDto(intent, bp), ctx)
-      );
+    switch (intent.type) {
+      case BookingPaymentTypeSchema.enum.HOTEL:
+        return this.commandBus.execute(
+          new BookHotelCommand(this.toHotelDto(intent, bp), ctx)
+        );
+
+      case BookingPaymentTypeSchema.enum.TRANSFER:
+        return this.commandBus.execute(
+          new BookTransferCommand(this.toTransferDto(intent, bp), ctx)
+        );
+
+      case BookingPaymentTypeSchema.enum.FLIGHT:
+        // Hibrit akış: koltuk zaten tutulduysa yapılacak iş yalnız ödemedir;
+        // aksi halde sipariş ödemeyle birlikte şimdi açılır.
+        return intent.mode === 'HOLD'
+          ? this.commandBus.execute(
+              new PayHeldFlightCommand({
+                bookingId: intent.flightBookingId,
+                ctx,
+              })
+            )
+          : this.commandBus.execute(
+              new BookFlightCommand(this.toFlightDto(intent, bp), ctx)
+            );
+
+      default:
+        return assertNever(
+          intent,
+          'Rezervasyona çevrilemeyen ödeme niyeti türü.'
+        );
     }
-    return this.commandBus.execute(
-      new BookTransferCommand(this.toTransferDto(intent, bp), ctx)
-    );
+  }
+
+  private toFlightDto(
+    intent: FlightInstantBookingIntent,
+    bp: BookingPayment
+  ): BookFlightDto {
+    return {
+      optionId: intent.optionId,
+      passengers: intent.passengers,
+      contactEmail: intent.contactEmail,
+      contactPhone: intent.contactPhone,
+      clinicId: bp.clinicId.value,
+      patientId: bp.patientId?.value ?? undefined,
+      leadId: bp.leadId?.value ?? undefined,
+    } as BookFlightDto;
   }
 
   private toHotelDto(

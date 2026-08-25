@@ -7,9 +7,13 @@ import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/doma
 import { BookingPaymentNotFoundException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 import {
   CreateBookingPaymentProps,
+  FlightBookingIntent,
   HotelBookingIntent,
 } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
 import { BookHotelCommand } from '@modules/crm/health-tourism/hotel/application/commands/book-hotel/book-hotel.command';
+import { BookTransferCommand } from '@modules/crm/health-tourism/transfer/application/commands/book-transfer/book-transfer.command';
+import { BookFlightCommand } from '@modules/crm/health-tourism/flight/application/commands/book-flight/book-flight.command';
+import { PayHeldFlightCommand } from '@modules/crm/health-tourism/flight/application/commands/pay-held-flight/pay-held-flight.command';
 import { NATS_SUBJECTS } from '@src/transport';
 import { IGetContext } from '@common/decorators';
 import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
@@ -346,9 +350,7 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     // yazılıyordu (kodda "TODO: event fırlatılacak" notu duruyordu).
     const bp = makeBp('PENDING');
     const { handler, stripeLink, criticalFailure } = build(bp, true);
-    (stripeLink.refund as jest.Mock).mockRejectedValue(
-      new Error('stripe 500')
-    );
+    (stripeLink.refund as jest.Mock).mockRejectedValue(new Error('stripe 500'));
 
     await handler.execute(
       new ConfirmBookingPaymentCommand({
@@ -440,5 +442,131 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         })
       )
     ).rejects.toBeInstanceOf(BookingPaymentNotFoundException);
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // FLIGHT — regresyon koruması
+  //
+  // `book()` ve `buildSummary()` eskiden ikili `if (HOTEL) … else …` idi ve
+  // birleşime eklenen her yeni tür SESSİZCE transfer dalına düşüyordu (TypeScript
+  // `else`'i kalan üyelere daraltıyor, `as` cast'i şekil uyuşmazlığını yutuyordu).
+  // Aşağıdaki testler uçuşun kendi komutuna gittiğini kanıtlar.
+  // ────────────────────────────────────────────────────────────────────────────
+  describe('FLIGHT intent dispatch', () => {
+    const makeFlightBp = (intent: FlightBookingIntent): BookingPayment => {
+      const bp = BookingPayment.create({
+        ...props,
+        bookingType: 'FLIGHT',
+        intent,
+      });
+      bp.attachLinks({
+        iyzicoConversationId: bp.id.value,
+        iyzicoUrl: 'https://iyzi',
+        stripeSessionId: 'cs_1',
+        stripeUrl: 'https://stripe',
+      });
+      return bp;
+    };
+
+    const holdIntent: FlightBookingIntent = {
+      type: 'FLIGHT',
+      mode: 'HOLD',
+      flightBookingId: '55555555-5555-4555-8555-555555555555',
+      duffelOrderId: 'ord_hold_1',
+      summary: 'TK1988 · FRA 09:15 → IST 13:05 (aktarmasız)',
+    };
+
+    const instantIntent: FlightBookingIntent = {
+      type: 'FLIGHT',
+      mode: 'INSTANT',
+      optionId: 'fl_abc12345',
+      clinicId: CLINIC_ID,
+      passengers: [
+        {
+          type: 'adult',
+          givenName: 'Ada',
+          familyName: 'Lovelace',
+          bornOn: '1990-01-01',
+        },
+      ],
+      contactEmail: 'ada@example.com',
+      contactPhone: '+905550000000',
+      summary: 'LH1300 · MUC 08:00 → IST 12:00 (aktarmasız)',
+    };
+
+    it('HOLD intent → PayHeldFlightCommand (koltuk tutulmuş, yalnız ödenir)', async () => {
+      const bp = makeFlightBp(holdIntent);
+      const { handler, commandBus } = build(bp);
+
+      await handler.execute(
+        new ConfirmBookingPaymentCommand({
+          bookingPaymentId: bp.id.value,
+          provider: 'STRIPE',
+          providerRef: 'pi_1',
+          ctx,
+        })
+      );
+
+      const dispatched = (commandBus.execute as jest.Mock).mock.calls.map(
+        ([cmd]) => cmd
+      );
+
+      const payCmd = dispatched.find((c) => c instanceof PayHeldFlightCommand);
+
+      expect(payCmd).toBeDefined();
+      expect(payCmd?.payload.bookingId).toBe(holdIntent.flightBookingId);
+      // Transfer dalına düşmediğini açıkça kanıtla.
+      expect(dispatched.some((c) => c instanceof BookTransferCommand)).toBe(
+        false
+      );
+      expect(bp.status).toBe('BOOKED');
+    });
+
+    it('INSTANT intent → BookFlightCommand (sipariş ödemeyle birlikte açılır)', async () => {
+      const bp = makeFlightBp(instantIntent);
+      const { handler, commandBus } = build(bp);
+
+      await handler.execute(
+        new ConfirmBookingPaymentCommand({
+          bookingPaymentId: bp.id.value,
+          provider: 'STRIPE',
+          providerRef: 'pi_1',
+          ctx,
+        })
+      );
+
+      const dispatched = (commandBus.execute as jest.Mock).mock.calls.map(
+        ([cmd]) => cmd
+      );
+
+      const bookCmd = dispatched.find((c) => c instanceof BookFlightCommand);
+
+      expect(bookCmd).toBeDefined();
+      expect(bookCmd?.data.optionId).toBe(instantIntent.optionId);
+      expect(bookCmd?.data.clinicId).toBe(CLINIC_ID);
+      expect(dispatched.some((c) => c instanceof BookTransferCommand)).toBe(
+        false
+      );
+      expect(bp.status).toBe('BOOKED');
+    });
+
+    it('uçuş özeti bildirime uçuşun kendi metniyle gider (transfer metni değil)', async () => {
+      const bp = makeFlightBp(holdIntent);
+      const { handler, natsClient } = build(bp);
+
+      await handler.execute(
+        new ConfirmBookingPaymentCommand({
+          bookingPaymentId: bp.id.value,
+          provider: 'STRIPE',
+          providerRef: 'pi_1',
+          ctx,
+        })
+      );
+
+      const [subject, payload] = (natsClient.emit as jest.Mock).mock.calls[0];
+      expect(subject).toBe(NATS_SUBJECTS.booking.confirmed);
+      expect(payload.bookingType).toBe('FLIGHT');
+      expect(payload.summary).toBe(holdIntent.summary);
+    });
   });
 });

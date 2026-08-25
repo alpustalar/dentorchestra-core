@@ -13,6 +13,7 @@ enum HotelbedsTransferBookingStatus {
 enum BookingPaymentType {
   HOTEL
   TRANSFER
+  FLIGHT
 }
 
 enum BookingPaymentStatus {

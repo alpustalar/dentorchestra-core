@@ -17,6 +17,7 @@ export * from './ClinicFinanceSettingsSchema';
 export * from './ClinicExceptionSchema';
 export * from './ConsentFormTemplateSchema';
 export * from './ConsentFormSubmissionSchema';
+export * from './DuffelFlightBookingSchema';
 export * from './AppointmentDiagnosisSchema';
 export * from './AppointmentProcedureSchema';
 export * from './ENabizSyncSchema';

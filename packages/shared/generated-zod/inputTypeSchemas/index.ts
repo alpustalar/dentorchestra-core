@@ -18,6 +18,7 @@ export { ClinicFinanceSettingsScalarFieldEnumSchema } from './ClinicFinanceSetti
 export { ClinicExceptionScalarFieldEnumSchema } from './ClinicExceptionScalarFieldEnumSchema';
 export { ConsentFormTemplateScalarFieldEnumSchema } from './ConsentFormTemplateScalarFieldEnumSchema';
 export { ConsentFormSubmissionScalarFieldEnumSchema } from './ConsentFormSubmissionScalarFieldEnumSchema';
+export { DuffelFlightBookingScalarFieldEnumSchema } from './DuffelFlightBookingScalarFieldEnumSchema';
 export { AppointmentDiagnosisScalarFieldEnumSchema } from './AppointmentDiagnosisScalarFieldEnumSchema';
 export { AppointmentProcedureScalarFieldEnumSchema } from './AppointmentProcedureScalarFieldEnumSchema';
 export { ENabizSyncScalarFieldEnumSchema } from './ENabizSyncScalarFieldEnumSchema';
@@ -141,6 +142,8 @@ export { BloodTypeSchema } from './BloodTypeSchema';
 export { GenderSchema } from './GenderSchema';
 export { CurrencySchema } from './CurrencySchema';
 export { TimeZoneSchema } from './TimeZoneSchema';
+export { DuffelFlightBookingModeSchema } from './DuffelFlightBookingModeSchema';
+export { DuffelFlightBookingStatusSchema } from './DuffelFlightBookingStatusSchema';
 export { ENabizSyncStatusSchema } from './ENabizSyncStatusSchema';
 export { LedgerStatusSchema } from './LedgerStatusSchema';
 export { LedgerTypeSchema } from './LedgerTypeSchema';

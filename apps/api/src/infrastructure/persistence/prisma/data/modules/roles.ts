@@ -66,6 +66,7 @@ const {
   HOTELBEDSHOTEL,
   HOTELBEDSBOOKING,
   HOTELBEDSTRANSFERBOOKING,
+  DUFFELFLIGHTBOOKING,
   CLINICHEALTHTOURISMCONFIG,
   BOOKINGPAYMENT,
   // Faturalama & tahsilat
@@ -173,11 +174,12 @@ const CRM = [LEAD, ACTIVITY, PIPELINE, PIPELINESTAGE];
 /** Reklam entegrasyonu ve kampanya metrikleri. */
 const MARKETING = [METAADACCOUNT, METACAMPAIGNMETRIC, METALEAD];
 
-/** Sağlık turizmi: otel/transfer rezervasyonu ve rezervasyon tahsilatı. */
+/** Sağlık turizmi: otel/transfer/uçuş rezervasyonu ve rezervasyon tahsilatı. */
 const HEALTH_TOURISM = [
   HOTELBEDSHOTEL,
   HOTELBEDSBOOKING,
   HOTELBEDSTRANSFERBOOKING,
+  DUFFELFLIGHTBOOKING,
   BOOKINGPAYMENT,
 ];
 

@@ -83,6 +83,14 @@ import { MESSAGING_MONGO_CONNECTION } from '@src/infrastructure/persistence/mong
         [ENV.HOTELBEDS_TRANSFER_API_KEY]: Joi.string().required(),
         [ENV.HOTELBEDS_TRANSFER_SECRET]: Joi.string().required(),
 
+        // Integration Duffel (uçuş) — bilinçli olarak OPSİYONEL: token yoksa yalnız
+        // uçuş uçları çalışmaz, uygulamanın tamamı ayağa kalkmayı sürdürür. Eksikliği
+        // DuffelApiService ilk çağrıda DuffelCredentialsMissingException ile bildirir
+        // (StripeClientFactory'nin tembel doğrulama deseni).
+        [ENV.DUFFEL_ACCESS_TOKEN]: Joi.string()
+          .pattern(/^duffel_(test|live)_/)
+          .optional(),
+
         [ENV.HEALTH_TOURISM_SERVICE_FEE_PERCENT]: Joi.number()
           .min(0)
           .max(100)

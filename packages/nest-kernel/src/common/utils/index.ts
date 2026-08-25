@@ -8,3 +8,4 @@ export * from './mapper-array';
 export * from './capitalize';
 export * from './end-time-calculator';
 export * from './create-bearer-token';
+export * from './assert-never';

@@ -1,6 +1,7 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { assertNever } from '@common/utils';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
 import {
   IPaymentLinkProvider,
@@ -172,10 +173,25 @@ export class InitiateBookingPaymentHandler
     };
   }
 
+  /**
+   * Ödeme linkinde görünen açıklama. `switch` + `assertNever` bilinçli: ikili
+   * `if/else` iken yeni bir rezervasyon türü sessizce "Havalimanı transferi"
+   * olarak etiketleniyordu — hasta yanlış açıklamalı bir link görürdü.
+   */
   private buildDescription(intent: BookingIntent): string {
-    return intent.type === 'HOTEL'
-      ? `Otel rezervasyonu — ${intent.hotelName}`
-      : `Havalimanı transferi — ${intent.vehicleName}`;
+    switch (intent.type) {
+      case 'HOTEL':
+        return `Otel rezervasyonu — ${intent.hotelName}`;
+      case 'TRANSFER':
+        return `Havalimanı transferi — ${intent.vehicleName}`;
+      case 'FLIGHT':
+        return `Uçuş rezervasyonu — ${intent.summary}`;
+      default:
+        return assertNever(
+          intent,
+          'Ödeme açıklaması üretilemeyen rezervasyon türü.'
+        );
+    }
   }
 
   private round2(value: number): number {
