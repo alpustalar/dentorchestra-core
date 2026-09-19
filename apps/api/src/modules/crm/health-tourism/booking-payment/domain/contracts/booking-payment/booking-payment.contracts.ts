@@ -48,8 +48,53 @@ export interface TransferBookingIntent {
   }>;
 }
 
-/** Ödeme onaylanınca HotelBeds'e replay edilecek rezervasyon niyeti. */
-export type BookingIntent = HotelBookingIntent | TransferBookingIntent;
+/**
+ * Uçuş niyeti kendi içinde ikiye ayrılır (hibrit ödeme akışı):
+ *
+ * - `HOLD`: koltuk tahsilattan ÖNCE Duffel'da tutuldu. Ödeme onayında yapılacak iş
+ *   siparişi açmak değil, tutulan siparişi ödemektir → `duffelOrderId` taşınır.
+ * - `INSTANT`: havayolu anında ödeme istiyor; sipariş ancak tahsilat onayında,
+ *   ödemeyle birlikte açılabilir → teklif (`optionId`) taşınır.
+ */
+export interface FlightHoldBookingIntent {
+  type: 'FLIGHT';
+  mode: 'HOLD';
+  /** Hold sırasında yaratılan dahili kayıt — ödeme onayında bu güncellenir. */
+  flightBookingId: string;
+  duffelOrderId: string;
+  summary: string;
+}
+
+export interface FlightInstantBookingIntent {
+  type: 'FLIGHT';
+  mode: 'INSTANT';
+  /** Cache'teki kısa teklif token'ı; sipariş onayda bununla açılır. */
+  optionId: string;
+  clinicId: string;
+  passengers: FlightIntentPassenger[];
+  contactEmail: string;
+  contactPhone: string;
+  summary: string;
+}
+
+export interface FlightIntentPassenger {
+  type: 'adult' | 'child' | 'infant_without_seat';
+  title?: 'mr' | 'ms' | 'mrs' | 'miss' | 'dr';
+  givenName: string;
+  familyName: string;
+  bornOn: string;
+  gender?: 'm' | 'f';
+}
+
+export type FlightBookingIntent =
+  | FlightHoldBookingIntent
+  | FlightInstantBookingIntent;
+
+/** Ödeme onaylanınca sağlayıcıya replay edilecek rezervasyon niyeti. */
+export type BookingIntent =
+  | HotelBookingIntent
+  | TransferBookingIntent
+  | FlightBookingIntent;
 
 /** Entity static create() girişi. Tutarlar düz sayı; entity Decimal'e çevirir. */
 export interface CreateBookingPaymentProps {

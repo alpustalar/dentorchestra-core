@@ -11,11 +11,15 @@ import { AuthGuard, CapabilityGuard } from '@modules/identity/auth/auth/guards';
 import { GetContext, HasCapability, IGetContext } from '@common/decorators';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import {
+  BookFlightDto,
   BookHotelDto,
   BookTransferDto,
+  CancelFlightBookingDto,
   CancelHotelBookingDto,
   CancelTransferBookingDto,
 } from '@shared/modules/health-tourism/dto/commands';
+import { BookFlightCommand } from '@modules/crm/health-tourism/flight/application/commands/book-flight/book-flight.command';
+import { CancelFlightBookingCommand } from '@modules/crm/health-tourism/flight/application/commands/cancel-flight-booking/cancel-flight-booking.command';
 import { BookHotelCommand } from '@modules/crm/health-tourism/hotel/application/commands/book-hotel/book-hotel.command';
 import { CancelHotelBookingCommand } from '@modules/crm/health-tourism/hotel/application/commands/cancel-hotel-booking/cancel-hotel-booking.command';
 import { BookTransferCommand } from '@modules/crm/health-tourism/transfer/application/commands/book-transfer/book-transfer.command';
@@ -23,7 +27,8 @@ import { CancelTransferBookingCommand } from '@modules/crm/health-tourism/transf
 import { ManualBookingOverrideRequiredException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 import { CAPABILITIES } from '@src/infrastructure/persistence/prisma/data/modules';
 
-const { HOTELBEDSBOOKING, HOTELBEDSTRANSFERBOOKING } = CAPABILITIES;
+const { HOTELBEDSBOOKING, HOTELBEDSTRANSFERBOOKING, DUFFELFLIGHTBOOKING } =
+  CAPABILITIES;
 @UseGuards(AuthGuard, CapabilityGuard)
 @Controller()
 export class HealthTourismCommandController {
@@ -71,6 +76,30 @@ export class HealthTourismCommandController {
     const cancelDto = { ...dto, reference } as CancelTransferBookingDto;
     return this.commandBus.execute(
       new CancelTransferBookingCommand(cancelDto, ctx)
+    );
+  }
+
+  // Direkt (ödeme-önce saga'yı baypas eden) uçuş booking — yalnızca manuel override.
+  // Bilet anında kesilir ve ödenir; normal akış AI/hasta tarafında ödeme linkidir.
+  @HasCapability(DUFFELFLIGHTBOOKING.create)
+  @Post('health-tourism/flights/bookings')
+  bookFlight(@Body() dto: BookFlightDto, @GetContext() ctx: IGetContext) {
+    if (!dto.manualOverride) {
+      throw new ManualBookingOverrideRequiredException();
+    }
+    return this.commandBus.execute(new BookFlightCommand(dto, ctx));
+  }
+
+  @HasCapability(DUFFELFLIGHTBOOKING.delete)
+  @Delete('health-tourism/flights/bookings/:bookingId')
+  cancelFlightBooking(
+    @Param('bookingId', ParseUUIDPipe) bookingId: string,
+    @Body() dto: CancelFlightBookingDto,
+    @GetContext() ctx: IGetContext
+  ) {
+    const cancelDto = { ...dto, bookingId } as CancelFlightBookingDto;
+    return this.commandBus.execute(
+      new CancelFlightBookingCommand(cancelDto, ctx)
     );
   }
 }

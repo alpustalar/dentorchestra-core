@@ -136,6 +136,15 @@ export class DateTimeManager {
   }
 
   /**
+   * İki tarih arasındaki farkı tam saniye olarak döner (later - earlier).
+   * Dakika altı hassasiyet gereken yerlerde kullanılır (ör. dış sağlayıcı
+   * tekliflerinin kalan geçerlilik süresinden cache TTL'i türetmek).
+   */
+  static diffInSeconds(later: Date, earlier: Date): number {
+    return dayjs(later).diff(dayjs(earlier), 'second');
+  }
+
+  /**
    * Verilen zamanın belirtilen aralıkta olup olmadığını kontrol eder (Sadece saat bazlı)
    */
   static isTimeWithinRange({
@@ -228,6 +237,14 @@ export class DateTimeManager {
     tz: TimeZoneType = DEFAULT_TZ
   ): Date {
     return this.tz(date, tz).add(minutes, 'minute').toDate();
+  }
+
+  static subtractMinutes(
+    date: Date,
+    minutes: number,
+    tz: TimeZoneType = DEFAULT_TZ
+  ): Date {
+    return this.tz(date, tz).subtract(minutes, 'minute').toDate();
   }
 
   static toMillis(

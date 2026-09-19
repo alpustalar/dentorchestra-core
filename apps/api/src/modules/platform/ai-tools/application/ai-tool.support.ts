@@ -11,9 +11,11 @@ import { GetClinicHealthTourismConfigQuery } from '@modules/crm/health-tourism/c
 import { GetAppointmentDetailQuery } from '@modules/clinical/appointment/application/queries/get-appointment-detail/get-appointment-detail.query';
 import { GetHotelBookingsQuery } from '@modules/crm/health-tourism/hotel/application/queries/get-hotel-bookings/get-hotel-bookings.query';
 import { GetTransferBookingsQuery } from '@modules/crm/health-tourism/transfer/application/queries/get-transfer-bookings/get-transfer-bookings.query';
+import { GetFlightBookingsQuery } from '@modules/crm/health-tourism/flight/application/queries/get-flight-bookings/get-flight-bookings.query';
 import { RefundBookingPaymentCommand } from '@modules/crm/health-tourism/booking-payment/application/commands/refund-booking-payment/refund-booking-payment.command';
 import { InitiateBookingPaymentResponse } from '@modules/crm/health-tourism/booking-payment/application/commands/initiate-booking-payment/initiate-booking-payment.response';
 import {
+  GetFlightBookingsDto,
   GetHotelBookingsDto,
   GetTransferBookingsDto,
 } from '@shared/modules/health-tourism/dto/queries';
@@ -111,6 +113,21 @@ export class AiToolSupport {
     } as GetTransferBookingsDto;
     const { data } = await this.queryBus.execute(
       new GetTransferBookingsQuery(dto, ctx)
+    );
+    return data;
+  }
+
+  /** Yazışmaya bağlı kişinin (patientId öncelikli, yoksa leadId) uçuş rezervasyonları. */
+  async loadOwnedFlightBookings(context: AiToolContext) {
+    const ctx = this.buildClinicContext(context);
+    const dto: GetFlightBookingsDto = {
+      clinicId: context.clinicId,
+      pagination: { page: 1, limit: 50 },
+      patientId: context.patientId ?? undefined,
+      leadId: context.patientId ? undefined : (context.leadId ?? undefined),
+    } as GetFlightBookingsDto;
+    const { data } = await this.queryBus.execute(
+      new GetFlightBookingsQuery(dto, ctx)
     );
     return data;
   }

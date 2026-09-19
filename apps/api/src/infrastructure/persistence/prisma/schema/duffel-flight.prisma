@@ -1,0 +1,62 @@
+/// Duffel uçuş rezervasyonu. Sağlık turizminin üçüncü dikeyi (otel + transfer + uçuş).
+/// Tedarikçi Duffel'dır; HotelBeds modelleriyle ilişkisi yoktur.
+
+enum DuffelFlightBookingMode {
+  HOLD // koltuk tutuldu, ödeme sonra (Duffel "hold order")
+  INSTANT // teklif anında ödeme istiyor; sipariş tahsilat sonrası açılır
+}
+
+enum DuffelFlightBookingStatus {
+  HELD // Duffel'da sipariş açık ama ödenmedi — payment_required_by'a kadar geçerli
+  PAYMENT_IN_PROGRESS // ödeme sahiplenildi (claim); Duffel'a istek gitti, sonucu henüz bilinmiyor
+  CONFIRMED // ödendi, bilet kesildi (PNR mevcut)
+  CANCELLED // iptal edildi
+  FAILED // sipariş veya ödeme başarısız (iade yolu işletilir)
+}
+
+model DuffelFlightBooking {
+  id             String  @id
+  organizationId String  @map("organization_id")
+  clinicId       String  @map("clinic_id")
+  patientId      String? @map("patient_id")
+  leadId         String? @map("lead_id")
+
+  /// Duffel order id (`ord_...`). Hold yolunda ödeme öncesi de dolar.
+  duffelOrderId String @unique @map("duffel_order_id")
+  /// Havayolu PNR'ı (`booking_reference`) — bilet kesilince dolar.
+  bookingReference String? @map("booking_reference")
+  /// Siparişin açıldığı teklif (`off_...`) — denetim izi.
+  offerId String @map("offer_id")
+
+  mode   DuffelFlightBookingMode
+  status DuffelFlightBookingStatus
+
+  /// Yolcu listesi (ad/soyad/doğum tarihi/tip) — Duffel'a gönderilen gövdenin kopyası.
+  passengers Json
+  /// Uçuş bacakları: segment, kalkış/varış havalimanı+zamanı, taşıyıcı, uçuş no.
+  /// Transfer akışı uçuş numarasını buradan okur (hastaya sormak yerine).
+  slices Json
+
+  totalAmount Decimal  @map("total_amount") @db.Decimal(12, 2)
+  currency    Currency
+
+  /// Hold yolunda Duffel'ın verdiği ödeme son tarihi (`payment_required_by`).
+  /// Bu an geçtiğinde Duffel koltuğu kendi bırakır.
+  holdExpiresAt DateTime? @map("hold_expires_at")
+
+  /// Ödemeyi hangi an sahiplendik (HELD → PAYMENT_IN_PROGRESS). Süreç ödeme ile
+  /// onay arasında çökerse kayıt PAYMENT_IN_PROGRESS'te kalır; bu damga "bayat
+  /// claim" tespitini (ve Duffel'a sorup mutabakat almayı) mümkün kılar.
+  paymentClaimedAt DateTime? @map("payment_claimed_at")
+
+  failureReason String? @map("failure_reason") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([organizationId])
+  @@index([clinicId])
+  @@index([patientId])
+  @@index([leadId])
+  @@map("duffel_flight_bookings")
+}

@@ -76,6 +76,7 @@ export const MODULE_LABELS = {
   hotelbedshotel: 'Otel Kataloğu',
   hotelbedsbooking: 'Otel Rezervasyonu',
   hotelbedstransferbooking: 'Transfer Rezervasyonu',
+  duffelflightbooking: 'Uçuş Rezervasyonu',
   clinichealthtourismconfig: 'Sağlık Turizmi Ayarları',
   bookingpayment: 'Rezervasyon Ödemesi',
 

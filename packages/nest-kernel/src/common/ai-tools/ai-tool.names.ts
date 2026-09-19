@@ -28,4 +28,8 @@ export const AI_TOOL_NAMES = {
   BOOK_TRANSFER: 'book_transfer',
   GET_TRANSFER_BOOKINGS: 'get_transfer_bookings',
   CANCEL_TRANSFER_BOOKING: 'cancel_transfer_booking',
+  SEARCH_FLIGHTS: 'search_flights',
+  BOOK_FLIGHT: 'book_flight',
+  GET_FLIGHT_BOOKINGS: 'get_flight_bookings',
+  CANCEL_FLIGHT_BOOKING: 'cancel_flight_booking',
 } as const;
