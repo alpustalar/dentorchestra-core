@@ -1,6 +1,9 @@
 import { DuffelFlightBooking } from './duffel-flight-booking.entity';
 import { CreateFlightBookingProps } from '@modules/crm/health-tourism/flight/domain/contracts';
-import { FlightBookingInvalidStateException } from '@modules/crm/health-tourism/flight/domain/exceptions/duffel-flight.exceptions';
+import {
+  FlightBookingInvalidStateException,
+  FlightPaymentInProgressException,
+} from '@modules/crm/health-tourism/flight/domain/exceptions/duffel-flight.exceptions';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
@@ -156,5 +159,81 @@ describe('DuffelFlightBooking — kalıcılık', () => {
     expect(row.totalAmount.toString()).toBe('1234.56');
     expect(row.currency).toBe('USD');
     expect(row.duffelOrderId).toBe('ord_123');
+  });
+});
+
+describe('DuffelFlightBooking — ödeme sahiplenme (claim)', () => {
+  it('HELD → PAYMENT_IN_PROGRESS geçişi damga bırakır', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'HOLD' }));
+
+    booking.markPaymentInProgress();
+
+    expect(booking.status).toBe('PAYMENT_IN_PROGRESS');
+    expect(booking.paymentClaimedAt).not.toBeNull();
+  });
+
+  it('aynı kayıt ikinci kez sahiplenilemez (çift ödemeyi kapıda durdurur)', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'HOLD' }));
+    booking.markPaymentInProgress();
+
+    expect(() => booking.markPaymentInProgress()).toThrow(
+      FlightBookingInvalidStateException
+    );
+  });
+
+  it('CONFIRMED kayıt sahiplenilemez', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'INSTANT' }));
+
+    expect(() => booking.markPaymentInProgress()).toThrow(
+      FlightBookingInvalidStateException
+    );
+  });
+
+  it('claim bırakılınca kayıt yeniden ödenebilir hâle döner', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'HOLD' }));
+    booking.markPaymentInProgress();
+
+    booking.releasePaymentClaim();
+
+    expect(booking.status).toBe('HELD');
+    expect(booking.paymentClaimedAt).toBeNull();
+  });
+
+  it('PAYMENT_IN_PROGRESS kayıt onaylanabilir ve damga temizlenir', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'HOLD' }));
+    booking.markPaymentInProgress();
+
+    booking.confirm({ bookingReference: 'PNR1', ...ACTOR });
+
+    expect(booking.status).toBe('CONFIRMED');
+    expect(booking.paymentClaimedAt).toBeNull();
+    expect(booking.bookingReference).toBe('PNR1');
+  });
+
+  it('taze claim bayat sayılmaz', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'HOLD' }));
+    booking.markPaymentInProgress();
+
+    expect(booking.isPaymentClaimStale).toBe(false);
+  });
+
+  it('ödeme sürerken İPTAL REDDEDİLİR (DB iptal / Duffel ödenmiş ayrışmasını önler)', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'HOLD' }));
+    booking.markPaymentInProgress();
+
+    expect(() => booking.cancel(ACTOR)).toThrow(
+      FlightPaymentInProgressException
+    );
+    expect(booking.status).toBe('PAYMENT_IN_PROGRESS');
+  });
+
+  it('claim bırakıldıktan sonra iptal yeniden serbesttir', () => {
+    const booking = DuffelFlightBooking.create(buildProps({ mode: 'HOLD' }));
+    booking.markPaymentInProgress();
+    booking.releasePaymentClaim();
+
+    booking.cancel(ACTOR);
+
+    expect(booking.status).toBe('CANCELLED');
   });
 });

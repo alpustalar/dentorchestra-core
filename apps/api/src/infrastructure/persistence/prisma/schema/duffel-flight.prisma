@@ -8,6 +8,7 @@ enum DuffelFlightBookingMode {
 
 enum DuffelFlightBookingStatus {
   HELD // Duffel'da sipariş açık ama ödenmedi — payment_required_by'a kadar geçerli
+  PAYMENT_IN_PROGRESS // ödeme sahiplenildi (claim); Duffel'a istek gitti, sonucu henüz bilinmiyor
   CONFIRMED // ödendi, bilet kesildi (PNR mevcut)
   CANCELLED // iptal edildi
   FAILED // sipariş veya ödeme başarısız (iade yolu işletilir)
@@ -42,6 +43,11 @@ model DuffelFlightBooking {
   /// Hold yolunda Duffel'ın verdiği ödeme son tarihi (`payment_required_by`).
   /// Bu an geçtiğinde Duffel koltuğu kendi bırakır.
   holdExpiresAt DateTime? @map("hold_expires_at")
+
+  /// Ödemeyi hangi an sahiplendik (HELD → PAYMENT_IN_PROGRESS). Süreç ödeme ile
+  /// onay arasında çökerse kayıt PAYMENT_IN_PROGRESS'te kalır; bu damga "bayat
+  /// claim" tespitini (ve Duffel'a sorup mutabakat almayı) mümkün kılar.
+  paymentClaimedAt DateTime? @map("payment_claimed_at")
 
   failureReason String? @map("failure_reason") @db.Text
 

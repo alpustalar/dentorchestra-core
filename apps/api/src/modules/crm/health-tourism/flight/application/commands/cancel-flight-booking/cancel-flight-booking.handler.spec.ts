@@ -3,7 +3,10 @@ import { CancelFlightBookingCommand } from './cancel-flight-booking.command';
 import { DuffelFlightBooking } from '@modules/crm/health-tourism/flight/domain/entities/duffel-flight-booking.entity';
 import { IDuffelApiService } from '@modules/crm/health-tourism/flight/domain/interfaces/duffel-api.interface';
 import { IDuffelFlightBookingCommandRepository } from '@modules/crm/health-tourism/flight/domain/repositories/duffel-flight-booking/duffel-flight-booking.command.repository';
-import { FlightBookingNotFoundException } from '@modules/crm/health-tourism/flight/domain/exceptions/duffel-flight.exceptions';
+import {
+  FlightBookingNotFoundException,
+  FlightPaymentInProgressException,
+} from '@modules/crm/health-tourism/flight/domain/exceptions/duffel-flight.exceptions';
 import { IPolicyFactory } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
@@ -146,5 +149,41 @@ describe('CancelFlightBookingHandler', () => {
         )
       )
     ).rejects.toBeInstanceOf(FlightBookingNotFoundException);
+  });
+});
+
+describe('CancelFlightBookingHandler — ödeme ile yarış', () => {
+  const makeHeldBooking = () =>
+    DuffelFlightBooking.create({
+      duffelOrderId: 'ord_1',
+      offerId: 'off_1',
+      mode: 'HOLD',
+      passengers: [],
+      slices: [],
+      totalAmount: 100,
+      currency: 'EUR',
+      organizationId: ORG_ID,
+      clinicId: CLINIC_ID,
+      actorId: ctx.actor.userId,
+      logSource: LogSource.SYSTEM,
+    });
+
+  it('ödeme sürerken iptal REDDEDİLİR ve Duffel’a iptal gitmez', async () => {
+    // Regresyon: iptal ile ödeme aynı anda ilerlerse kayıt CANCELLED, Duffel
+    // siparişi PAID kalabiliyordu (para gitti, sistemde iptal görünüyor).
+    const booking = makeHeldBooking();
+    booking.markPaymentInProgress();
+
+    const { handler, duffelApi, repo } = build(booking);
+
+    await expect(
+      handler.execute(
+        new CancelFlightBookingCommand(dto(booking.id.value), ctx)
+      )
+    ).rejects.toBeInstanceOf(FlightPaymentInProgressException);
+
+    expect(duffelApi.cancelOrder).not.toHaveBeenCalled();
+    expect(repo.update).not.toHaveBeenCalled();
+    expect(booking.status).toBe('PAYMENT_IN_PROGRESS');
   });
 });

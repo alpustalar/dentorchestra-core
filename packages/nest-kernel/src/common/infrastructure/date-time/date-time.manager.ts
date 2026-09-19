@@ -239,6 +239,14 @@ export class DateTimeManager {
     return this.tz(date, tz).add(minutes, 'minute').toDate();
   }
 
+  static subtractMinutes(
+    date: Date,
+    minutes: number,
+    tz: TimeZoneType = DEFAULT_TZ
+  ): Date {
+    return this.tz(date, tz).subtract(minutes, 'minute').toDate();
+  }
+
   static toMillis(
     date: Date | string = new Date(),
     tz: TimeZoneType = DEFAULT_TZ

@@ -35,6 +35,19 @@ export interface FlightOrderResult {
   paymentRequiredBy: string | null;
 }
 
+/**
+ * Duffel'daki siparişin o anki gerçek durumu. Ödeme ile yerel onay arasında süreç
+ * çökerse "gerçekten ödendi mi" sorusunun tek doğru cevabı sağlayıcıdadır; yerel
+ * durum makinesi tek başına idempotency sağlamaz.
+ */
+export interface FlightOrderState {
+  orderId: string;
+  bookingReference: string | null;
+  /** `payment_status.awaiting_payment === false` → sipariş ödenmiş. */
+  isPaid: boolean;
+  isCancelled: boolean;
+}
+
 export interface FlightCancellationResult {
   cancellationId: string;
   refundAmount: string | null;
@@ -62,6 +75,12 @@ export interface IDuffelApiService {
   createInstantOrder(
     params: CreateFlightOrderParams
   ): Promise<FlightOrderResult>;
+
+  /**
+   * Siparişin sağlayıcıdaki durumunu okur; sipariş yoksa `null`. Ödeme tekrarını
+   * önlemek için ödeme öncesi/sonrası mutabakatta kullanılır.
+   */
+  getOrderState(orderId: string): Promise<FlightOrderState | null>;
 
   /** Tutulan siparişi Duffel bakiyesinden öder. */
   payOrder(params: {

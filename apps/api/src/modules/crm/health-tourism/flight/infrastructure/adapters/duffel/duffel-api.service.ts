@@ -22,6 +22,7 @@ import {
   CreateFlightOrderParams,
   FlightCancellationResult,
   FlightOrderResult,
+  FlightOrderState,
   FlightSearchParams,
   IDuffelApiService,
 } from '@modules/crm/health-tourism/flight/domain/interfaces/duffel-api.interface';
@@ -170,6 +171,22 @@ export class DuffelApiService implements IDuffelApiService {
     );
 
     return mapOrderToResult(response.data);
+  }
+
+  async getOrderState(orderId: string): Promise<FlightOrderState | null> {
+    try {
+      const { data } = await this.duffel.orders.get(orderId);
+      return {
+        orderId: data.id,
+        bookingReference: data.booking_reference ?? null,
+        // Duffel "ödendi" bilgisini olumsuzlama ile verir: awaiting_payment=false.
+        isPaid: data.payment_status?.awaiting_payment === false,
+        isCancelled: Boolean(data.cancelled_at),
+      };
+    } catch (error) {
+      if (isNotFound(error)) return null;
+      throw new DuffelApiException('getOrderState', extractMessage(error));
+    }
   }
 
   async payOrder(params: {

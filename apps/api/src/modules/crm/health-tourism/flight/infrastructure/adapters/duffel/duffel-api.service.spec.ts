@@ -9,12 +9,13 @@ import {
 const mockOfferRequestsCreate = jest.fn();
 const mockOffersGet = jest.fn();
 const mockOrdersCreate = jest.fn();
+const mockOrdersGet = jest.fn();
 
 jest.mock('@duffel/api', () => ({
   Duffel: jest.fn().mockImplementation(() => ({
     offerRequests: { create: mockOfferRequestsCreate },
     offers: { get: mockOffersGet },
-    orders: { create: mockOrdersCreate },
+    orders: { create: mockOrdersCreate, get: mockOrdersGet },
     payments: { create: jest.fn() },
     orderCancellations: { create: jest.fn(), confirm: jest.fn() },
   })),
@@ -243,5 +244,65 @@ describe('DuffelApiService — sipariş açma', () => {
       bookingReference: 'PNR123',
       paymentRequiredBy: '2026-08-30T10:00:00Z',
     });
+  });
+});
+
+describe('DuffelApiService — sipariş durumu (ödeme mutabakatı)', () => {
+  it('awaiting_payment=false ise sipariş ÖDENMİŞ sayılır', async () => {
+    mockOrdersGet.mockResolvedValue({
+      data: {
+        id: 'ord_1',
+        booking_reference: 'PNR123',
+        payment_status: { awaiting_payment: false },
+        cancelled_at: null,
+      },
+    });
+
+    await expect(buildService().getOrderState('ord_1')).resolves.toEqual({
+      orderId: 'ord_1',
+      bookingReference: 'PNR123',
+      isPaid: true,
+      isCancelled: false,
+    });
+  });
+
+  it('awaiting_payment=true ise ödenmemiş sayılır', async () => {
+    mockOrdersGet.mockResolvedValue({
+      data: {
+        id: 'ord_1',
+        booking_reference: 'PNR123',
+        payment_status: { awaiting_payment: true },
+        cancelled_at: null,
+      },
+    });
+
+    const state = await buildService().getOrderState('ord_1');
+
+    expect(state?.isPaid).toBe(false);
+  });
+
+  it('payment_status hiç yoksa ödenmiş VARSAYILMAZ', async () => {
+    // Belirsizlik "ödendi"ye çevrilirse ödenmemiş bir bilet onaylanır.
+    mockOrdersGet.mockResolvedValue({
+      data: { id: 'ord_1', booking_reference: null, cancelled_at: null },
+    });
+
+    const state = await buildService().getOrderState('ord_1');
+
+    expect(state?.isPaid).toBe(false);
+  });
+
+  it('sipariş yoksa (404) null döner', async () => {
+    mockOrdersGet.mockRejectedValue({ meta: { status: 404 } });
+
+    await expect(buildService().getOrderState('ord_yok')).resolves.toBeNull();
+  });
+
+  it('sağlayıcı hatası DuffelApiException olarak yükselir (sessizce yutulmaz)', async () => {
+    mockOrdersGet.mockRejectedValue({ errors: [{ message: 'boom' }] });
+
+    await expect(
+      buildService().getOrderState('ord_1')
+    ).rejects.toBeInstanceOf(DuffelApiException);
   });
 });

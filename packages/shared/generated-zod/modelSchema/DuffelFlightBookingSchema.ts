@@ -45,6 +45,12 @@ export const DuffelFlightBookingSchema = z.object({
    * Bu an geçtiğinde Duffel koltuğu kendi bırakır.
    */
   holdExpiresAt: z.coerce.date().nullable(),
+  /**
+   * Ödemeyi hangi an sahiplendik (HELD → PAYMENT_IN_PROGRESS). Süreç ödeme ile
+   * onay arasında çökerse kayıt PAYMENT_IN_PROGRESS'te kalır; bu damga "bayat
+   * claim" tespitini (ve Duffel'a sorup mutabakat almayı) mümkün kılar.
+   */
+  paymentClaimedAt: z.coerce.date().nullable(),
   failureReason: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),

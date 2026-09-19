@@ -26,7 +26,17 @@ import {
   FlightBookingConfirmedEvent,
   FlightBookingCreatedEvent,
 } from '@modules/crm/health-tourism/flight/domain/events/flight-booking.events';
-import { FlightBookingInvalidStateException } from '@modules/crm/health-tourism/flight/domain/exceptions/duffel-flight.exceptions';
+import {
+  FlightBookingInvalidStateException,
+  FlightPaymentInProgressException,
+} from '@modules/crm/health-tourism/flight/domain/exceptions/duffel-flight.exceptions';
+
+/**
+ * Ödeme claim'i bu süreden eskiyse "sahibi çökmüş" kabul edilir ve devralınabilir.
+ * Duffel ödeme çağrısı saniyeler sürer; 2 dakika canlı bir denemeyi yanlışlıkla
+ * devralmayacak kadar geniş, takılı kaydı makul sürede kurtaracak kadar dar.
+ */
+export const PAYMENT_CLAIM_STALE_AFTER_MINUTES = 2;
 
 /**
  * Uçuş rezervasyonu (aggregate root).
@@ -36,12 +46,17 @@ import { FlightBookingInvalidStateException } from '@modules/crm/health-tourism/
  * bilgisi yalnız `BookingPayment.status`'ta duruyordu. Uçuşta bilet kesimi kaydın
  * kendisinde izlenir:
  *
- *   HELD ──(ödeme)──▶ CONFIRMED ──▶ CANCELLED
- *     │                   │
- *     └──▶ CANCELLED      └──▶ (iptal)
- *     └──▶ FAILED  (ödeme/sipariş hatası)
+ *   HELD ──(claim)──▶ PAYMENT_IN_PROGRESS ──(ödeme başarılı)──▶ CONFIRMED ──▶ CANCELLED
+ *     │                      │
+ *     │                      └──(ödeme başarısız)──▶ HELD  (claim geri bırakılır)
+ *     └──▶ CANCELLED         └──▶ FAILED
  *
  * INSTANT yolda kayıt doğrudan CONFIRMED doğar (sipariş zaten ödenmiş açılır).
+ *
+ * PAYMENT_IN_PROGRESS ara durumu şart: ödeme çağrısı bilerek satır kilidi DIŞINDA
+ * yapılıyor, dolayısıyla "kilitli okuyup HELD gördüm" tek başına iki eşzamanlı
+ * isteğin ikisinin de Duffel'a ödeme göndermesini engellemiyordu. Sahiplenme
+ * kilidin içinde KALICI olarak yazılır; ikinci istek artık HELD görmez.
  */
 export class DuffelFlightBooking extends AggregateRoot {
   constructor(data: IDuffelFlightBooking) {
@@ -60,6 +75,7 @@ export class DuffelFlightBooking extends AggregateRoot {
     this._slices = data.slices;
     this._totalAmount = Money.create(data.totalAmount, data.currency).orThrow();
     this._holdExpiresAt = data.holdExpiresAt;
+    this._paymentClaimedAt = data.paymentClaimedAt;
     this._failureReason = data.failureReason;
     this._createdAt = data.createdAt;
     this._updatedAt = data.updatedAt;
@@ -135,6 +151,11 @@ export class DuffelFlightBooking extends AggregateRoot {
     return this._holdExpiresAt;
   }
 
+  private _paymentClaimedAt: Date | null;
+  get paymentClaimedAt(): Date | null {
+    return this._paymentClaimedAt;
+  }
+
   private _failureReason: string | null;
   get failureReason(): string | null {
     return this._failureReason;
@@ -154,6 +175,7 @@ export class DuffelFlightBooking extends AggregateRoot {
     return {
       status: {
         isHeld: this.isHeld(),
+        isPaymentInProgress: this.isPaymentInProgress(),
         isConfirmed: this.isConfirmed(),
         isCancelled: this.isCancelled(),
       },
@@ -171,6 +193,23 @@ export class DuffelFlightBooking extends AggregateRoot {
     return DateTimeManager.isBefore(
       this._holdExpiresAt,
       DateTimeManager.create()
+    );
+  }
+
+  /**
+   * Ödeme sahiplenildi ama sonuç yazılamadan süreç öldü mü? Yalnız bu durumda
+   * başka bir istek claim'i devralıp sağlayıcıyla mutabakat yapabilir.
+   */
+  public get isPaymentClaimStale(): boolean {
+    if (this._status !== DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS)
+      return false;
+    if (!this._paymentClaimedAt) return true;
+    return DateTimeManager.isBefore(
+      this._paymentClaimedAt,
+      DateTimeManager.subtractMinutes(
+        DateTimeManager.create(),
+        PAYMENT_CLAIM_STALE_AFTER_MINUTES
+      )
     );
   }
 
@@ -207,6 +246,7 @@ export class DuffelFlightBooking extends AggregateRoot {
       totalAmount: amount.value,
       currency: currency.value,
       holdExpiresAt: props.holdExpiresAt ?? null,
+      paymentClaimedAt: null,
       failureReason: null,
       createdAt: now,
       updatedAt: now,
@@ -236,10 +276,10 @@ export class DuffelFlightBooking extends AggregateRoot {
   }
 
   /**
-   * Tutulan koltuk ödendi, bilet kesildi. Yalnız HELD kayıtta çağrılabilir —
-   * CONFIRMED bir kaydı yeniden ödemek Duffel'da çift çekim demektir.
+   * Ödemeyi sahiplenir: HELD → PAYMENT_IN_PROGRESS. Bu geçiş kilit altında yazılıp
+   * commit edildiği için ödemeye yalnız TEK bir istek girebilir.
    */
-  public confirm(props: ConfirmFlightBookingProps): void {
+  public markPaymentInProgress(): void {
     if (this._status !== DuffelFlightBookingStatusSchema.enum.HELD) {
       throw new FlightBookingInvalidStateException(
         this._id.value,
@@ -248,9 +288,50 @@ export class DuffelFlightBooking extends AggregateRoot {
       );
     }
 
+    this._status = DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS;
+    this._paymentClaimedAt = DateTimeManager.create();
+    this._updatedAt = this._paymentClaimedAt;
+  }
+
+  /**
+   * Ödeme denemesi başarısız oldu ve sağlayıcıda para GEÇMEDİĞİ doğrulandı; koltuk
+   * yeniden ödenebilir duruma döner. Doğrulanmadıysa çağrılmaz — kayıt
+   * PAYMENT_IN_PROGRESS'te bırakılır ki mutabakat yolundan geçsin.
+   */
+  public releasePaymentClaim(): void {
+    if (
+      this._status !== DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS
+    )
+      return;
+
+    this._status = DuffelFlightBookingStatusSchema.enum.HELD;
+    this._paymentClaimedAt = null;
+    this._updatedAt = DateTimeManager.create();
+  }
+
+  /**
+   * Tutulan koltuk ödendi, bilet kesildi. Yalnız HELD veya PAYMENT_IN_PROGRESS
+   * kayıtta çağrılabilir — CONFIRMED bir kaydı yeniden ödemek Duffel'da çift
+   * çekim demektir.
+   */
+  public confirm(props: ConfirmFlightBookingProps): void {
+    const payable: DuffelFlightBookingStatus[] = [
+      DuffelFlightBookingStatusSchema.enum.HELD,
+      DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS,
+    ];
+
+    if (!payable.includes(this._status)) {
+      throw new FlightBookingInvalidStateException(
+        this._id.value,
+        this._status,
+        payable.join('|')
+      );
+    }
+
     this._status = DuffelFlightBookingStatusSchema.enum.CONFIRMED;
     if (props.bookingReference) this._bookingReference = props.bookingReference;
     this._holdExpiresAt = null;
+    this._paymentClaimedAt = null;
     this._updatedAt = DateTimeManager.create();
 
     this.addDomainEvent(
@@ -271,12 +352,29 @@ export class DuffelFlightBooking extends AggregateRoot {
     );
   }
 
-  /** İptal idempotenttir: ikinci çağrı sessizce döner, event tekrarlanmaz. */
+  /**
+   * İptal idempotenttir: ikinci çağrı sessizce döner, event tekrarlanmaz.
+   *
+   * Ödeme sahiplenilmişken iptal REDDEDİLİR: o an Duffel'da para geçmiş olabilir;
+   * kaydı CANCELLED yazmak "DB iptal / Duffel ödenmiş" ayrışmasını üretir. Çıkış
+   * yolu ödemeyi sonuçlandırmaktır (PayHeldFlight mutabakat yaparak kaydı ya
+   * CONFIRMED'a taşır ya HELD'e geri bırakır); sonrasında iptal serbesttir.
+   */
   public cancel(props: CancelFlightBookingProps): void {
     if (this._status === DuffelFlightBookingStatusSchema.enum.CANCELLED) return;
 
+    if (
+      this._status === DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS
+    ) {
+      throw new FlightPaymentInProgressException(
+        this._id.value,
+        this._paymentClaimedAt
+      );
+    }
+
     this._status = DuffelFlightBookingStatusSchema.enum.CANCELLED;
     this._holdExpiresAt = null;
+    this._paymentClaimedAt = null;
     this._updatedAt = DateTimeManager.create();
 
     this.addDomainEvent(
@@ -302,6 +400,7 @@ export class DuffelFlightBooking extends AggregateRoot {
   /** Sipariş/ödeme başarısız — saga iade yoluna girer. */
   public markFailed(reason: string): void {
     this._status = DuffelFlightBookingStatusSchema.enum.FAILED;
+    this._paymentClaimedAt = null;
     this._failureReason = reason;
     this._updatedAt = DateTimeManager.create();
   }
@@ -323,6 +422,7 @@ export class DuffelFlightBooking extends AggregateRoot {
       totalAmount: this._totalAmount.value,
       currency: this._totalAmount.currency,
       holdExpiresAt: this._holdExpiresAt,
+      paymentClaimedAt: this._paymentClaimedAt,
       failureReason: this._failureReason,
       createdAt: this._createdAt,
       updatedAt: DateTimeManager.create(),
@@ -339,6 +439,21 @@ export class DuffelFlightBooking extends AggregateRoot {
           this._id.value,
           this._status,
           DuffelFlightBookingStatusSchema.enum.HELD
+        )
+    );
+  }
+
+  private isPaymentInProgress() {
+    const is =
+      this._status === DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS;
+    return Guard.monitor(
+      is,
+      is,
+      () =>
+        new FlightBookingInvalidStateException(
+          this._id.value,
+          this._status,
+          DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS
         )
     );
   }

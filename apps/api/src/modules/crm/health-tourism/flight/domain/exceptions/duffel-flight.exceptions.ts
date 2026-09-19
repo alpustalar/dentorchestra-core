@@ -113,6 +113,27 @@ export class FlightBookingInvalidStateException extends DomainException<{
   }
 }
 
+/**
+ * Ödeme başka bir istek tarafından sahiplenilmiş (PAYMENT_IN_PROGRESS) ve claim
+ * henüz bayatlamamış. İkinci istek Duffel'a gitmez — sonuç belli olduğunda kayıt
+ * ya CONFIRMED ya da yeniden HELD olur; çağıran o zaman tekrar dener.
+ */
+export class FlightPaymentInProgressException extends DomainException<{
+  bookingId: string;
+  claimedAt: string | null;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.DUFFEL_FLIGHT_BOOKING.PAYMENT_IN_PROGRESS;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(bookingId: string, claimedAt: Date | null) {
+    super(
+      'Bu uçuş rezervasyonunun ödemesi hâlihazırda işleniyor. Sonuç belli olduktan sonra tekrar deneyin.',
+      { bookingId, claimedAt: claimedAt?.toISOString() ?? null }
+    );
+  }
+}
+
 export class FlightPassengersRequiredException extends DomainException {
   public readonly errorCode = ERROR_CODES.DUFFEL_FLIGHT_BOOKING.NO_PASSENGERS;
 
