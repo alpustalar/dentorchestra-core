@@ -3,8 +3,7 @@ import { IBaseCommandRepository } from '@common/domain/repositories/base-command
 
 export const PAYMENT_COMMAND_REPOSITORY = Symbol('IPaymentCommandRepository');
 
-export interface IPaymentCommandRepository
-  extends IBaseCommandRepository<Payment> {
+export interface IPaymentCommandRepository extends IBaseCommandRepository<Payment> {
   /**
    * Taksitin ait olduğu ödemeyi, satırı `FOR UPDATE` kilitleyerek yükler. Taksit
    * durum geçişleri (tahsil/iade/iptal/başarısız) para hareketidir ve POS callback'i

@@ -18,6 +18,16 @@ export class TaxParameterQueryRepository
     super(prisma);
   }
 
+  /**
+   * Verilen tarihte yürürlükteki sürüm. Aralık **yarı açık**: `[validFrom, validTo)`
+   * — yani `validTo: { gt: date }`.
+   *
+   * Kapanan sürümün `validTo`'su yeni sürümün `validFrom`'una eşit olduğu için
+   * (`TaxParameter.close`), `gte` kullanıldığında tam o anda iki satır birden
+   * eşleşiyordu; doğru sonuç yalnız `orderBy validFrom desc` sayesinde geliyordu.
+   * Sıralamaya bağlı doğruluk, iki satırın `validFrom`'u eşit olduğunda (ilk sürüm
+   * yarışı) tamamen belirsizleşir.
+   */
   findEffective(
     clinicId: string,
     key: TaxParameterKey,
@@ -28,7 +38,7 @@ export class TaxParameterQueryRepository
         clinicId,
         key,
         validFrom: { lte: date },
-        OR: [{ validTo: null }, { validTo: { gte: date } }],
+        OR: [{ validTo: null }, { validTo: { gt: date } }],
       },
       orderBy: { validFrom: 'desc' },
     });

@@ -1,11 +1,19 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { REQUIRES_MODULE_KEY } from '@common/decorators/requires-module.decorator';
 import { IRequestWithActor, TenantEntitlements } from '@common/interfaces';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetTenantEntitlementsQuery } from '@modules/platform/subscription/application/queries/get-tenant-entitlements/get-tenant-entitlements.query';
 import { SubscriptionModuleRequiredException } from '@modules/platform/subscription/domain/exceptions/subscription.exceptions';
-import { SubscriptionCacheService } from '@modules/platform/subscription/infrastructure/cache/subscription-cache.service';
+import {
+  ISubscriptionCacheService,
+  SUBSCRIPTION_CACHE_SERVICE,
+} from '@modules/platform/subscription/domain/interfaces/subscription-cache.service.interface';
 import { Priority } from '@src/domain/value-objects/priority.vo';
 
 /**
@@ -18,7 +26,8 @@ export class ModuleEntitlementGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly queryBus: TSQueryBus,
-    private readonly cacheService: SubscriptionCacheService
+    @Inject(SUBSCRIPTION_CACHE_SERVICE)
+    private readonly cacheService: ISubscriptionCacheService
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

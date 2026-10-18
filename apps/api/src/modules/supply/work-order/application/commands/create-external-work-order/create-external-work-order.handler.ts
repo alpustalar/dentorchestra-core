@@ -15,9 +15,10 @@ import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/servi
 import { ITenantScopeResolver } from '@shared';
 
 @CommandHandler(CreateExternalWorkOrderCommand)
-export class CreateExternalWorkOrderHandler
-  implements ICommandHandler<CreateExternalWorkOrderCommand, string>
-{
+export class CreateExternalWorkOrderHandler implements ICommandHandler<
+  CreateExternalWorkOrderCommand,
+  string
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_COMMAND_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderCommandRepository,

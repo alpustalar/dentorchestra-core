@@ -62,3 +62,42 @@ export class JournalEntryAlreadyReversedException extends DomainException {
     super(message);
   }
 }
+
+/**
+ * Fiş ikiden az satır taşıyor. Çift taraflı kayıtta en az bir borç + bir alacak
+ * satırı bulunmak zorundadır; tek satırlı "fiş" tanım gereği dengesizdir.
+ */
+export class JournalEntryInsufficientLinesException extends DomainException<{
+  lineCount: number;
+}> {
+  public readonly errorCode = ERROR_CODES.JOURNAL_ENTRY.INSUFFICIENT_LINES;
+  public override readonly httpStatus = HttpStatus.UNPROCESSABLE_ENTITY;
+
+  constructor(lineCount: number) {
+    super(`Fiş en az iki satır içermelidir (gelen: ${lineCount}).`, {
+      lineCount,
+    });
+  }
+}
+
+/**
+ * Aynı dönemde aynı yevmiye numarası. DB kısıtı (`[clinicId, periodId, entryNo]`)
+ * emniyet kemeridir: numara normalde dönem satırındaki sayaçtan kilit altında
+ * tahsis edilir, çakışma olmamalıdır. Tetiklenirse tahsis yolu baypas edilmiş ya
+ * da sayaç geri gitmiş demektir — `eventId` mükerrerliğiyle (idempotent tekrar)
+ * karıştırılmamalıdır: bu bir veri bütünlüğü arızasıdır, normal bir yarış değil.
+ */
+export class JournalEntryNumberCollisionException extends DomainException<{
+  periodId: string;
+  entryNo: string | null;
+}> {
+  public readonly errorCode = ERROR_CODES.JOURNAL_ENTRY.NUMBER_COLLISION;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(periodId: string, entryNo: string | null) {
+    super(
+      `Yevmiye numarası bu dönemde zaten kullanılmış (dönem=${periodId}, no=${entryNo ?? '-'}).`,
+      { periodId, entryNo }
+    );
+  }
+}

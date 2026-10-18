@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { ConsentTemplateArchivedEvent } from '@modules/clinical/consent-form/domain/events';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { LogType } from '@src/domain/constants/log-action.constant';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class ConsentTemplateArchivedListener {
@@ -10,7 +10,7 @@ export class ConsentTemplateArchivedListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(ConsentTemplateArchivedEvent.NAME, { async: true })
+  @OnDomainEvent(ConsentTemplateArchivedEvent.NAME)
   async handle(event: ConsentTemplateArchivedEvent): Promise<void> {
     const { log, metadata } = event;
     try {

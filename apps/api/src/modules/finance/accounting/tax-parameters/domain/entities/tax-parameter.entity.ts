@@ -1,11 +1,19 @@
 import { TaxParameter as ITaxParameter } from '@shared';
 import { Decimal } from 'decimal.js';
-import { BadRequestException } from '@nestjs/common';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { CreateTaxParameterProps } from '@modules/finance/accounting/tax-parameters/domain/contracts/tax-parameter';
 import { TaxParameterKeyType as TaxParameterKey } from '@input-type-schemas/TaxParameterKeySchema';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import {
+  STATUTORY_VAT_RATES,
+  TAX_RATE_MAX_DECIMAL_PLACES,
+} from '@src/domain/constants/tax';
+import {
+  InvalidTaxRateException,
+  InvalidTaxValidityRangeException,
+  TaxParameterAlreadyClosedException,
+} from '@modules/finance/accounting/tax-parameters/domain/exceptions';
 
 /**
  * Parametrik vergi oranı. (clinicId, key) için tarih-versiyonlu bir oran satırı.
@@ -77,10 +85,11 @@ export class TaxParameter extends AggregateRoot {
   }
 
   public static create(props: CreateTaxParameterProps): TaxParameter {
-    TaxParameter.assertValidRate(props.rate);
+    TaxParameter.assertValidRate(props.key, props.rate);
     if (props.validTo && props.validTo <= props.validFrom) {
-      throw new BadRequestException(
-        'validTo, validFrom tarihinden sonra olmalıdır.'
+      throw new InvalidTaxValidityRangeException(
+        props.validFrom,
+        props.validTo
       );
     }
 
@@ -98,28 +107,80 @@ export class TaxParameter extends AggregateRoot {
     });
   }
 
-  private static assertValidRate(rate: number): void {
+  /** KDV anahtarları yasal orana bağlıdır; stopaj/kurumlar için sabit küme yoktur. */
+  private static isVatKey(key: TaxParameterKey): boolean {
+    return key.startsWith('VAT_');
+  }
+
+  /**
+   * Oranı **yazma kapısında** doğrular.
+   *
+   * KDV anahtarlarında yasal küme (`STATUTORY_VAT_RATES`) zorlanır. Eskiden burada
+   * yalnız 0–100 aralığı kontrol ediliyordu; oysa oranın gerçekte kullanıldığı yer
+   * (`VatRate` VO) aynı listeyi kopya olarak taşıyıp yasal olmayan değeri
+   * reddediyordu. Sonuç: %8 gibi bir oran parametre tablosuna sorunsuz yazılıyor,
+   * hata **fatura kesilirken** ve sebebinden kopuk bir mesajla ortaya çıkıyor,
+   * faturalama duruyordu. Kontrol kapıya alındığında kullanılamaz bir oran hiç
+   * kaydedilemez.
+   *
+   * KDV dışı oranlarda (stopaj, kurumlar vergisi) yasal küme yoktur; sınır DB
+   * kolonundan gelir: 0–100 ve en çok 2 ondalık basamak (`Decimal(5,2)`).
+   */
+  private static assertValidRate(key: TaxParameterKey, rate: number): void {
     if (Number.isNaN(rate) || rate < 0 || rate > 100) {
-      throw new BadRequestException('Vergi oranı 0-100 arasında olmalıdır.');
+      throw new InvalidTaxRateException(key, rate, '0-100');
+    }
+
+    if (TaxParameter.isVatKey(key)) {
+      if (!STATUTORY_VAT_RATES.includes(rate)) {
+        throw new InvalidTaxRateException(
+          key,
+          rate,
+          STATUTORY_VAT_RATES.join(' / ')
+        );
+      }
+      return;
+    }
+
+    if (new Decimal(rate).decimalPlaces() > TAX_RATE_MAX_DECIMAL_PLACES) {
+      throw new InvalidTaxRateException(
+        key,
+        rate,
+        `en çok ${TAX_RATE_MAX_DECIMAL_PLACES} ondalık basamak`
+      );
     }
   }
 
-  /** Yeni bir oran yürürlüğe girince bu (açık) sürümü kapatır. */
+  /**
+   * Yeni bir oran yürürlüğe girince bu (açık) sürümü kapatır.
+   *
+   * Zaten kapalıysa **sesli hata** verir. Eskiden sessizce geri dönüyordu ve bu,
+   * eşzamanlı iki güncellemede çift açık sürüm üreten hatayı tam olarak gizleyen
+   * şeydi: ikinci istek kilidi aldıktan sonra satırı kapalı görüyor, `close()`
+   * hiçbir şey yapmıyor, ama yeni sürüm yine açılıyordu.
+   */
   public close(validTo: Date): void {
-    if (this._validTo) return;
+    if (this._validTo) {
+      throw new TaxParameterAlreadyClosedException(this._id, this._validTo);
+    }
     if (validTo < this._validFrom) {
-      throw new BadRequestException(
-        'Kapanış tarihi başlangıç tarihinden önce olamaz.'
-      );
+      throw new InvalidTaxValidityRangeException(this._validFrom, validTo);
     }
     this._validTo = validTo;
     this._updatedAt = DateTimeManager.create();
   }
 
-  /** Verilen tarihte bu oran yürürlükte mi? */
+  /**
+   * Verilen tarihte bu oran yürürlükte mi? Aralık **yarı açık**: `[validFrom, validTo)`.
+   *
+   * `validTo` dahil sayılırsa, kapanan sürümün `validTo`'su yeni sürümün
+   * `validFrom`'una eşit olduğu için (bkz. `close`) tam o anda **iki** sürüm birden
+   * yürürlükte görünür. Sıralamaya güvenmek bunu yalnız gizler; aralığın dışlayıcı
+   * olması tanımı tekilleştirir.
+   */
   public isEffectiveAt(date: Date): boolean {
     if (date < this._validFrom) return false;
-    return this._validTo === null || date <= this._validTo;
+    return this._validTo === null || date < this._validTo;
   }
 
   public toPersistence(): ITaxParameter {

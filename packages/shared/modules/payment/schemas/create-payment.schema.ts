@@ -18,6 +18,9 @@ export const CreatePaymentSchema = z
     amount: z
       .number({ message: 'Tutar sayısal bir değer olmalıdır' })
       .positive({ message: 'Tutar sıfırdan büyük olmalıdır' })
+      // Kuruştan ince tutar DB'de (`Decimal(10,2)`) sessizce yuvarlanır; tahsil
+      // edilen ile kayda geçen tutar birbirinden ayrışır.
+      .multipleOf(0.01, { message: 'Tutar en fazla 2 ondalık basamak taşıyabilir' })
       .optional(),
     currency: CurrencySchema,
     method: PaymentMethodSchema.default('CREDIT_CARD').optional(),

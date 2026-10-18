@@ -13,10 +13,10 @@ import {
 import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetFinancialEventByIdQuery)
-export class GetFinancialEventByIdHandler
-  implements
-    IQueryHandler<GetFinancialEventByIdQuery, GetFinancialEventByIdResponse>
-{
+export class GetFinancialEventByIdHandler implements IQueryHandler<
+  GetFinancialEventByIdQuery,
+  GetFinancialEventByIdResponse
+> {
   constructor(
     @Inject(FINANCIAL_EVENT_QUERY_REPOSITORY)
     private readonly financialEventRepo: IFinancialEventQueryRepository,

@@ -39,7 +39,8 @@ export class MatchPurchaseInvoiceHandler implements ICommandHandler<
 
     await this.txManager.run(async () => {
       // Kilitli okuma: eşleştirme kararı siparişin kümülatif sayacını besliyor.
-      const invoice = await this.purchaseInvoiceCommandRepo.findByIdForUpdate(invoiceId);
+      const invoice =
+        await this.purchaseInvoiceCommandRepo.findByIdForUpdate(invoiceId);
       if (!invoice) throw new PurchaseInvoiceNotFoundException(invoiceId);
 
       this.policyFactory
@@ -61,7 +62,7 @@ export class MatchPurchaseInvoiceHandler implements ICommandHandler<
           invoiceId: invoice.id.value,
           clinicId: invoice.clinicId.value,
           supplierId: invoice.supplierId.value,
-          grandTotal: invoice.grandTotal.value.toNumber(),
+          grandTotal: invoice.grandTotal.value.toFixed(2),
           currency: invoice.currency,
           ctx,
         })

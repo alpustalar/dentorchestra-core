@@ -8,12 +8,29 @@ import {
   CurrencyMismatchException,
   InsufficientFundsException,
   InvalidAllocationCountException,
+  InvalidFxRateException,
   InvalidMoneyAmountException,
 } from '@src/domain/exceptions/money.exceptions';
 import { isEmpty } from '@common/utils';
 
 export class Money {
+  /** Kuruş ölçeği — para kolonları `Decimal(x,2)`. */
   static readonly PRECISION = 2;
+
+  /**
+   * Para yuvarlama **modu** — projede tek kaynak.
+   *
+   * `decimal.js`'in global varsayılanı da bugün `ROUND_HALF_UP`'tır, ama bu
+   * varsayılan `Decimal.set({ rounding })` ile her yerden değiştirilebilir ve
+   * mod geçilmeden yazılmış her `toDecimalPlaces(2)` çağrısı o anda sessizce
+   * başka davranır. Modu açıkça taşımak, para aritmetiğini **görünmez bir global
+   * ayardan** kurtarır (CLAUDE.md finans kuralı 12: kabul/dönüşüm kuralı tek
+   * sabitte yaşar, kopya yazılmaz).
+   *
+   * Yarıyı yukarı: KDV ve indirim hesaplarında mükellef lehine/aleyhine
+   * sistematik sapma üretmeyen, TDHP uygulamasında yerleşik olan mod.
+   */
+  static readonly ROUNDING = Decimal.ROUND_HALF_UP;
 
   private static readonly schema = z
     .object({
@@ -70,6 +87,35 @@ export class Money {
         };
       },
     };
+  }
+
+  /**
+   * Bir Decimal'i kuruş ölçeğine yuvarlar — **para yuvarlamasının tek kapısı**.
+   *
+   * Ham `toDecimalPlaces(2)` yerine bu kullanılır: ölçek ve mod birlikte, tek
+   * sabitten gelir. Yüzde/oran gibi para olmayan büyüklükler buradan geçmez
+   * (onların ölçeği farklıdır — ör. kur 6 hane, oran 1 hane).
+   */
+  public static scale(value: Decimal): Decimal {
+    return value.toDecimalPlaces(Money.PRECISION, Money.ROUNDING);
+  }
+
+  /**
+   * Tutar kuruş ölçeğinde mi (en çok iki ondalık hane)?
+   *
+   * Para kolonları `Decimal(x,2)`: üçüncü basamak taşıyan bir tutar hata vermez,
+   * **sessizce yuvarlanır**. Yuvarlama tek başına zararsız görünür ama saklanan
+   * değer, uygulamanın doğruladığı değerden farklı olur — yevmiyede bu, Σborç =
+   * Σalacak özdeşliğinin *doğrulandıktan sonra* bozulması demektir (10.005 +
+   * 89.995 = 100.00 doğrulanır, 10.01 + 90.00 ≠ 100.00 saklanır).
+   *
+   * Yüklem (predicate) olarak durur, exception fırlatmaz: her katman kendi
+   * tipli hatasını fırlatır (kasada `CashInvalidPrecisionException`, yevmiyede
+   * `InvalidJournalLineAmountException`) — ölçünün tanımı tek yerde, hatanın
+   * kimliği kendi yerinde kalır.
+   */
+  public static isKurusScaled(value: Decimal): boolean {
+    return value.decimalPlaces() <= Money.PRECISION;
   }
 
   public get value(): Decimal {
@@ -151,10 +197,7 @@ export class Money {
    * "liste − indirim = matrah" eşitliğini toplamda bir kuruş kaydırır.
    */
   public round(): Money {
-    return new Money(
-      this._value.toDecimalPlaces(2, Decimal.ROUND_HALF_UP),
-      this._currency
-    );
+    return new Money(Money.scale(this._value), this._currency);
   }
 
   public applyPercentage(percentage: number | string | Decimal): Money {
@@ -168,7 +211,7 @@ export class Money {
       throw new InvalidAllocationCountException(count);
     }
     const total = this._value;
-    const each = total.div(count).toDecimalPlaces(2, Decimal.ROUND_HALF_UP);
+    const each = Money.scale(total.div(count));
     const remainder = total.sub(each.mul(count));
 
     const results = Array.from(
@@ -213,6 +256,29 @@ export class Money {
   public multiply(quantity: number | Decimal): Money {
     const q = new Decimal(quantity);
     return new Money(this._value.mul(q), this._currency);
+  }
+
+  /**
+   * Tutarı **başka bir para birimine** çevirir: kur ile çarpar, kuruşa yuvarlar
+   * ve sonucun para birimini hedef cinse çevirir.
+   *
+   * Neden ayrı bir kapı: `multiply` para birimini bilerek **korur** (birim fiyat
+   * × adet aynı cinstendir). Kurla `multiply` edip etiketi değiştirmemek, TRY
+   * tutarı taşıyan ama kendini EUR sanan bir `Money` üretir — o noktadan sonra
+   * `add`/`subtract`/`isGreaterThan` guard'ı koruma değil **tuzak** olur: iki
+   * "EUR" sorunsuz toplanır, biri aslında TRY'dir ve hiçbir kontrol uyarmaz.
+   * Çevrim bu yüzden adını söyleyen tek bir yerden geçer.
+   *
+   * Yuvarlama burada yapılır çünkü çevrilmiş tutar daima bir **satır tutarıdır**
+   * (defter satırı / DB `Decimal(x,2)`); ham çarpımı taşımak toplamı bir kuruş
+   * kaydırır (bkz. {@link round}).
+   */
+  public convert(rate: number | Decimal, to: CurrencyType): Money {
+    const r = new Decimal(rate);
+    if (!r.isFinite() || r.lessThanOrEqualTo(0)) {
+      throw new InvalidFxRateException(r.toString());
+    }
+    return new Money(Money.scale(this._value.mul(r)), to);
   }
 
   public calculateVat(vatRate: number | string | Decimal): Money {

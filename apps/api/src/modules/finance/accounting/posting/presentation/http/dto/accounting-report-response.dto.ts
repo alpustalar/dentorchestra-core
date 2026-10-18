@@ -238,13 +238,10 @@ export class IncomeStatementReportResponseDto {
 export class BalanceSheetReportResponseDto {
   @Expose(FIN) clinicId: string;
 
+  /** Bilanço bir **an** raporu: tek tarih taşır (aralık değil). */
   @Expose(FIN)
   @Type(() => Date)
-  dateFrom: Date | null;
-
-  @Expose(FIN)
-  @Type(() => Date)
-  dateTo: Date | null;
+  asOf: Date | null;
 
   @Expose(FIN)
   @Type(() => FinancialStatementSectionResponseDto)

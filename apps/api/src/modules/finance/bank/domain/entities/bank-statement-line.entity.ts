@@ -18,9 +18,11 @@ import {
 } from '@modules/finance/bank/domain/contracts';
 import { MatchableStatementLine } from '@modules/finance/bank/domain/rules/statement-line-matcher';
 import {
+  BankStatementInvalidPrecisionException,
   BankStatementLineMatchNoteTooLongException,
   BankStatementLineMatchRefRequiredException,
 } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
+import { Money } from '@src/domain/value-objects/money.vo';
 
 /**
  * Ekstre Hareketi (aggregate root). Bankadan gelen tekil hareket satırı; içerideki
@@ -144,6 +146,10 @@ export class BankStatementLine extends AggregateRoot {
   public static createForImport(
     props: StatementLineImportProps
   ): BankStatementLine {
+    // Kuruştan ince tutar `Decimal(16,2)` kolonunda yuvarlanır; ekstrenin kendi
+    // bakiye kontrolü (açılış + Σ = kapanış) o zaman yanlış yere düşer.
+    const amount = BankStatementLine.toKurus(props.amount);
+
     return new BankStatementLine({
       id: UUID.createOrGenerate(props.id).value,
       bankStatementId: UUID.create(props.bankStatementId).orThrow().value,
@@ -152,10 +158,10 @@ export class BankStatementLine extends AggregateRoot {
       organizationId: UUID.create(props.organizationId).orThrow().value,
       transactionDate: props.transactionDate,
       description: props.description,
-      amount: new Decimal(props.amount),
+      amount,
       balanceAfter:
         props.balanceAfter !== undefined && props.balanceAfter !== null
-          ? new Decimal(props.balanceAfter)
+          ? BankStatementLine.toKurus(props.balanceAfter)
           : null,
       reference: props.reference ?? null,
       counterpartyName: props.counterpartyName ?? null,
@@ -167,6 +173,14 @@ export class BankStatementLine extends AggregateRoot {
       reconciledAt: null,
       createdAt: DateTimeManager.create(),
     });
+  }
+
+  private static toKurus(amount: number): Decimal {
+    const decimal = new Decimal(amount);
+    if (decimal.decimalPlaces() > Money.PRECISION) {
+      throw new BankStatementInvalidPrecisionException(decimal.toString());
+    }
+    return decimal;
   }
 
   /** Mutabakat: eşleştir / yoksay / geri al. UNMATCHED'e dönüşte iz temizlenir. */

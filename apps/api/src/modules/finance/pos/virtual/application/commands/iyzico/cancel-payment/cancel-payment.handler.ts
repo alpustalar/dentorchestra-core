@@ -36,10 +36,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @CommandHandler(CancelPaymentCommand)
-export class CancelPaymentHandler
-  implements
-    ICommandHandler<CancelPaymentCommand, CancelPaymentCommandResponse>
-{
+export class CancelPaymentHandler implements ICommandHandler<
+  CancelPaymentCommand,
+  CancelPaymentCommandResponse
+> {
   private readonly internalCtx = ExecutionContextFactory.createInternal();
   constructor(
     private readonly txManager: TransactionManager,

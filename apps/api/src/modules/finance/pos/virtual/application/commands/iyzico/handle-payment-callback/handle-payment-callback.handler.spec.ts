@@ -1,11 +1,19 @@
+/*
+ * SDK/komut taklitleri `any` taşır ve jest mock metodları `this` bağlamından
+ * ayrı okunur; kurallar yalnız bu dosyada kapatılır (üretim kodunda açık kalır).
+ */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-return, @typescript-eslint/require-await, @typescript-eslint/unbound-method */
 /**
  * @deprecated logic e2e kontrol edildi
  * */
 
+import { Decimal } from 'decimal.js';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { HandlePaymentCallbackHandler } from './handle-payment-callback.handler';
 import { IyzicoTransactionNotFoundException } from '@modules/finance/pos/virtual/domain/exceptions/iyzico.exceptions';
+import { IyzicoCallbackRejectedException } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/rules/iyzico-callback-rejected.exception';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { HandlePaymentCallbackCommand } from './handle-payment-callback.command';
 import {
   IIyzicoProvider,
@@ -31,13 +39,14 @@ import { DateTimeManager } from '@common/infrastructure/date-time/date-time.mana
 
 const makeTransaction = (
   status: IyzicoTransactionStatusType = IyzicoTransactionStatusSchema.enum
-    .INITIALIZE
+    .INITIALIZE,
+  overrides: { token?: string } = {}
 ): IyzicoTransactionWithInstallment =>
   ({
     id: 'tx-1',
     installmentId: 'inst-1',
     conversationId: 'conv-1',
-    token: 'token-abc',
+    token: overrides.token ?? 'token-abc',
     iyzicoPaymentId: null,
     iyzicoPaymentTransactionId: null,
     rawResponse: null,
@@ -48,7 +57,10 @@ const makeTransaction = (
     updatedAt: DateTimeManager.create(),
     installment: {
       id: 'inst-1',
-      amount: { toString: () => '1000.00' },
+      // Elle kurulmuş `{ toString }` taklidi yerine gerçek Decimal: taksit
+      // tutarı DB'de `Decimal(10,2)` ve köprü onu `toFixed(2)` ile kuruş
+      // ölçeğine damgalıyor — taklit sözleşmeyi değil kendini doğruluyordu.
+      amount: new Decimal('1000.00'),
       method: 'CREDIT_CARD',
       payment: {
         id: 'pay-1',
@@ -78,6 +90,7 @@ describe('HandlePaymentCallbackHandler', () => {
       cancelPayment: jest.fn(),
       createSubMerchant: jest.fn(),
       updateSubMerchant: jest.fn(),
+      retrieveSubMerchant: jest.fn(),
       callbackUrl: 'http://localhost/callback',
     };
 
@@ -117,6 +130,10 @@ describe('HandlePaymentCallbackHandler', () => {
         { provide: TransactionManager, useValue: mockTxManager },
         { provide: TSCommandBus, useValue: mockCommandBus },
         { provide: TSQueryBus, useValue: {} },
+        {
+          provide: CriticalFailurePublisher,
+          useValue: { publish: jest.fn() },
+        },
       ],
     }).compile();
 
@@ -138,6 +155,7 @@ describe('HandlePaymentCallbackHandler', () => {
     it('throws IyzicoTransactionNotFoundException', async () => {
       iyzicoProvider.retrieveCheckoutForm.mockResolvedValue({
         isSuccess: true,
+        conversationId: 'conv-1',
       } as any);
       iyzicoCommandRepo.findByConversationIdForUpdate.mockResolvedValue(null);
 
@@ -151,6 +169,7 @@ describe('HandlePaymentCallbackHandler', () => {
     it('returns early without re-processing a SUCCESS transaction', async () => {
       iyzicoProvider.retrieveCheckoutForm.mockResolvedValue({
         isSuccess: true,
+        conversationId: 'conv-1',
       } as any);
       iyzicoCommandRepo.findByConversationIdForUpdate.mockResolvedValue(
         makeTransaction(IyzicoTransactionStatusSchema.enum.SUCCESS)
@@ -170,6 +189,10 @@ describe('HandlePaymentCallbackHandler', () => {
       paymentTransactionId: 'iyzico-tx-item-1',
       errorCode: undefined,
       errorMessage: undefined,
+      // Bağ kanıtı: sağlayıcı korelasyon anahtarını yankılar.
+      conversationId: 'conv-1',
+      price: '100.00',
+      currency: 'TRY',
       rawResponse: { raw: true },
     };
 
@@ -199,10 +222,28 @@ describe('HandlePaymentCallbackHandler', () => {
       const paidCmd = commandBus.execute.mock.calls
         .map((c) => c[0])
         .find((cmd) => cmd instanceof MarkInstallmentAsPaidCommand);
-      expect(paidCmd).toMatchObject({
+      // Komut artık payload objesi taşır; aktör iç bağlamdan (SYSTEM) gelir —
+      // tahsilatı bildiren sanal POS callback'idir, insan değil.
+      expect(paidCmd?.payload).toMatchObject({
         installmentId: 'inst-1',
         details: 'Ödeme Başarılı',
       });
+      expect(paidCmd?.payload.ctx.actor.userId).toBe('SYSTEM');
+    });
+
+    it('BAŞKA ödemeye ait token ile işlem başarılı yapılamaz', async () => {
+      // Regresyon: sonuç `retrieveCheckoutForm(token)` ile iyzico'dan okunuyor
+      // ama güncellenecek kayıt `conversationId`'den geliyordu. Uç @Public
+      // olduğu için geçerli bir token + başka bir conversationId, bekleyen bir
+      // işlemi "başarılı" yapmaya yetiyordu.
+      iyzicoCommandRepo.findByConversationIdForUpdate.mockResolvedValue(
+        makeTransaction(undefined, { token: 'token-of-another-payment' })
+      );
+
+      await expect(handler.execute(makeCommand())).rejects.toThrow(
+        IyzicoCallbackRejectedException
+      );
+      expect(commandBus.execute).not.toHaveBeenCalled();
     });
   });
 
@@ -213,6 +254,9 @@ describe('HandlePaymentCallbackHandler', () => {
       paymentTransactionId: undefined,
       errorCode: '5007',
       errorMessage: 'Yetersiz bakiye',
+      conversationId: 'conv-1',
+      price: '100.00',
+      currency: 'TRY',
       rawResponse: { raw: true },
     };
 
@@ -239,7 +283,7 @@ describe('HandlePaymentCallbackHandler', () => {
       const failedCmd = commandBus.execute.mock.calls
         .map((c) => c[0])
         .find((cmd) => cmd instanceof MarkInstallmentAsFailedCommand);
-      expect(failedCmd).toMatchObject({
+      expect(failedCmd?.payload).toMatchObject({
         installmentId: 'inst-1',
         details: 'Yetersiz bakiye',
       });

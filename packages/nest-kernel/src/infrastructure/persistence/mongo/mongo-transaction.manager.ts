@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model } from 'mongoose';
 import { DomainEvent } from '@common/interfaces';
+import { emitDetached } from '@common/utils/emit-detached';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import {
   TransactionContext,
@@ -97,7 +98,7 @@ export class MongoTransactionManager implements OnApplicationBootstrap {
     }
 
     const { result, events } = await this.withTransaction(work);
-    await this.emitAfterCommit(events);
+    this.emitAfterCommit(events);
     return result;
   }
 
@@ -212,18 +213,17 @@ export class MongoTransactionManager implements OnApplicationBootstrap {
   }
 
   /**
-   * Toplanan event'leri yayınlar. Bir listener'ın hatası ne diğer listener'ları ne de
-   * kalıcılaşmış yazmayı etkiler; yalnız loglanır. Sıra korunur.
+   * Toplanan event'leri yayınlar — **beklemeden** (`emitDetached`). Bir listener'ın
+   * hatası ne diğer listener'ları ne de kalıcılaşmış yazmayı etkiler; loglanır.
+   * Sıra korunur.
+   *
+   * Postgres tarafındaki `TransactionManager` ile aynı sözleşme: kritik olmayan
+   * kanal beklemez (istek yanıtını bir dış çağrının arkasına koymaz), kritik kanal
+   * outbox'tan gider ve orada bekleyen taraf hatayı görür.
    */
-  private async emitAfterCommit(events: DomainEvent[]): Promise<void> {
+  private emitAfterCommit(events: DomainEvent[]): void {
     for (const event of events) {
-      try {
-        await this.eventEmitter.emitAsync(event.name, event.payload);
-      } catch (error) {
-        this.logger.error(
-          `Event listener'ı hata verdi (event=${event.name}): ${error}`
-        );
-      }
+      emitDetached(this.eventEmitter, event.name, event.payload);
     }
   }
 }

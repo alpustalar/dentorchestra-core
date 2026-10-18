@@ -15,6 +15,8 @@ import { BankStatementLineCommandRepository } from './bank-statement-line/bank-s
 import { BankStatementLineQueryRepository } from './bank-statement-line/bank-statement-line.query.repository';
 import { BANK_ACCOUNT_COMMAND_REPOSITORY } from '@modules/finance/bank/domain/repositories/bank-account/bank-account.command.repository';
 import { BANK_ACCOUNT_QUERY_REPOSITORY } from '@modules/finance/bank/domain/repositories/bank-account/bank-account.query.repository';
+import { PROVIDER_SETTLEMENT_COMMAND_REPOSITORY } from '@modules/finance/bank/domain/repositories/provider-settlement/provider-settlement.command.repository';
+import { ProviderSettlementCommandRepository } from './provider-settlement/provider-settlement.command.repository';
 
 @Module({
   providers: [
@@ -42,6 +44,10 @@ import { BANK_ACCOUNT_QUERY_REPOSITORY } from '@modules/finance/bank/domain/repo
       provide: BANK_STATEMENT_LINE_QUERY_REPOSITORY,
       useClass: BankStatementLineQueryRepository,
     },
+    {
+      provide: PROVIDER_SETTLEMENT_COMMAND_REPOSITORY,
+      useClass: ProviderSettlementCommandRepository,
+    },
   ],
   exports: [
     BANK_ACCOUNT_COMMAND_REPOSITORY,
@@ -50,6 +56,7 @@ import { BANK_ACCOUNT_QUERY_REPOSITORY } from '@modules/finance/bank/domain/repo
     BANK_STATEMENT_QUERY_REPOSITORY,
     BANK_STATEMENT_LINE_COMMAND_REPOSITORY,
     BANK_STATEMENT_LINE_QUERY_REPOSITORY,
+    PROVIDER_SETTLEMENT_COMMAND_REPOSITORY,
   ],
 })
 export class BankRepositoriesModule {}

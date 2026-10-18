@@ -40,9 +40,10 @@ import { UUID } from '@src/domain/value-objects/uuid.vo';
  * aktör aşabilir ve aştığında satıra onaylayan izi düşer.
  */
 @CommandHandler(AddTreatmentChargeCommand)
-export class AddTreatmentChargeHandler
-  implements ICommandHandler<AddTreatmentChargeCommand, string>
-{
+export class AddTreatmentChargeHandler implements ICommandHandler<
+  AddTreatmentChargeCommand,
+  string
+> {
   constructor(
     @Inject(TREATMENT_CHARGE_COMMAND_REPOSITORY)
     private readonly chargeRepo: ITreatmentChargeCommandRepository,
@@ -92,7 +93,9 @@ export class AddTreatmentChargeHandler
       clinicId: appointment.clinicId,
     });
 
-    const charge = TreatmentCharge.create({
+    // `add` = `create` + denetim olayı (olay entity içinde doğar, repository
+    // `flushEvents` ile yayınlar — handler ayrıca publish etmez).
+    const charge = TreatmentCharge.add({
       id: UUID.generate().value,
       organizationId,
       clinicId: appointment.clinicId,
@@ -106,7 +109,9 @@ export class AddTreatmentChargeHandler
       listPrice,
       discountRate: new Decimal(data.discountRate),
       discountReason: data.discountReason ?? null,
-      vatRate: VatRate.create(data.vatRate ?? settings.defaultVatRate).orThrow(),
+      vatRate: VatRate.create(
+        data.vatRate ?? settings.defaultVatRate
+      ).orThrow(),
 
       maxDiscountPercent: settings.maxDiscountPercent,
       // Tavanı yalnız kliniği yöneten aktör aşabilir.
@@ -115,9 +120,12 @@ export class AddTreatmentChargeHandler
       ),
 
       createdById: ctx.actor.userId,
+      logSource: ctx.actor.source,
     });
 
-    const saved = await this.txManager.run(() => this.chargeRepo.create(charge));
+    const saved = await this.txManager.run(() =>
+      this.chargeRepo.create(charge)
+    );
 
     return saved.id.value;
   }

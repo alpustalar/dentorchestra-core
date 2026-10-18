@@ -1,9 +1,9 @@
 import { USER_EVENTS } from '@src/domain/constants/events';
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { EnqueueForceDeleteEvent } from '@modules/identity/user/domain/events/enqueue-force-delete.event';
 import { UserProducer } from '@modules/identity/user/infrastructure/messaging/queue/producer/user.producer';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class EnqueueForceDeleteListener {
@@ -14,7 +14,7 @@ export class EnqueueForceDeleteListener {
     private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
-  @OnEvent(USER_EVENTS.ENQUEUE_FORCE_DELETE, { async: true })
+  @OnDomainEvent(USER_EVENTS.ENQUEUE_FORCE_DELETE)
   async handle(event: EnqueueForceDeleteEvent) {
     const { log, firebaseUid } = event;
 

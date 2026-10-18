@@ -170,7 +170,13 @@ describe('PayHeldFlightHandler', () => {
     });
     expect(booking.status).toBe('CONFIRMED');
     expect(repo.update).toHaveBeenCalled();
-    expect(result).toBe(booking.id.value);
+    // Dönüş yalnız id değil: saga defterin tedarikçi borcu satırını bu tutardan
+    // yazar. Tutar Duffel'a FİİLEN gönderilen tutarla aynıdır.
+    expect(result).toEqual({
+      bookingId: booking.id.value,
+      supplierAmount: '349.90',
+      supplierCurrency: 'EUR',
+    });
   });
 
   it('zaten CONFIRMED kayda ikinci webhook düşerse Duffel’a tekrar ödeme GİTMEZ', async () => {
@@ -185,7 +191,13 @@ describe('PayHeldFlightHandler', () => {
 
     expect(duffelApi.payOrder).not.toHaveBeenCalled();
     expect(repo.update).not.toHaveBeenCalled();
-    expect(result).toBe(booking.id.value);
+    // Mükerrer bildirimde de tutar döner: "zaten onaylı" dalında tutarı atlamak,
+    // saga'nın defterini teklif tutarına geri düşürürdü.
+    expect(result).toEqual({
+      bookingId: booking.id.value,
+      supplierAmount: '349.90',
+      supplierCurrency: 'EUR',
+    });
   });
 
   it('hold süresi dolmuşsa ödeme denenmez (koltuk Duffel’da serbest bırakıldı)', async () => {
@@ -247,7 +259,9 @@ describe('PayHeldFlightHandler — eşzamanlılık', () => {
     );
 
     gate.resolve();
-    await expect(first).resolves.toBe(booking.id.value);
+    await expect(first).resolves.toMatchObject({
+      bookingId: booking.id.value,
+    });
 
     expect(duffelApi.payOrder).toHaveBeenCalledTimes(1);
     expect(booking.status).toBe('CONFIRMED');

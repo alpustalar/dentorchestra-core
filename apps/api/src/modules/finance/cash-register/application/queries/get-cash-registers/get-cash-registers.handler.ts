@@ -13,9 +13,10 @@ import {
 } from '@modules/finance/cash-register/domain/repositories/cash-register/cash-register.query.repository';
 
 @QueryHandler(GetCashRegistersQuery)
-export class GetCashRegistersHandler
-  implements IQueryHandler<GetCashRegistersQuery, GetCashRegistersResponse>
-{
+export class GetCashRegistersHandler implements IQueryHandler<
+  GetCashRegistersQuery,
+  GetCashRegistersResponse
+> {
   constructor(
     @Inject(CASH_REGISTER_QUERY_REPOSITORY)
     private readonly cashRegisterRepo: ICashRegisterQueryRepository,
@@ -48,7 +49,9 @@ export class GetCashRegistersHandler
       data: result.items,
       meta: {
         pagination: buildPaginationMeta(pagination, result.total),
-        serializationOptions: policy.getSerializationOptions({ clinicId: clinicId }),
+        serializationOptions: policy.getSerializationOptions({
+          clinicId: clinicId,
+        }),
       },
     };
   }

@@ -152,6 +152,10 @@ model TreatmentCharge {
   // Satır iptali: fatura kesildikten sonra silinemez, iptal edilir (iz kalır).
   voidedAt    DateTime? @map("voided_at")
   voidReason  String?   @map("void_reason")
+  // İptali yapan personel (Firebase UID — UUID değil). `voidedAt` tek başına
+  // "kim" sorusunu yanıtlamıyordu; satır faturanın ticari dayanağı olduğu için
+  // kalıcı damga zorunlu (CLAUDE.md finans kuralı 7).
+  voidedById  String?   @map("voided_by_id")
 
   appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
   treatment   Treatment   @relation(fields: [treatmentId], references: [id])

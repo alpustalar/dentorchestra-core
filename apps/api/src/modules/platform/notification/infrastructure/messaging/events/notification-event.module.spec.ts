@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { opsAlertPortFactory } from './notification-event.module';
 import { SlackOpsAlertAdapter } from '@modules/platform/notification/infrastructure/delivery/slack-ops-alert.adapter';
@@ -41,5 +42,42 @@ describe('opsAlertPortFactory', () => {
     const port = opsAlertPortFactory(config({}), slack, log);
 
     expect(port).toBe(log);
+  });
+
+  /**
+   * Log'a düşmek **sessiz** olmaz. Ölçüldü: `SLACK_OPS_WEBHOOK_URL` hiçbir ortam
+   * dosyasında tanımlı değildi ve `.env.example`'da bile yazılı değildi — yani
+   * 40'tan fazla "CRITICAL uyarı çıkar" güvencesi yalnız bir log satırına
+   * dayanıyordu ve kimse eksiğin farkına varamıyordu.
+   */
+  describe('eksik kanal duyurulur', () => {
+    let warnSpy: jest.SpyInstance;
+    let errorSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      jest.spyOn(Logger.prototype, 'log').mockImplementation();
+      warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+      errorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+    });
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('geliştirmede uyarı (warn) seviyesinde', () => {
+      opsAlertPortFactory(config({ [ENV.MODE]: 'DEVELOPMENT' }), slack, log);
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('YAPILANDIRILMADI')
+      );
+      expect(errorSpy).not.toHaveBeenCalled();
+    });
+
+    it('üretimde hata (error) seviyesinde', () => {
+      opsAlertPortFactory(config({ [ENV.MODE]: 'PRODUCTION' }), slack, log);
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('YAPILANDIRILMADI')
+      );
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
   });
 });

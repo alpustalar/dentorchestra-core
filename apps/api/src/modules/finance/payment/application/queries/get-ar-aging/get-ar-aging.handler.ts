@@ -6,10 +6,14 @@ import {
   ArAgingBucket,
   ArAgingBucketLabel,
   ArAgingPatientRisk,
+  ArAgingSummary,
   GetArAgingResponse,
 } from './get-ar-aging.response';
 import { Decimal } from 'decimal.js';
-import { OpenInstallmentRow } from '@modules/finance/payment/domain/contracts/payment';
+import {
+  CollectedTotalRow,
+  OpenInstallmentRow,
+} from '@modules/finance/payment/domain/contracts/payment';
 import {
   IPaymentQueryRepository,
   PAYMENT_QUERY_REPOSITORY,
@@ -18,6 +22,7 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
+import type { CurrencyType } from '@input-type-schemas/CurrencySchema';
 
 const BUCKET_ORDER: ArAgingBucketLabel[] = [
   'NOT_DUE',
@@ -33,10 +38,24 @@ interface PatientAccumulator {
   oldestDueDate: Date | null;
 }
 
+interface CurrencyAccumulator {
+  outstanding: Decimal;
+  overdue: Decimal;
+}
+
+/**
+ * Alacak yaşlandırma raporu.
+ *
+ * Tüm toplamlar **para birimi başına** üretilir; birimler arası toplam
+ * alınmaz. Taksit satırları kur bilgisi taşımadığı için TRY'ye çevirmek
+ * (Model A) burada mümkün değil — farklı birimleri toplamak ise yönetime
+ * yanlış bir alacak büyüklüğü gösterir.
+ */
 @QueryHandler(GetArAgingQuery)
-export class GetArAgingHandler
-  implements IQueryHandler<GetArAgingQuery, GetArAgingResponse>
-{
+export class GetArAgingHandler implements IQueryHandler<
+  GetArAgingQuery,
+  GetArAgingResponse
+> {
   constructor(
     @Inject(PAYMENT_QUERY_REPOSITORY)
     private readonly paymentRepo: IPaymentQueryRepository,
@@ -63,42 +82,16 @@ export class GetArAgingHandler
       query.asOf ?? DateTimeManager.create()
     );
 
-    const { openInstallments, collectedTotal } = await this.paymentRepo.arAging(
-      { clinicId }
-    );
-
-    const buckets = this.buildBuckets(openInstallments, asOf);
-    const patients = this.buildPatientRisk(openInstallments, asOf);
-
-    const zero = new Decimal(0);
-    const totalOutstanding = openInstallments.reduce(
-      (sum, row) => sum.plus(new Decimal(row.amount.toString())),
-      zero
-    );
-    const totalOverdue = openInstallments.reduce(
-      (sum, row) =>
-        this.isOverdue(row, asOf)
-          ? sum.plus(new Decimal(row.amount.toString()))
-          : sum,
-      zero
-    );
-    const denominator = collectedTotal.plus(totalOutstanding);
-    const collectionRate = denominator.isZero()
-      ? zero
-      : collectedTotal.div(denominator);
+    const { openInstallments, collectedTotals } =
+      await this.paymentRepo.arAging({ clinicId });
 
     return {
       data: {
         clinicId,
         asOf,
-        buckets,
-        patients,
-        summary: {
-          totalOutstanding: totalOutstanding.toFixed(2),
-          totalOverdue: totalOverdue.toFixed(2),
-          totalCollected: collectedTotal.toFixed(2),
-          collectionRate: collectionRate.toFixed(4),
-        },
+        buckets: this.buildBuckets(openInstallments, asOf),
+        patients: this.buildPatientRisk(openInstallments, asOf),
+        summaries: this.buildSummaries(openInstallments, collectedTotals, asOf),
       },
       meta: {
         serializationOptions: policy.getSerializationOptions({ clinicId }),
@@ -110,42 +103,47 @@ export class GetArAgingHandler
     rows: OpenInstallmentRow[],
     asOf: Date
   ): ArAgingBucket[] {
-    const zero = new Decimal(0);
-    const acc = new Map<ArAgingBucketLabel, { count: number; amount: Decimal }>(
-      BUCKET_ORDER.map((label) => [label, { count: 0, amount: zero }])
-    );
+    const acc = new Map<string, { count: number; amount: Decimal }>();
 
     for (const row of rows) {
-      const label = this.classify(row, asOf);
-      const bucket = acc.get(label)!;
+      const key = `${this.classify(row, asOf)}|${row.currency}`;
+      const bucket = acc.get(key) ?? { count: 0, amount: new Decimal(0) };
       bucket.count += 1;
-      bucket.amount = bucket.amount.plus(new Decimal(row.amount.toString()));
+      bucket.amount = bucket.amount.plus(this.toDecimal(row.amount));
+      acc.set(key, bucket);
     }
 
-    return BUCKET_ORDER.map((label) => {
-      const bucket = acc.get(label)!;
-      return { label, count: bucket.count, amount: bucket.amount.toFixed(2) };
-    });
+    // Kovalar her para birimi için sabit sırada (boş kova da görünür) üretilir.
+    return [...this.currenciesOf(rows)].flatMap((currency) =>
+      BUCKET_ORDER.map((label) => {
+        const bucket = acc.get(`${label}|${currency}`);
+        return {
+          label,
+          currency,
+          count: bucket?.count ?? 0,
+          amount: (bucket?.amount ?? new Decimal(0)).toFixed(2),
+        };
+      })
+    );
   }
 
   private buildPatientRisk(
     rows: OpenInstallmentRow[],
     asOf: Date
   ): ArAgingPatientRisk[] {
-    const zero = new Decimal(0);
     const acc = new Map<string, PatientAccumulator>();
 
     for (const row of rows) {
-      const entry = acc.get(row.patientId) ?? {
-        outstanding: zero,
-        overdue: zero,
+      const key = `${row.patientId}|${row.currency}`;
+      const entry = acc.get(key) ?? {
+        outstanding: new Decimal(0),
+        overdue: new Decimal(0),
         oldestDueDate: null,
       };
-      entry.outstanding = entry.outstanding.plus(
-        new Decimal(row.amount.toString())
-      );
+      const amount = this.toDecimal(row.amount);
+      entry.outstanding = entry.outstanding.plus(amount);
       if (this.isOverdue(row, asOf)) {
-        entry.overdue = entry.overdue.plus(new Decimal(row.amount.toString()));
+        entry.overdue = entry.overdue.plus(amount);
       }
       if (
         row.dueDate &&
@@ -153,7 +151,7 @@ export class GetArAgingHandler
       ) {
         entry.oldestDueDate = row.dueDate;
       }
-      acc.set(row.patientId, entry);
+      acc.set(key, entry);
     }
 
     // Sıralama string'e dönmeden önce ham Decimal'lar üzerinde yapılır.
@@ -161,12 +159,72 @@ export class GetArAgingHandler
       .sort(([, aEntry], [, bEntry]) =>
         bEntry.overdue.comparedTo(aEntry.overdue)
       )
-      .map(([patientId, entry]) => ({
-        patientId,
-        outstanding: entry.outstanding.toFixed(2),
-        overdue: entry.overdue.toFixed(2),
-        oldestDueDate: entry.oldestDueDate,
-      }));
+      .map(([key, entry]) => {
+        const [patientId, currency] = key.split('|');
+        return {
+          patientId,
+          currency: currency as CurrencyType,
+          outstanding: entry.outstanding.toFixed(2),
+          overdue: entry.overdue.toFixed(2),
+          oldestDueDate: entry.oldestDueDate,
+        };
+      });
+  }
+
+  private buildSummaries(
+    rows: OpenInstallmentRow[],
+    collectedTotals: CollectedTotalRow[],
+    asOf: Date
+  ): ArAgingSummary[] {
+    const open = new Map<CurrencyType, CurrencyAccumulator>();
+
+    for (const row of rows) {
+      const entry = open.get(row.currency) ?? {
+        outstanding: new Decimal(0),
+        overdue: new Decimal(0),
+      };
+      const amount = this.toDecimal(row.amount);
+      entry.outstanding = entry.outstanding.plus(amount);
+      if (this.isOverdue(row, asOf)) {
+        entry.overdue = entry.overdue.plus(amount);
+      }
+      open.set(row.currency, entry);
+    }
+
+    const collected = new Map<CurrencyType, Decimal>(
+      collectedTotals.map((row) => [row.currency, this.toDecimal(row.amount)])
+    );
+
+    const currencies = new Set<CurrencyType>([
+      ...open.keys(),
+      ...collected.keys(),
+    ]);
+
+    return [...currencies].map((currency) => {
+      const outstanding = open.get(currency)?.outstanding ?? new Decimal(0);
+      const overdue = open.get(currency)?.overdue ?? new Decimal(0);
+      const collectedTotal = collected.get(currency) ?? new Decimal(0);
+      const denominator = collectedTotal.plus(outstanding);
+
+      return {
+        currency,
+        totalOutstanding: outstanding.toFixed(2),
+        totalOverdue: overdue.toFixed(2),
+        totalCollected: collectedTotal.toFixed(2),
+        collectionRate: denominator.isZero()
+          ? new Decimal(0).toFixed(4)
+          : collectedTotal.div(denominator).toFixed(4),
+      };
+    });
+  }
+
+  private currenciesOf(rows: OpenInstallmentRow[]): Set<CurrencyType> {
+    return new Set(rows.map((row) => row.currency));
+  }
+
+  /** Prisma Decimal ↔ decimal.js: aritmetik tek kütüphanede yapılır. */
+  private toDecimal(amount: OpenInstallmentRow['amount']): Decimal {
+    return new Decimal(amount.toString());
   }
 
   private classify(row: OpenInstallmentRow, asOf: Date): ArAgingBucketLabel {

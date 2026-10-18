@@ -24,6 +24,7 @@ import {
 } from '@src/infrastructure/payment/pos/physical/providers/iyzico-terminal/iyzico-terminal.errors';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
+import { PosAccountingBridgeService } from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import PosTransactionStatusSchema from '@input-type-schemas/PosTransactionStatusSchema';
 import PosTransactionKindSchema from '@input-type-schemas/PosTransactionKindSchema';
 import { Decimal } from 'decimal.js';
@@ -56,6 +57,7 @@ export class IyzicoTerminalRefundHandler implements ICommandHandler<
     private readonly iyzicoTerminalService: IyzicoTerminalService,
     private readonly txManager: TransactionManager,
     private readonly posPaymentSync: PosPaymentSyncService,
+    private readonly accountingBridge: PosAccountingBridgeService,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory
   ) {}
@@ -84,6 +86,8 @@ export class IyzicoTerminalRefundHandler implements ICommandHandler<
       paymentDate,
       refundAmount,
       originalPaymentId,
+      originalPatientId,
+      originalTransactionId,
       originalExternalRef,
     } = await this.txManager.outboxRun(async () => {
       const originalTx = await this.posTransactionCommandRepo.findByIdForUpdate(
@@ -138,9 +142,13 @@ export class IyzicoTerminalRefundHandler implements ICommandHandler<
 
       const refundTx = await this.posTransactionCommandRepo.create(
         PosTransaction.create({
+          initiatedById: ctx.actor.userId,
           posDeviceId: device.id.value,
           clinicId: input.clinicId,
           paymentId: originalTx.paymentId ?? undefined,
+          // Hasta bağı orijinal satıştan DEVRALINIR (bkz. pax ters kayıtları):
+          // ters kayıt kendi satırı olduğu için bu kolon boş kalıyordu.
+          patientId: originalTx.patientId?.value ?? undefined,
           amount: refundAmount.toNumber(),
           currency: originalTx.amount.currency,
           kind: PosTransactionKindSchema.enum.REFUND,
@@ -154,6 +162,8 @@ export class IyzicoTerminalRefundHandler implements ICommandHandler<
         paymentDate,
         refundAmount: refundAmount.toNumber(),
         originalPaymentId: originalTx.paymentId,
+        originalPatientId: originalTx.patientId?.value ?? null,
+        originalTransactionId: originalTx.id.value,
         originalExternalRef: originalTx.externalRef,
       };
     });
@@ -186,6 +196,22 @@ export class IyzicoTerminalRefundHandler implements ICommandHandler<
             await this.posPaymentSync.markRefunded({
               paymentId: originalPaymentId,
               clinicId: input.clinicId,
+              // Tutar zorunlu: ters kaydın tutarına EŞİT taksit aranır. Önceden
+              // ilk tamamlanmış taksit koşulsuz REFUNDED yapılıyordu — kısmi
+              // iadede tüm taksit iade sayılıp ters kayıt fazla gelir düşürüyordu.
+              amount: refundTx.amount.value,
+              ctx,
+            });
+          }
+          // Muhasebe köprüsü: kart iadesi → 120 / 108 (bkz. pax ters kaydı).
+          if (originalPatientId) {
+            await this.accountingBridge.recordBestEffort({
+              kind: 'REVERSAL',
+              patientId: originalPatientId,
+              clinicId: input.clinicId,
+              amount: refundTx.amount.value,
+              posTransactionId: refundTx.id.value,
+              originalPosTransactionId: originalTransactionId,
             });
           }
         } else {

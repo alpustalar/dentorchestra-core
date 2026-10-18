@@ -15,9 +15,10 @@ import {
 import { POS_EVENTS } from '@src/domain/constants/events';
 
 @CommandHandler(PaxBatchCloseCommand)
-export class PaxBatchCloseHandler
-  implements ICommandHandler<PaxBatchCloseCommand, PaxBatchCloseResponse>
-{
+export class PaxBatchCloseHandler implements ICommandHandler<
+  PaxBatchCloseCommand,
+  PaxBatchCloseResponse
+> {
   private readonly logger = new Logger(PaxBatchCloseHandler.name);
 
   constructor(

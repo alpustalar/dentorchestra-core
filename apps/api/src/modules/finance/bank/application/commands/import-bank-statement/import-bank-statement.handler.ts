@@ -22,9 +22,10 @@ import {
 } from '@modules/finance/bank/domain/repositories/bank-account/bank-account.command.repository';
 
 @CommandHandler(ImportBankStatementCommand)
-export class ImportBankStatementHandler
-  implements ICommandHandler<ImportBankStatementCommand, string>
-{
+export class ImportBankStatementHandler implements ICommandHandler<
+  ImportBankStatementCommand,
+  string
+> {
   constructor(
     // Hesabın varlığı/arşiv durumu ekstre yazılıp yazılmayacağını belirliyor →
     // Command Context.

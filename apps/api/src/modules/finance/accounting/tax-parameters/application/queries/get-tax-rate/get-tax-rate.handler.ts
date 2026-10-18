@@ -1,6 +1,6 @@
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
-import { TaxParameterNotConfiguredException } from '@modules/finance/accounting/tax-parameters/domain/exceptions/tax-parameter-not-configured.exception';
+import { TaxParameterNotConfiguredException } from '@modules/finance/accounting/tax-parameters/domain/exceptions';
 import { GetTaxRateQuery } from './get-tax-rate.query';
 import { GetTaxRateResponse } from './get-tax-rate.response';
 import {
@@ -9,9 +9,10 @@ import {
 } from '@modules/finance/accounting/tax-parameters/domain/repositories/tax-parameter/tax-parameter.query.repository';
 
 @QueryHandler(GetTaxRateQuery)
-export class GetTaxRateHandler
-  implements IQueryHandler<GetTaxRateQuery, GetTaxRateResponse>
-{
+export class GetTaxRateHandler implements IQueryHandler<
+  GetTaxRateQuery,
+  GetTaxRateResponse
+> {
   constructor(
     @Inject(TAX_PARAMETER_QUERY_REPOSITORY)
     private readonly taxParameterRepo: ITaxParameterQueryRepository

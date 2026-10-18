@@ -12,9 +12,10 @@ import {
 } from '@modules/supply/inventory/domain/repositories/product/product.query.repository';
 
 @QueryHandler(GetProductStockQuery)
-export class GetProductStockHandler
-  implements IQueryHandler<GetProductStockQuery, GetProductStockResponse>
-{
+export class GetProductStockHandler implements IQueryHandler<
+  GetProductStockQuery,
+  GetProductStockResponse
+> {
   constructor(
     @Inject(PRODUCT_QUERY_REPOSITORY)
     private readonly productRepo: IProductQueryRepository,

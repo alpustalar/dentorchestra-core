@@ -1,8 +1,13 @@
 import { ClinicPaymentGateway as IClinicPaymentGateway } from '@shared/generated-zod';
 import { AggregateRoot } from '@common/domain/aggregate-root';
-import { CreateClinicPaymentGatewayProps } from '@modules/finance/payment-gateway/domain/contracts/clinic-payment-gateway';
+import {
+  CreateClinicPaymentGatewayProps,
+  UpdateClinicPaymentGatewayProps,
+} from '@modules/finance/payment-gateway/domain/contracts/clinic-payment-gateway';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { ClinicPaymentGatewayRegisteredEvent } from '@modules/finance/payment-gateway/domain/events';
+import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 
 /**
  * Kliniğin ödeme altyapısı (finance bounded-context). Clinic'ten ayrıştırılmış
@@ -48,18 +53,35 @@ export class ClinicPaymentGateway extends AggregateRoot {
   ): ClinicPaymentGateway {
     const now = DateTimeManager.create();
 
-    return new ClinicPaymentGateway({
+    const gateway = new ClinicPaymentGateway({
       id: UUID.createOrGenerate(props.id).value,
       clinicId: UUID.create(props.clinicId).orThrow().value,
       iyzicoSubMerchantKey: props.iyzicoSubMerchantKey,
       createdAt: now,
       updatedAt: now,
     });
+
+    gateway.raiseRegistered({
+      isNew: true,
+      maskedIban: props.maskedIban,
+      actorId: props.actorId,
+      source: props.source,
+    });
+
+    return gateway;
   }
 
-  /** Iyzico alt üye işyeri anahtarını günceller (yeniden kayıt akışı). */
-  public updateSubMerchantKey(key: string): void {
-    this._iyzicoSubMerchantKey = key;
+  /** Iyzico alt üye işyeri kaydını günceller (yeniden kayıt akışı). */
+  public updateSubMerchantKey(props: UpdateClinicPaymentGatewayProps): void {
+    this._iyzicoSubMerchantKey = props.iyzicoSubMerchantKey;
+    this._updatedAt = DateTimeManager.create();
+
+    this.raiseRegistered({
+      isNew: false,
+      maskedIban: props.maskedIban,
+      actorId: props.actorId,
+      source: props.source,
+    });
   }
 
   public toPersistence(): IClinicPaymentGateway {
@@ -68,7 +90,30 @@ export class ClinicPaymentGateway extends AggregateRoot {
       iyzicoSubMerchantKey: this._iyzicoSubMerchantKey,
       clinicId: this._clinicId.value,
       createdAt: this._createdAt,
-      updatedAt: DateTimeManager.create(),
+      updatedAt: this._updatedAt,
     };
+  }
+
+  private raiseRegistered(props: {
+    isNew: boolean;
+    maskedIban: string;
+    actorId: string;
+    source: UpdateClinicPaymentGatewayProps['source'];
+  }): void {
+    this.addDomainEvent(
+      new ClinicPaymentGatewayRegisteredEvent({
+        clinicId: this._clinicId.value,
+        subMerchantKey: this._iyzicoSubMerchantKey,
+        isNew: props.isNew,
+        maskedIban: props.maskedIban,
+        actorId: props.actorId,
+        source: props.source,
+        action: LogAction.PAYMENT_GATEWAY_REGISTERED,
+        type: LogType.INFO,
+        details: props.isNew
+          ? 'Klinik ödeme altyapısı (iyzico alt üye işyeri) kuruldu.'
+          : 'Klinik ödeme altyapısı (iyzico alt üye işyeri) güncellendi.',
+      })
+    );
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentBookedEvent } from '@modules/clinical/appointment/domain/events/book-appointment.event';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Randevu oluşturulmasının (hasta portalı / online) yan etkilerini işler
@@ -14,7 +14,7 @@ import { AppointmentBookedEvent } from '@modules/clinical/appointment/domain/eve
 export class AppointmentBookedListener {
   private readonly logger = new Logger(AppointmentBookedListener.name);
 
-  @OnEvent(APPOINTMENT_EVENTS.BOOKED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.BOOKED)
   async handle(event: AppointmentBookedEvent): Promise<void> {
     this.logger.log(
       `Randevu oluşturuldu (onay bekliyor): appointmentId=${event.appointmentId}, ` +

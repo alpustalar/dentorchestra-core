@@ -20,9 +20,13 @@ export class ClinicGovernmentSpecsResponseDto {
   @Type(() => String)
   companyTaxNumber: string | null;
 
-  // --- Kritik Regülasyon Sırları ve Şifreler (Kesinlikle Sadece Admin) ---
+  // --- Kritik Regülasyon Sırları ---
+  // Şifrenin KENDİSİ yanıtta yok; yalnız yapılandırılmış olup olmadığı. Grup
+  // kısıtı ("sadece ADMIN") yanlış yere konmuş bir güvenceydi: gruba giren
+  // aktör için hâlâ düz metin bir şifre ve serileştirme interceptor'ı
+  // `@Serialize` yoksa fail-open çalışıyor.
   @Expose({ groups: [ADMIN] })
-  ussPassword: string | null;
+  ussPasswordConfigured: boolean;
 
   // --- Audit Zaman Damgaları ---
   @Expose({ groups: [MANAGEMENT, ADMIN] })

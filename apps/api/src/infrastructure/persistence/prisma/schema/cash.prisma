@@ -61,6 +61,13 @@ model CashSession {
   countedAmount  Decimal? @map("counted_amount") @db.Decimal(14, 2) // fiziki sayım (kapanışta)
   difference     Decimal? @db.Decimal(14, 2) // countedAmount - expectedAmount (+ fazla / - açık)
 
+  // Tek-açık-oturum kilidi: YALNIZ açık oturumda doludur (kapanışta null'a
+  // çekilir) ve tekildir. Postgres'te NULL'lar birbiriyle çakışmadığı için
+  // `@unique` tam olarak "kasa başına en fazla bir AÇIK oturum" kısmî index'i
+  // gibi davranır — açılış kilidi (FOR UPDATE) ilk savunma, bu kısıt son
+  // savunmadır (POS `activeVoidOriginalId` ile aynı kalıp).
+  activeRegisterId String? @unique @map("active_register_id")
+
   openedById String    @map("opened_by_id")
   closedById String?   @map("closed_by_id")
   openedAt   DateTime  @default(now()) @map("opened_at")

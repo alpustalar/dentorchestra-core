@@ -14,6 +14,15 @@ export class BookingPaymentCommandRepository
     super(prisma);
   }
 
+  /**
+   * Alanlar tek tek yazılıyor (`...rest` değil) çünkü bu metod `create` alanlarına
+   * (tutarlar, intent, kiracı) dokunmamalı. Bedeli: **şemaya eklenen her yeni
+   * değişken kolon bu listeye de eklenmek ZORUNDA** — entity'nin hesapladığı ama
+   * mapping'in yazmadığı alan hata vermez, log üretmez ve geri getirilemez
+   * (CLAUDE.md finans kuralı 9). `supplier_amount` tam böyle düşmüştü: damga
+   * entity'de hesaplanıyor, `toPersistence` taşıyor, burada kayboluyordu → defter
+   * her rezervasyonda "fiilî maliyet bilinmiyor" alarmı verirdi.
+   */
   async update(entity: BookingPayment): Promise<BookingPayment> {
     const data = entity.toPersistence();
     const raw = await this.db.bookingPayment.update({
@@ -31,6 +40,12 @@ export class BookingPaymentCommandRepository
         bookingReference: data.bookingReference,
         bookingId: data.bookingId,
         failureReason: data.failureReason,
+        supplierAmount: data.supplierAmount,
+        supplierCurrency: data.supplierCurrency,
+        supplierRetainedAmount: data.supplierRetainedAmount,
+        supplierRetainedCurrency: data.supplierRetainedCurrency,
+        refundedAt: data.refundedAt,
+        refundReason: data.refundReason,
         updatedAt: data.updatedAt,
       },
     });

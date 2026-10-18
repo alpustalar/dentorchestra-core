@@ -1,5 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ContextService } from '@src/infrastructure/context/context.service';
+import {
+  CONTEXT_SERVICE,
+  IContextService,
+} from '@src/infrastructure/context/context.service.interface';
 import {
   AppointmentCancellationRequestedEvent,
   AppointmentCancellationRequestedPayload,
@@ -13,13 +16,12 @@ import {
   AppointmentsBulkCancelledEventPayload,
 } from '@modules/clinical/appointment/domain/events/appointments-bulk-cancelled.event';
 import { IAppointmentEventPublisher } from '@modules/clinical/appointment/domain/interfaces/appointment-event-publisher.interface';
-import { CONTEXT_SERVICE } from '@src/infrastructure/context/context.service.interface';
 
 @Injectable()
 export class AppointmentEventPublisher implements IAppointmentEventPublisher {
   constructor(
     @Inject(CONTEXT_SERVICE)
-    private readonly contextService: ContextService
+    private readonly contextService: IContextService
   ) {}
 
   cancellationRequested(payload: AppointmentCancellationRequestedPayload) {

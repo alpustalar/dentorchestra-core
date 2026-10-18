@@ -4,7 +4,6 @@ import { FinancialEventTypeSchema } from '@shared';
 
 describe('PurchaseInvoiceReceivedRule', () => {
   const rule = new PurchaseInvoiceReceivedRule();
-  const ctx = { clinicId: 'clinic-1', organizationId: 'org-1' };
 
   const makeEvent = (payload: Record<string, unknown>) =>
     new FinancialEvent({
@@ -34,8 +33,7 @@ describe('PurchaseInvoiceReceivedRule', () => {
         vatTotal: '100.00',
         grandTotal: '1100.00',
         lineAccountCode: '150',
-      }),
-      ctx
+      })
     );
 
     expect(draft.lines).toHaveLength(3);
@@ -63,8 +61,7 @@ describe('PurchaseInvoiceReceivedRule', () => {
         vatTotal: '0.00',
         grandTotal: '500.00',
         lineAccountCode: '770',
-      }),
-      ctx
+      })
     );
 
     expect(draft.lines).toHaveLength(2);

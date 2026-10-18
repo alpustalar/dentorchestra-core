@@ -1,6 +1,9 @@
 import { Inject } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
+import {
+  IPolicyFactory,
+  POLICY_FACTORY,
+} from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { FindProviderByIdQuery } from './find-provider-by-id.query';
 import { FindProviderByIdQueryResponse } from '@modules/clinical/provider/application/queries/find-provider-by-id/find-provider-by-id.response';
 import { ProviderNotFoundException } from '@modules/clinical/provider/domain/exceptions/provider.exceptions';
@@ -10,14 +13,17 @@ import {
 } from '@modules/clinical/provider/domain/repositories/provider/provider.query.repository';
 
 @QueryHandler(FindProviderByIdQuery)
-export class FindProviderByIdHandler
-  implements
-    IQueryHandler<FindProviderByIdQuery, FindProviderByIdQueryResponse>
-{
+export class FindProviderByIdHandler implements IQueryHandler<
+  FindProviderByIdQuery,
+  FindProviderByIdQueryResponse
+> {
   constructor(
     @Inject(PROVIDER_QUERY_REPOSITORY)
     private readonly providerRepo: IProviderQueryRepository,
-    private readonly policyFactory: PolicyFactory
+    // Sınıf değil token: `PolicyFactory` hiçbir modülde sınıf olarak provider
+    // değil; global PolicyModule onu POLICY_FACTORY token'ıyla sağlıyor.
+    @Inject(POLICY_FACTORY)
+    private readonly policyFactory: IPolicyFactory
   ) {}
 
   async execute(

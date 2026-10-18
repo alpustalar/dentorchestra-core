@@ -5,5 +5,5 @@ export const GetHotelBookingsSchema = z.object({
   pagination: PaginationSchema,
   patientId: z.uuid().optional(),
   leadId: z.uuid().optional(),
-  clinicId: z.uuid()
+  clinicId: z.uuid(),
 });

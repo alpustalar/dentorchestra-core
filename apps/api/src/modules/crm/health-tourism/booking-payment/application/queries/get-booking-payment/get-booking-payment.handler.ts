@@ -8,9 +8,10 @@ import {
 } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.query.repository';
 
 @QueryHandler(GetBookingPaymentQuery)
-export class GetBookingPaymentHandler
-  implements IQueryHandler<GetBookingPaymentQuery, GetBookingPaymentResponse>
-{
+export class GetBookingPaymentHandler implements IQueryHandler<
+  GetBookingPaymentQuery,
+  GetBookingPaymentResponse
+> {
   constructor(
     @Inject(BOOKING_PAYMENT_QUERY_REPOSITORY)
     private readonly bookingPaymentRepo: IBookingPaymentQueryRepository

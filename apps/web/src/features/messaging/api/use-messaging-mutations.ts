@@ -1,10 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import {
-  messagingEndpoints,
-  type SendMessage,
-} from '@core-crm/shared/client';
+import { messagingEndpoints, type SendMessage } from '@core-crm/shared/client';
 
 import { api } from '@/lib/api';
 

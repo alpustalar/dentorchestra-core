@@ -69,7 +69,20 @@ export class HotelbedsTransferApiService
     }
 
     const json = (await res.json()) as { services?: RawTransferService[] };
-    return (json.services ?? []).map(mapToAvailabilityItem);
+    // Fiyatı okunamayan seçenek listeye GİRMEZ. Eskiden `?? 0` ile sıfır fiyatlı
+    // olarak dönüyordu; arama sonucu artan fiyata sıralandığı için o seçenek
+    // listenin BAŞINA geçiyor ve hastaya "bedava transfer" olarak sunuluyordu.
+    // Eksik fiyatın varsayılanı yoktur — teklif edilemeyen seçenek atlanır.
+    const services = json.services ?? [];
+    const quotable = services.filter(hasQuotablePrice);
+    if (quotable.length < services.length) {
+      this.logger.warn(
+        `Transfer aramasında fiyatı okunamayan ${
+          services.length - quotable.length
+        } seçenek atlandı (${fromCode}→${toCode}).`
+      );
+    }
+    return quotable.map(mapToAvailabilityItem);
   }
 
   async createBooking(
@@ -152,10 +165,15 @@ export class HotelbedsTransferApiService
     const booking = json.RS?.bookings?.[0];
     if (!booking) throw new Error('Transfer iptal yanıtı boş.');
 
+    // `?? 0` DEĞİL: sağlayıcı cezayı bildirmediyse "ceza yok" demek uydurmadır.
+    // Bilinmeyen hâl null olarak taşınır ve iade akışında alarmla duyurulur.
+    const retained = parseRetainedAmount(booking.cancellationAmount);
+
     return {
       reference: booking.reference,
       status: booking.status ?? 'CANCELLED',
-      cancellationAmount: booking.cancellationAmount ?? 0,
+      cancellationAmount: retained,
+      currency: retained === null ? null : (booking.currency ?? null),
     };
   }
 
@@ -238,6 +256,26 @@ interface RawBooking {
 }
 
 // ─── Mappers ─────────────────────────────────────────────────────────────────
+
+/**
+ * İptal cezası: yalnız sonlu, negatif olmayan bir sayı kabul edilir. Alan hiç
+ * gelmediğinde (ya da sayıya çevrilemediğinde) sonuç **null**'dır — "0" demek
+ * defterde tedarikçi borcunun tamamının serbest kaldığı anlamına gelirdi.
+ */
+function parseRetainedAmount(raw: unknown): number | null {
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) return null;
+  return raw;
+}
+
+/**
+ * Teklif edilebilir mi: hem toplam hem net tutar pozitif bir sayı olarak gelmiş
+ * olmalı. Satış fiyatı bu tutardan türetildiği için (net × (1 + komisyon)) eksik
+ * ya da sıfır fiyat doğrudan hastaya giden bir fiyattır.
+ */
+function hasQuotablePrice(raw: RawTransferService): boolean {
+  const total = raw.price?.totalAmount;
+  return typeof total === 'number' && Number.isFinite(total) && total > 0;
+}
 
 function mapToAvailabilityItem(
   raw: RawTransferService
@@ -324,7 +362,10 @@ function mapToBookingResult(raw: RawBooking): TransferBookingResult {
       phone: raw.holder?.phone,
     },
     transfers: raw.transfers ?? [],
-    totalAmount: parseFloat(raw.totalAmount ?? '0'),
+    // `?? '0'` YOK: sağlayıcı rezervasyonu açtığı tutarı bildirmediyse maliyet
+    // bilinmiyordur, sıfır değildir. NaN entity kapısında (`Money` + pozitiflik)
+    // durur; sıfır o kapıdan geçip deftere "bedava rezervasyon" olarak yazılırdı.
+    totalAmount: parseFloat(raw.totalAmount as string),
     currency: raw.currency ?? 'EUR',
     supplier: raw.supplier?.name ? { name: raw.supplier.name } : undefined,
   };

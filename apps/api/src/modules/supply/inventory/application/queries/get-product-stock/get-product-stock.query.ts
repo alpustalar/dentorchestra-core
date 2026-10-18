@@ -6,6 +6,6 @@ export class GetProductStockQuery implements IQuery {
   readonly __responseType!: GetProductStockResponse;
   constructor(
     public readonly clinicId: string,
-    public readonly ctx: IGetContext,
+    public readonly ctx: IGetContext
   ) {}
 }

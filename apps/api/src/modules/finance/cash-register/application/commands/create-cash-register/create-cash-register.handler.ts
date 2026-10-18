@@ -16,9 +16,10 @@ import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/servi
 import { ITenantScopeResolver } from '@shared';
 
 @CommandHandler(CreateCashRegisterCommand)
-export class CreateCashRegisterHandler
-  implements ICommandHandler<CreateCashRegisterCommand, string>
-{
+export class CreateCashRegisterHandler implements ICommandHandler<
+  CreateCashRegisterCommand,
+  string
+> {
   constructor(
     @Inject(CASH_REGISTER_COMMAND_REPOSITORY)
     private readonly cashRegisterRepo: ICashRegisterCommandRepository,

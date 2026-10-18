@@ -26,10 +26,10 @@ model User {
   /// Bu kullanıcının BAŞKALARINA verdiği yetkiler (kim verdi izi).
   issuedCapabilities  UserCapability[] @relation("capability_granters")
 
-  lastLogin      DateTime        @default(now()) @map("last_login")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  deletedAt      DateTime?       @map("deleted_at")
+  lastLogin          DateTime            @default(now()) @map("last_login")
+  createdAt          DateTime            @default(now()) @map("created_at")
+  updatedAt          DateTime            @updatedAt @map("updated_at")
+  deletedAt          DateTime?           @map("deleted_at")
   financeLedgers     FinanceLedger[]
   stockMovements     StockMovement[]
   staffNotifications StaffNotification[]

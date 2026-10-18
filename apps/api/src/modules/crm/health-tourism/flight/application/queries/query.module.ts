@@ -5,6 +5,7 @@ import { SearchFlightOffersHandler } from './search-flight-offers/search-flight-
 import { GetFlightOfferHandler } from './get-flight-offer/get-flight-offer.handler';
 import { GetFlightBookingsHandler } from './get-flight-bookings/get-flight-bookings.handler';
 import { GetFlightBookingByIdHandler } from './get-flight-booking-by-id/get-flight-booking-by-id.handler';
+import { QuoteOptionModule } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.module';
 
 export const FLIGHT_QUERY_HANDLERS = [
   SearchFlightOffersHandler,
@@ -14,7 +15,7 @@ export const FLIGHT_QUERY_HANDLERS = [
 ];
 
 @Module({
-  imports: [CqrsModule, FlightInfrastructureModule],
+  imports: [CqrsModule, FlightInfrastructureModule, QuoteOptionModule],
   providers: [...FLIGHT_QUERY_HANDLERS],
   exports: [...FLIGHT_QUERY_HANDLERS],
 })

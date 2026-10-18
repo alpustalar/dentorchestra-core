@@ -9,7 +9,6 @@ import {
 import { AuthGuard, CapabilityGuard } from '@modules/identity/auth/auth/guards';
 import { GetContext, HasCapability, IGetContext } from '@common/decorators';
 import { PaginationDto } from '@shared';
-import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetLedgerByClinicIdQuery } from '@modules/finance/finance-ledger/application/queries/get-ledger-by-clinic-id/get-ledger-by-clinic-id.query';
 import { GetClinicFinanceSummaryQuery } from '@modules/finance/finance-ledger/application/queries/get-clinic-finance-summary/get-clinic-finance-summary.query';
@@ -18,16 +17,20 @@ import { DateTimeManager } from '@common/infrastructure/date-time/date-time.mana
 import { Serialize } from '@common/decorators/serialize.decorator';
 import {
   FinanceLedgerResponseDto,
+  LedgerMismatchResponseDto,
   LedgerSummaryResponseDto,
   PatientFinanceSummaryResponseDto,
   PatientLedgerItemResponseDto,
 } from '@modules/finance/finance-ledger/presentation/http/dto/finance-ledger-response.dto';
 import type { FinanceLedger } from '@shared';
 import type {
+  LedgerMismatchRow,
   LedgerSummary,
   PatientFinanceSummary,
   PatientLedgerItem,
 } from '@modules/finance/finance-ledger/domain/contracts/finance-ledger';
+import { FindLedgerMismatchesQuery } from '@modules/finance/finance-ledger/application/queries/find-ledger-mismatches/find-ledger-mismatches.query';
+import { FindLedgerMismatchesFilterDto } from '@shared/modules/finance-ledger/dto/queries';
 import { GetLedgerByPatientIdQuery } from '@modules/finance/finance-ledger/application/queries/get-ledger-by-patient-id/get-ledger-by-patient-id.query';
 import { CAPABILITIES } from '@src/infrastructure/persistence/prisma/data/modules';
 
@@ -36,10 +39,27 @@ const { FINANCELEDGER } = CAPABILITIES;
 @HasCapability(FINANCELEDGER.read)
 @Controller('finance-ledger')
 export class FinanceLedgerQueryController {
-  constructor(
-    private readonly commandBus: TSCommandBus,
-    private readonly queryBus: TSQueryBus
-  ) {}
+  constructor(private readonly queryBus: TSQueryBus) {}
+
+  /**
+   * Kaynak (taksit) ↔ cari defter farkı: tahsilatı/iadesi defterde eksik ya da
+   * durumu kaymış kayıtlar. Telafi yolu `POST reconciliation/backfill`.
+   *
+   * Rota sabit segmentli ve `clinic/:clinicId` kalıplarından ÖNCE tanımlı
+   * olmalı (`reconciliation` bir UUID olarak eşleşmeye çalışmasın).
+   */
+  @Get('reconciliation/mismatches')
+  @Serialize<LedgerMismatchRow, LedgerMismatchResponseDto>(
+    LedgerMismatchResponseDto
+  )
+  getMismatches(
+    @GetContext() ctx: IGetContext,
+    @Query() filter: FindLedgerMismatchesFilterDto
+  ) {
+    return this.queryBus.execute(
+      new FindLedgerMismatchesQuery({ filter, ctx })
+    );
+  }
 
   @Get('clinic/:clinicId')
   @Serialize<FinanceLedger, FinanceLedgerResponseDto>(FinanceLedgerResponseDto)

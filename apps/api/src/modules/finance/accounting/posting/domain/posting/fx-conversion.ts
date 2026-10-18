@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { CurrencyType } from '@input-type-schemas/CurrencySchema';
+import { Money } from '@src/domain/value-objects/money.vo';
 
 export interface FxConvertLineInput {
   debit?: string;
@@ -46,8 +47,8 @@ export class FxConversion {
     const origCredit = credit ? new Decimal(credit) : null;
 
     return {
-      debit: (origDebit ?? new Decimal(0)).mul(rate).toDecimalPlaces(2),
-      credit: (origCredit ?? new Decimal(0)).mul(rate).toDecimalPlaces(2),
+      debit: Money.scale((origDebit ?? new Decimal(0)).mul(rate)),
+      credit: Money.scale((origCredit ?? new Decimal(0)).mul(rate)),
       currency: functionalCurrency,
       originalDebit: origDebit,
       originalCredit: origCredit,

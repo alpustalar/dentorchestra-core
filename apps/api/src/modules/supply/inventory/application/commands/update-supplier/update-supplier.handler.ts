@@ -13,9 +13,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @CommandHandler(UpdateSupplierCommand)
-export class UpdateSupplierHandler
-  implements ICommandHandler<UpdateSupplierCommand, void>
-{
+export class UpdateSupplierHandler implements ICommandHandler<
+  UpdateSupplierCommand,
+  void
+> {
   constructor(
     @Inject(SUPPLIER_COMMAND_REPOSITORY)
     private readonly supplierRepo: ISupplierCommandRepository,

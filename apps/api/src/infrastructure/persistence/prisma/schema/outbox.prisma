@@ -1,7 +1,32 @@
 model Outbox {
-  id          String    @id
-  type        String // Olayın adı (örn: "AppointmentCancelled")
-  payload     Json // Olayın içeriği (appointmentId, userId vb.)
+  id      String @id
+  type    String // Olayın adı (örn: "AppointmentCancelled")
+  payload Json // Olayın içeriği (appointmentId, userId vb.)
+
+  /// Teslim sırası. `createdAt` **bir transaction içinde sabittir** (Postgres'te
+  /// CURRENT_TIMESTAMP tx başlangıç anıdır), dolayısıyla aynı `outboxRun()` ile
+  /// mühürlenen event'leri sıralayamaz: hepsi aynı damgayı taşır. Sıra bir kimlik
+  /// değil, veritabanının atadığı **teslim numarasıdır** — bu yüzden ID politikasının
+  /// (elle üretilen id) kapsamı dışındadır ve uygulamadan güvenle atanamaz.
+  seq BigInt @unique @default(autoincrement())
+
   createdAt   DateTime  @default(now())
-  processedAt DateTime? // Ne zaman gönderildi? (Null ise henüz gönderilmedi)
+  processedAt DateTime? // Ne zaman teslim edildi? (Null ise henüz teslim edilmedi)
+
+  /// Kaç kez teslim denendi. Sahiplenme anında artar: süreç teslim ortasında
+  /// çökse bile deneme sayılır, yoksa aynı kayıt sonsuza kadar döngüye girer.
+  attempts Int @default(0)
+
+  /// Son hatanın mesajı — ölü mektup kaydına bakan operatörün tek ipucu.
+  lastError String?
+
+  /// Ölü mektup: deneme hakkı tükendi. Artık sahiplenilmez; elle müdahale (hatayı
+  /// giderip `attempts`/`failedAt` sıfırlama) bekler. Sessizce kaybolmaz.
+  failedAt DateTime?
+
+  /// Kiralama (lease). Kaydı bir işçi aldı; süresi geçerse başka işçi devralır.
+  /// Kilitsiz `findMany` ile iki örnek aynı kaydı iki kez yayınlıyordu.
+  claimedAt DateTime?
+
+  @@index([processedAt, failedAt, seq])
 }

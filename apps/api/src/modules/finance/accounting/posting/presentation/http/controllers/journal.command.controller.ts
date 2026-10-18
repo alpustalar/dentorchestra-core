@@ -1,4 +1,11 @@
-import { Body, Controller, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard, CapabilityGuard } from '@modules/identity/auth/auth/guards';
 import { GetContext, HasCapability, IGetContext } from '@common/decorators';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
@@ -11,12 +18,21 @@ const { JOURNALENTRY } = CAPABILITIES;
 export class JournalCommandController {
   constructor(private readonly commandBus: TSCommandBus) {}
 
-  /** Storno: POSTED fişi ters kayıtla iptal eder; dönen değer storno fişinin id'si. */
-  @HasCapability(JOURNALENTRY.create)
+  /**
+   * Storno: POSTED fişi ters kayıtla iptal eder; dönen değer storno fişinin id'si.
+   *
+   * Yetki `create` değil **`delete`**: storno, defterdeki bir kaydın etkisini
+   * götüren yıkıcı bir düzeltmedir — fiş üretmek (ki normalde sistem yapar) ile
+   * aynı yetkiye bağlanmamalıdır (CLAUDE.md finans kuralı 7). Bugün `fullAccess`
+   * taşıyan roller ikisine de sahip olduğundan davranış değişmez; ayrım rol
+   * matrisinde `fullAccess(...ACCOUNTING)` → `manage(...ACCOUNTING)` yapılınca
+   * tek satırda etkinleşir (bkz. `documents/finans/09-guvence-denetimi.md`).
+   */
+  @HasCapability(JOURNALENTRY.delete)
   @Post(':id/reverse')
   reverse(
     @GetContext() ctx: IGetContext,
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body('reason') reason?: string
   ) {
     return this.commandBus.execute(

@@ -8,10 +8,10 @@ import {
 } from '@modules/finance/finance-ledger/domain/repositories/finance-ledger/finance-ledger.query.repository';
 
 @QueryHandler(GetRevenueByPatientsQuery)
-export class GetRevenueByPatientsHandler
-  implements
-    IQueryHandler<GetRevenueByPatientsQuery, GetRevenueByPatientsResponse>
-{
+export class GetRevenueByPatientsHandler implements IQueryHandler<
+  GetRevenueByPatientsQuery,
+  GetRevenueByPatientsResponse
+> {
   constructor(
     @Inject(FINANCE_LEDGER_QUERY_REPOSITORY)
     private readonly financeLedgerRepo: IFinanceLedgerQueryRepository

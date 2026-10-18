@@ -28,3 +28,15 @@ export interface CloseCashSessionInput {
   countedAmount: Decimal;
   closedById: string;
 }
+
+/**
+ * Kasadan çıkış kapısının girişi. Toplamlar (`totalIn`/`totalOut`) oturum satırı
+ * `FOR UPDATE` ile kilitliyken Command Repo'dan okunur — kilitsiz okunan toplam,
+ * eşzamanlı ikinci çıkışın aynı parayı ikinci kez harcamasına izin verirdi.
+ */
+export interface AssertCashWithdrawalInput {
+  totalIn: Decimal;
+  totalOut: Decimal;
+  /** Kaydedilmek istenen çıkış tutarı (pozitif). */
+  requested: Decimal;
+}

@@ -15,8 +15,7 @@ export const SUBSCRIPTION_PAYMENT_METHOD_COMMAND_REPOSITORY = Symbol(
  * ayrı bir read-model query'si açılır, bu repo yazma tarafında kalır.
  */
 
-export interface ISubscriptionPaymentMethodCommandRepository
-  extends IBaseCommandRepository<SubscriptionPaymentMethod> {
+export interface ISubscriptionPaymentMethodCommandRepository extends IBaseCommandRepository<SubscriptionPaymentMethod> {
   create(entity: SubscriptionPaymentMethod): Promise<SubscriptionPaymentMethod>;
   /**
    * Abonelik-başına tek kayıtlı yöntem: varsa günceller (yeni kart), yoksa oluşturur.

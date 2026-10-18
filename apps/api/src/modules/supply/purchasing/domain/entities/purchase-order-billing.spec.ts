@@ -1,6 +1,7 @@
 import { Decimal } from 'decimal.js';
 import { PurchaseOrder } from './purchase-order.entity';
 import {
+  PurchaseOrderCancelWithInvoicesException,
   PurchaseOrderNotBillableException,
   PurchaseOrderOverInvoicedException,
 } from '@modules/supply/purchasing/domain/exceptions/purchasing.exceptions';
@@ -160,13 +161,50 @@ describe('PurchaseOrder — fatura eşleştirme (3-way match)', () => {
       lines: order.lines,
     });
 
+    // Tutarlar kuruş ölçeğinde **string**: okuma modeli para alanlarını JSON'a
+    // kayan nokta olarak vermez (finans okuma modellerinin tamamıyla aynı).
     expect(summary).toEqual({
-      orderedTotal: 1200,
-      receivedValue: 720, // 6 × 100 + %20
-      invoicedTotal: 480,
-      remainingToInvoice: 720,
-      receiptVariance: 240, // mal geldi, faturası gelmedi
+      orderedTotal: '1200.00',
+      receivedValue: '720.00', // 6 × 100 + %20
+      invoicedTotal: '480.00',
+      remainingToInvoice: '720.00',
+      receiptVariance: '240.00', // mal geldi, faturası gelmedi
       billingStatus: 'PARTIALLY_BILLED',
+    });
+  });
+
+  describe('iptal ile fatura sayacı', () => {
+    it('faturası eşleşmiş sipariş iptal edilemez', () => {
+      // Fatura eşleştirme SENT durumunda da yapılabiliyor. Sayacı dolu bir
+      // siparişi iptal etmek, iptal edilmiş bir siparişe bağlı borç bırakır:
+      // `applyInvoice` artık reddedildiği için sayaç bir daha doğru değere
+      // getirilemez ve üçlü eşleştirme o sipariş için kalıcı anlamsızlaşır.
+      const order = makeSentOrder();
+      order.applyInvoice(new Decimal(480));
+
+      expect(() => order.cancel()).toThrow(
+        PurchaseOrderCancelWithInvoicesException
+      );
+      expect(order.status).toBe('SENT');
+    });
+
+    it('eşleştirme kaldırıldıktan sonra iptal edilebilir', () => {
+      const order = makeSentOrder();
+      order.applyInvoice(new Decimal(480));
+      order.revertInvoice(new Decimal(480));
+
+      order.cancel();
+
+      expect(order.status).toBe('CANCELLED');
+      expect(order.billingStatus).toBe('NOT_BILLED');
+    });
+
+    it('hiç faturalanmamış sipariş doğrudan iptal edilir', () => {
+      const order = makeSentOrder();
+
+      order.cancel();
+
+      expect(order.status).toBe('CANCELLED');
     });
   });
 });

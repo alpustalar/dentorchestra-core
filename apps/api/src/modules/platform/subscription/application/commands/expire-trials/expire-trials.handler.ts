@@ -9,9 +9,10 @@ import {
 } from '@modules/platform/subscription/domain/repositories/subscription/subscription.command.repository';
 
 @CommandHandler(ExpireTrialsCommand)
-export class ExpireTrialsHandler
-  implements ICommandHandler<ExpireTrialsCommand, void>
-{
+export class ExpireTrialsHandler implements ICommandHandler<
+  ExpireTrialsCommand,
+  void
+> {
   private readonly logger = new Logger(ExpireTrialsHandler.name);
 
   constructor(

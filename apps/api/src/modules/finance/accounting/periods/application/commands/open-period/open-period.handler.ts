@@ -16,15 +16,17 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
+import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 /**
  * Bir clinic (defter) için ilgili yılın muhasebe dönemini açar.
  * Aynı yıl için ikinci dönem açılamaz (clinicId+year unique).
  */
 @CommandHandler(OpenPeriodCommand)
-export class OpenPeriodHandler
-  implements ICommandHandler<OpenPeriodCommand, string>
-{
+export class OpenPeriodHandler implements ICommandHandler<
+  OpenPeriodCommand,
+  string
+> {
   constructor(
     @Inject(ACCOUNTING_PERIOD_COMMAND_REPOSITORY)
     private readonly accountingPeriodRepo: IAccountingPeriodCommandRepository,
@@ -43,17 +45,23 @@ export class OpenPeriodHandler
     this.policyFactory
       .finance(ctx.actor, ctx.source)
       .evaluator.check((p) => p.actorCanManageTargetClinic(clinicId))
-      .orThrow('accounting.period.open');
+      .orThrow(ACCOUNTING_EVENTS.PERIOD_OPEN);
 
     const organizationId = await this.tenantScopeResolver.resolve({
       clinicId,
     });
 
-    const period = AccountingPeriod.create({ clinicId, organizationId, year });
+    const period = AccountingPeriod.create({
+      clinicId,
+      organizationId,
+      year,
+      actorId: ctx.actor.userId,
+      source: ctx.actor.source,
+    });
 
     await this.txManager.run(async () => {
       // "Zaten var mı" kararı yazmayla aynı transaction içinde ve command repo'dan;
-      // nihai güvence `clinicId_year` unique kısıtı.
+      // nihai güvence `clinicId_year` unique kısıtı (repo P2002'yi tipli hataya çevirir).
       const existing = await this.accountingPeriodRepo.findByYear(
         clinicId,
         year

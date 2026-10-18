@@ -82,7 +82,7 @@ describe('Subscription entity — polimorfik sahip + yaşam döngüsü', () => {
     ).toBe(true);
   });
 
-  it('confirmPayment → ACTIVE + externalId + SubscriptionActivatedEvent', () => {
+  it('confirmPayment → ACTIVE + providerPaymentId + SubscriptionActivatedEvent', () => {
     const sub = Subscription.create({
       billingTarget: 'ORGANIZATION',
       organizationId,
@@ -100,7 +100,11 @@ describe('Subscription entity — polimorfik sahip + yaşam döngüsü', () => {
       source: LogSource.SYSTEM,
     });
     expect(sub.status).toBe('ACTIVE');
-    expect(sub.externalId).toBe('iyz-pay-1');
+    // Ödeme kimliği KENDİ kolonuna yazılır; `externalId` callback'in korelasyon
+    // anahtarıdır (conversationId) ve ezilirse sağlayıcının ikinci bildirimi
+    // aboneliği bulamaz.
+    expect(sub.providerPaymentId).toBe('iyz-pay-1');
+    expect(sub.externalId).toBeNull();
     const events = sub.getDomainEvents();
     expect(events.some((e) => e instanceof SubscriptionActivatedEvent)).toBe(
       true

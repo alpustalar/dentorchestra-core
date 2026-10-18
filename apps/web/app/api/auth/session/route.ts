@@ -15,6 +15,7 @@ import {
  * gelen kişi yalnız boş bir kabuk görür: sayfadaki her veri çağrısı gerçek
  * token'ı olmadığı için backend'de 401 yer.
  */
+
 export async function POST(request: Request) {
   const body = (await request.json()) as { token?: unknown };
 

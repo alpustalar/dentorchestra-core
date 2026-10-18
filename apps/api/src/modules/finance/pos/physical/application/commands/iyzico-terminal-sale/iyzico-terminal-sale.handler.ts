@@ -20,18 +20,13 @@ import PaymentMethodSchema from '@input-type-schemas/PaymentMethodSchema';
 import PosTransactionStatusSchema from '@input-type-schemas/PosTransactionStatusSchema';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
-import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
-import { EnsurePartyForPatientCommand } from '@modules/finance/party/application/commands/ensure-party-for-patient/ensure-party-for-patient.command';
-import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
-import { FinancialEventTypeSchema, PartyRoleSchema } from '@shared';
+import { PosAccountingBridgeService } from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { PosTransaction } from '@modules/finance/pos/physical/domain/entities/pos-transaction.entity';
 import {
   IyzicoTerminalSalesTypeSchema,
   IyzicoTerminalStatusSchema,
 } from '@src/infrastructure/payment/pos/physical/providers/iyzico-terminal/iyzico-terminal.contracts';
-import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
-import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 import {
   IPosDeviceCommandRepository,
   POS_DEVICE_COMMAND_REPOSITORY,
@@ -41,13 +36,12 @@ import {
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { POS_EVENTS } from '@src/domain/constants/events';
-import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 
 @CommandHandler(IyzicoTerminalSaleCommand)
-export class IyzicoTerminalSaleHandler
-  implements
-    ICommandHandler<IyzicoTerminalSaleCommand, IyzicoTerminalSaleResponse>
-{
+export class IyzicoTerminalSaleHandler implements ICommandHandler<
+  IyzicoTerminalSaleCommand,
+  IyzicoTerminalSaleResponse
+> {
   private readonly logger = new Logger(IyzicoTerminalSaleHandler.name);
 
   constructor(
@@ -62,7 +56,7 @@ export class IyzicoTerminalSaleHandler
     private readonly posPaymentSync: PosPaymentSyncService,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
-    private readonly criticalFailure: CriticalFailurePublisher
+    private readonly accountingBridge: PosAccountingBridgeService
   ) {}
 
   async execute(
@@ -120,6 +114,7 @@ export class IyzicoTerminalSaleHandler
         }
 
         const posTransaction = PosTransaction.create({
+          initiatedById: ctx.actor.userId,
           posDeviceId: device.id.value,
           clinicId: input.clinicId,
           patientId: input.patientId,
@@ -163,14 +158,17 @@ export class IyzicoTerminalSaleHandler
             await this.posPaymentSync.markPaid({
               paymentId,
               clinicId: input.clinicId,
+              amount: transaction.amount.value,
+              ctx,
             });
           }
           // Muhasebe köprüsü: kart tahsilatı → 108 / 120 (cari hasta varsa).
           if (input.patientId) {
-            await this.recordPosPaymentReceived({
+            await this.accountingBridge.recordBestEffort({
+              kind: 'SALE',
               patientId: input.patientId,
               clinicId: input.clinicId,
-              amount: transaction.amount.value.toString(),
+              amount: transaction.amount.value,
               posTransactionId,
             });
           }
@@ -181,6 +179,8 @@ export class IyzicoTerminalSaleHandler
             await this.posPaymentSync.markFailed({
               paymentId,
               clinicId: input.clinicId,
+              amount: transaction.amount.value,
+              ctx,
               reason: result.errorMessage,
             });
           }
@@ -235,6 +235,8 @@ export class IyzicoTerminalSaleHandler
             await this.posPaymentSync.markFailed({
               paymentId,
               clinicId: input.clinicId,
+              amount: transaction.amount.value,
+              ctx,
               reason: err.message,
             });
           }
@@ -251,69 +253,4 @@ export class IyzicoTerminalSaleHandler
       throw err;
     }
   }
-
-  /**
-   * iyzico kart tahsilatını muhasebe katmanına köprüler: cari garanti +
-   * PAYMENT_RECEIVED olayı (POS → 108). dedupeKey ile idempotent; köprü hatası
-   * tahsilatı bozmaz.
-   */
-  private async recordPosPaymentReceived(
-    input: RecordPosPaymentReceivedInput
-  ): Promise<void> {
-    const ctx = ExecutionContextFactory.createInternal();
-
-    try {
-      const { partyId } = await this.commandBus.execute(
-        new EnsurePartyForPatientCommand(
-          input.patientId,
-          input.clinicId,
-          PartyRoleSchema.enum.CUSTOMER,
-          ctx
-        )
-      );
-
-      await this.commandBus.execute(
-        new RecordFinancialEventCommand(
-          {
-            clinicId: input.clinicId,
-            type: FinancialEventTypeSchema.enum.PAYMENT_RECEIVED,
-            payload: { method: 'POS_CARD', amount: input.amount, partyId },
-            sourceModule: FINANCIAL_EVENT_SOURCE_MODULES.POS,
-            sourceRefId: input.posTransactionId,
-            dedupeKey: FinancialEventDedupeKeys.payment_received_pos(
-              input.posTransactionId
-            ),
-          },
-          ctx
-        )
-      );
-    } catch (error) {
-      this.logger.error(
-        `Muhasebe köprüsü başarısız: posTransactionId=${input.posTransactionId}`,
-        error
-      );
-      // Kart çekildi (para tahsil edildi) ama ekonomik olay kaydedilmedi:
-      // tahsilat deftere hiç düşmez ve bunu fark edecek başka bir mekanizma yok.
-      this.criticalFailure.publish({
-        operation: 'finance.pos.accounting-bridge',
-        severity: 'CRITICAL',
-        summary: 'POS tahsilatı alındı ancak muhasebe köprüsü çalışmadı.',
-        errorMessage: error instanceof Error ? error.message : String(error),
-        context: {
-          posTransactionId: input.posTransactionId,
-          patientId: input.patientId,
-          amount: input.amount,
-        },
-        clinicId: input.clinicId,
-        dedupeKey: `pos-bridge-failed:${input.posTransactionId}`,
-      });
-    }
-  }
-}
-
-interface RecordPosPaymentReceivedInput {
-  patientId: string;
-  clinicId: string;
-  amount: string;
-  posTransactionId: string;
 }

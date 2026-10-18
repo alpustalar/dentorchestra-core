@@ -5,8 +5,7 @@ export const TREATMENT_CHARGE_COMMAND_REPOSITORY = Symbol(
   'ITreatmentChargeCommandRepository'
 );
 
-export interface ITreatmentChargeCommandRepository
-  extends IBaseCommandRepository<TreatmentCharge> {
+export interface ITreatmentChargeCommandRepository extends IBaseCommandRepository<TreatmentCharge> {
   create(entity: TreatmentCharge): Promise<TreatmentCharge>;
 
   /**
@@ -22,4 +21,15 @@ export interface ITreatmentChargeCommandRepository
    * fatura/tahsilat tutarı bu satırlardan türer ve karar besler.
    */
   findActiveByAppointmentId(appointmentId: string): Promise<TreatmentCharge[]>;
+
+  /**
+   * Aynı okuma, satırlar `FOR UPDATE` **kilitli** — yalnız aktif transaction
+   * içinde. Fatura/tahsilat tutarı bu toplamdan yazıldığı için, okuma ile yazma
+   * arasında bir satırın iptal edilmesi ya da indiriminin değişmesi faturayı
+   * kendi satırlarıyla uyuşmaz hâle getirir; kilit o pencereyi kapatır
+   * (iptal/indirim yolları da aynı satırları kilitliyor → serileşirler).
+   */
+  findActiveByAppointmentIdForUpdate(
+    appointmentId: string
+  ): Promise<TreatmentCharge[]>;
 }

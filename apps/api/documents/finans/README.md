@@ -19,17 +19,21 @@ Entegratör modülü kapalıyken sistem en azından **önmuhasebe + fiş üretim
 
 ## Okuma sırası ve modül haritası
 
-| Dosya | İçerik | Kim için kritik |
-|-------|--------|-----------------|
-| [`00-mimari.md`](./00-mimari.md) | Katmanlı mimari, modülerlik, çapraz kesen konular (multi-tenant, audit, dönem) | Herkes — önce bunu oku |
-| [`01-veri-modeli.md`](./01-veri-modeli.md) | Çekirdek varlıklar, PostgreSQL şeması, TypeScript tipleri | Backend |
-| [`02-hesap-plani.md`](./02-hesap-plani.md) | TDHP + klinik özelinde hesap planı, hesap türleri | Muhasebe çekirdeği |
-| [`03-onmuhasebe.md`](./03-onmuhasebe.md) | Cari, kasa/banka/POS, fatura, stok, tahsilat, çek/senet | Operasyon katmanı |
-| [`04-muhasebe-defterler.md`](./04-muhasebe-defterler.md) | Yevmiye fişi, defter-i kebir, mizan, dönem kapama, mali tablolar | Muhasebe çekirdeği |
-| [`05-muhasebelestirme-kurallari.md`](./05-muhasebelestirme-kurallari.md) | Olay → fiş şablonu eşleşmeleri (posting rules engine) | **En kritik** — entegrasyonun kalbi |
-| [`06-vergi.md`](./06-vergi.md) | KDV, tevkifat, stopaj, geçici/kurumlar vergisi, beyanname verisi | Vergi |
-| [`07-entegrator-modulu.md`](./07-entegrator-modulu.md) | e-Fatura/e-Arşiv/e-SMM, Logo/GİB; pluggable + fallback | Entegrasyon |
-| [`08-girdi-cikti-ozeti.md`](./08-girdi-cikti-ozeti.md) | Hangi girdiyi tutmalısın / hangi çıktıyı üretmelisin (kontrol listesi) | Ürün/kapsam |
+| Dosya                                                                    | İçerik                                                                                                                                            | Kim için kritik                     |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| [`00-mimari.md`](./00-mimari.md)                                         | Katmanlı mimari, modülerlik, çapraz kesen konular (multi-tenant, audit, dönem)                                                                    | Herkes — önce bunu oku              |
+| [`01-veri-modeli.md`](./01-veri-modeli.md)                               | Çekirdek varlıklar, PostgreSQL şeması, TypeScript tipleri                                                                                         | Backend                             |
+| [`02-hesap-plani.md`](./02-hesap-plani.md)                               | TDHP + klinik özelinde hesap planı, hesap türleri                                                                                                 | Muhasebe çekirdeği                  |
+| [`03-onmuhasebe.md`](./03-onmuhasebe.md)                                 | Cari, kasa/banka/POS, fatura, stok, tahsilat, çek/senet                                                                                           | Operasyon katmanı                   |
+| [`04-muhasebe-defterler.md`](./04-muhasebe-defterler.md)                 | Yevmiye fişi, defter-i kebir, mizan, dönem kapama, mali tablolar                                                                                  | Muhasebe çekirdeği                  |
+| [`05-muhasebelestirme-kurallari.md`](./05-muhasebelestirme-kurallari.md) | Olay → fiş şablonu eşleşmeleri (posting rules engine)                                                                                             | **En kritik** — entegrasyonun kalbi |
+| [`06-vergi.md`](./06-vergi.md)                                           | KDV, tevkifat, stopaj, geçici/kurumlar vergisi, beyanname verisi                                                                                  | Vergi                               |
+| [`07-entegrator-modulu.md`](./07-entegrator-modulu.md)                   | e-Fatura/e-Arşiv/e-SMM, Logo/GİB; pluggable + fallback                                                                                            | Entegrasyon                         |
+| [`08-girdi-cikti-ozeti.md`](./08-girdi-cikti-ozeti.md)                   | Hangi girdiyi tutmalısın / hangi çıktıyı üretmelisin (kontrol listesi)                                                                            | Ürün/kapsam                         |
+| [`09-guvence-denetimi.md`](./09-guvence-denetimi.md)                     | Para güvenliği denetimi: modül-modül kontrol listesi + açık bulgular (P0/P1/P2)                                                                   | **Canlıya çıkmadan** — herkes       |
+| [`10-kalan-isler.md`](./10-kalan-isler.md)                               | Denetimden kalan işler **tek listede**: 22 iş paketi (tetikleyici + bağımlılık sırası), kabul edilmiş tasarım kararları, kurulum/operasyon durumu | Planlama — sıradaki turu seçerken   |
+| [`11-eksik-kalanlar.md`](./11-eksik-kalanlar.md)                         | Ertelenen kalemlerin düz listesi — **üretilir** (`pnpm finans:eksik`), elle tutulmaz                                                              | Hiçbir kalemin düşmediğini görmek   |
+| [`12-durum-devri.md`](./12-durum-devri.md)                               | **Durum devri:** mimari kararlar + 16 kural indeksi + kapatılan bulgular + migration durumu + bekleyen 22 paket, tek sayfada                      | Yeni bir oturuma bağlam vermek      |
 
 ## Katman özeti (tek bakışta)
 

@@ -1,5 +1,6 @@
 import { Expose, Type } from 'class-transformer';
 import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { JsonValueType } from '@input-type-schemas/JsonValueSchema';
 import { IyzicoTransactionStatusType as IyzicoTransactionStatus } from '@input-type-schemas/IyzicoTransactionStatusSchema';
 
 const { INTERNAL, MANAGEMENT, FINANCIAL, ADMIN } = ResponseGroups;
@@ -16,8 +17,8 @@ export class IyzicoTransactionResponseDto {
   status: IyzicoTransactionStatus;
 
   // --- Gateway Referansları (Sadece Finans, Yönetim ve Admin) ---
-  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
-  token: string | null;
+  // `token` BİLİNÇLİ olarak yok: §73'teki callback bağının yerel kanıtı bu
+  // kolondur; yanıtta taşımak kanıtı okunabilir kılar.
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   iyzicoPaymentId: string | null;
@@ -32,9 +33,18 @@ export class IyzicoTransactionResponseDto {
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   errorMessage: string | null;
 
-  // --- Gateway Ham Logları (Sadece Yönetim ve Admin) ---
+  /**
+   * Gateway ham yanıtı (yalnız yönetim/admin).
+   *
+   * Bu alan bir dönem **non-3DS çekim yapmaya yeten** kart saklama
+   * token'larını (`cardToken` + `cardUserKey`) tarayıcıya kadar taşıyordu.
+   * Artık taşımıyor ama güvence **burada değil, yazma sınırında**:
+   * `IyzicoTransaction` blob'u `redactSensitive` ile maskeleyerek saklıyor.
+   * Burada süzmek yalnız bu okuyucuyu korurdu — DB'ye bakan operatör, yedek ve
+   * ileride eklenecek raporlar korumasız kalırdı.
+   */
   @Expose({ groups: [MANAGEMENT, ADMIN] })
-  rawResponse: any | null;
+  rawResponse: JsonValueType | null;
 
   // --- Audit Zaman Damgaları ---
   @Expose({ groups: [MANAGEMENT, ADMIN] })

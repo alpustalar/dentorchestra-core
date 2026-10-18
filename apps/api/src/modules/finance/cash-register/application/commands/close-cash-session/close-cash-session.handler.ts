@@ -17,21 +17,24 @@ import {
 import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
 import { CASH_REGISTER_EVENTS } from '@src/domain/constants/events/cash-register.constant';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import {
   CASH_SESSION_COMMAND_REPOSITORY,
   ICashSessionCommandRepository,
 } from '@modules/finance/cash-register/domain/repositories/cash-session/cash-session.command.repository';
 
 @CommandHandler(CloseCashSessionCommand)
-export class CloseCashSessionHandler
-  implements ICommandHandler<CloseCashSessionCommand, CloseCashSessionResponse>
-{
+export class CloseCashSessionHandler implements ICommandHandler<
+  CloseCashSessionCommand,
+  CloseCashSessionResponse
+> {
   constructor(
     @Inject(CASH_SESSION_COMMAND_REPOSITORY)
     private readonly cashSessionRepo: ICashSessionCommandRepository,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
     private readonly commandBus: TSCommandBus,
+    private readonly criticalFailure: CriticalFailurePublisher,
     private readonly txManager: TransactionManager
   ) {}
 
@@ -66,6 +69,8 @@ export class CloseCashSessionHandler
         closedById: ctx.actor.userId,
       });
 
+      this.alarmOnNegativeDrawer(session);
+
       await this.postClosingToAccounting(session, ctx);
       await this.cashSessionRepo.update(session);
 
@@ -76,6 +81,38 @@ export class CloseCashSessionHandler
         countedAmount: (session.countedAmount ?? new Decimal(0)).toFixed(2),
         difference: (session.difference ?? new Decimal(0)).toFixed(2),
       };
+    });
+  }
+
+  /**
+   * Beklenen tutar negatifse çekmece bir noktada eksiye düşmüştür.
+   *
+   * Çıkış kapısı (`assertCanWithdraw`) bunu artık kaydın önünde durduruyor; geriye
+   * yalnız kapı yokken yazılmış **eski** hareketler kalıyor. Bu durumda `fark =
+   * sayım − beklenen` pozitif çıkar ve köprü onu "sayım fazlası" → 679 Diğer
+   * Olağandışı Gelir olarak fişler; yani uydurma bir gelir. Kapanış bloke
+   * EDİLMEZ (kasanın kapanabilmesi gerekir) ama sessiz de geçilmez: fiş atılmadan
+   * önce uyarı çıkar, insanın bakması gerekir.
+   */
+  private alarmOnNegativeDrawer(session: CashSession): void {
+    const expected = session.expectedAmount ?? new Decimal(0);
+    if (!expected.isNegative()) return;
+
+    this.criticalFailure.publish({
+      operation: 'finance.cash-register.close-session',
+      severity: 'CRITICAL',
+      summary:
+        'Kasa oturumu negatif beklenen tutarla kapandı: çıkışlar çekmecedeki ' +
+        'nakdi aşmış. Sayım farkı gerçek bir fazla DEĞİL, eksi kasanın izidir.',
+      errorMessage: null,
+      context: {
+        sessionId: session.id.value,
+        expectedAmount: expected.toFixed(2),
+        countedAmount: (session.countedAmount ?? new Decimal(0)).toFixed(2),
+        difference: (session.difference ?? new Decimal(0)).toFixed(2),
+      },
+      clinicId: session.clinicId.value,
+      dedupeKey: `cash-session-negative-drawer:${session.id.value}`,
     });
   }
 

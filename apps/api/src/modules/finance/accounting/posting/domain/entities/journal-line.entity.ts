@@ -4,6 +4,8 @@ import { Currency } from '@src/domain/value-objects/currency.vo';
 import { Decimal } from 'decimal.js';
 import { CreateJournalEntryLineProps } from '@modules/finance/accounting/posting/domain/contracts/journal-line';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
+import { Money } from '@src/domain/value-objects/money.vo';
+import { InvalidJournalLineAmountException } from '@modules/finance/shared/domain/exceptions';
 
 export class JournalLine {
   private readonly _amount: JournalEntryLineAmount;
@@ -106,6 +108,12 @@ export class JournalLine {
         Currency.fromTrusted(Currency.enum.TRY)
     );
 
+    // Orijinal (yabancı para) tutarlar da `Decimal(14,2)` kolonunda durur:
+    // kuruş ölçeği onlar için de zorlanır, yoksa izlenebilirlik kolonu saklanan
+    // değerden sapar ve `original × fxRate ≈ debit` mutabakatı hiç tutmaz.
+    const originalDebit = JournalLine.toKurusOrThrow(props.originalDebit);
+    const originalCredit = JournalLine.toKurusOrThrow(props.originalCredit);
+
     return new JournalLine({
       id: UUID.createOrGenerate(props.id).value,
       entryId,
@@ -114,14 +122,8 @@ export class JournalLine {
       debit: amount.debit,
       credit: amount.credit,
       currency: amount.currency.value ?? 'TRY',
-      originalDebit:
-        props.originalDebit != null
-          ? new Decimal(props.originalDebit.toString())
-          : null,
-      originalCredit:
-        props.originalCredit != null
-          ? new Decimal(props.originalCredit.toString())
-          : null,
+      originalDebit,
+      originalCredit,
       originalCurrency: props.originalCurrency
         ? Currency.create(props.originalCurrency).orThrow().value
         : null,
@@ -129,6 +131,23 @@ export class JournalLine {
         props.fxRate != null ? new Decimal(props.fxRate.toString()) : null,
       lineDesc: props.lineDesc ?? null,
     });
+  }
+
+  /**
+   * Orijinal para tutarını kuruş ölçeğinde doğrular; ölçek aşılırsa satır
+   * tutarıyla **aynı** tipli hatayı fırlatır (tek kural, tek hata kimliği).
+   */
+  private static toKurusOrThrow(
+    value: Decimal | string | number | null | undefined
+  ): Decimal | null {
+    if (value == null) return null;
+    const decimal = new Decimal(value.toString());
+    if (!Money.isKurusScaled(decimal)) {
+      throw new InvalidJournalLineAmountException(
+        `Orijinal para tutarı en çok iki ondalık hane taşıyabilir (gelen: ${decimal.toString()}).`
+      );
+    }
+    return decimal;
   }
 
   public matchesAccount(accountId: string): boolean {

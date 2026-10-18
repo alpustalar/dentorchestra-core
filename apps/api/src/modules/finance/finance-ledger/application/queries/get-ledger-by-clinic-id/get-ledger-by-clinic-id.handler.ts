@@ -13,10 +13,10 @@ import {
 } from '@modules/finance/finance-ledger/domain/repositories/finance-ledger/finance-ledger.query.repository';
 
 @QueryHandler(GetLedgerByClinicIdQuery)
-export class GetLedgerByClinicIdHandler
-  implements
-    IQueryHandler<GetLedgerByClinicIdQuery, GetLedgerByClinicIdQueryResponse>
-{
+export class GetLedgerByClinicIdHandler implements IQueryHandler<
+  GetLedgerByClinicIdQuery,
+  GetLedgerByClinicIdQueryResponse
+> {
   constructor(
     @Inject(FINANCE_LEDGER_QUERY_REPOSITORY)
     private readonly financeLedgerRepository: IFinanceLedgerQueryRepository,

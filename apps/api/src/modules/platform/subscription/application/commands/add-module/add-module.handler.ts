@@ -27,9 +27,10 @@ export interface AddModuleResult {
 }
 
 @CommandHandler(AddModuleCommand)
-export class AddModuleHandler
-  implements ICommandHandler<AddModuleCommand, AddModuleResult>
-{
+export class AddModuleHandler implements ICommandHandler<
+  AddModuleCommand,
+  AddModuleResult
+> {
   constructor(
     @Inject(SUBSCRIPTION_ITEM_COMMAND_REPOSITORY)
     private readonly subscriptionItemRepo: ISubscriptionItemCommandRepository,

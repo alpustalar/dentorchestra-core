@@ -1,5 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import { InvalidJournalEntrySequenceException } from '@modules/finance/shared/domain/exceptions';
 
 export class JournalEntrySequence {
   private static readonly schema = z
@@ -29,7 +29,9 @@ export class JournalEntrySequence {
     const result = this.schema.safeParse(value);
 
     if (!result.success) {
-      throw new BadRequestException(result.error.message);
+      throw new InvalidJournalEntrySequenceException(
+        result.error.issues.map((issue) => issue.message).join(' ')
+      );
     }
 
     return new JournalEntrySequence(result.data);

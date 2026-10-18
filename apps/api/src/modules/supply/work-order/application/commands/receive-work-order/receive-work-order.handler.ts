@@ -19,9 +19,10 @@ import { WORK_ORDER_EVENTS } from '@src/domain/constants/events';
  * yolundan işlenir (mükerrer kayıt olmaz).
  */
 @CommandHandler(ReceiveWorkOrderCommand)
-export class ReceiveWorkOrderHandler
-  implements ICommandHandler<ReceiveWorkOrderCommand, void>
-{
+export class ReceiveWorkOrderHandler implements ICommandHandler<
+  ReceiveWorkOrderCommand,
+  void
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_COMMAND_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderCommandRepository,

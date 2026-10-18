@@ -100,7 +100,7 @@ describe('ApplyInvoiceToPurchaseOrderHandler — fatura eşleştirme (kilit + uy
     overrides: Partial<{
       clinicId: string;
       supplierId: string;
-      grandTotal: number;
+      grandTotal: string;
       currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
     }> = {}
   ) =>
@@ -109,7 +109,7 @@ describe('ApplyInvoiceToPurchaseOrderHandler — fatura eşleştirme (kilit + uy
       invoiceId: INVOICE_ID,
       clinicId: overrides.clinicId ?? CLINIC_ID,
       supplierId: overrides.supplierId ?? SUPPLIER_ID,
-      grandTotal: overrides.grandTotal ?? 1200,
+      grandTotal: overrides.grandTotal ?? '1200.00',
       currency: overrides.currency ?? CurrencySchema.enum.TRY,
       ctx,
     });
@@ -118,7 +118,7 @@ describe('ApplyInvoiceToPurchaseOrderHandler — fatura eşleştirme (kilit + uy
     const order = makeSentOrder();
     const { handler, update } = build(order);
 
-    await handler.execute(commandFor(order, { grandTotal: 480 }));
+    await handler.execute(commandFor(order, { grandTotal: '480.00' }));
 
     expect(order.invoicedTotal.toNumber()).toBe(480);
     expect(order.billingStatus).toBe('PARTIALLY_BILLED');
@@ -130,7 +130,7 @@ describe('ApplyInvoiceToPurchaseOrderHandler — fatura eşleştirme (kilit + uy
     const { handler, purchaseOrderRepo, findByIdForUpdate, depthAtCall } =
       build(order);
 
-    await handler.execute(commandFor(order, { grandTotal: 100 }));
+    await handler.execute(commandFor(order, { grandTotal: '100.00' }));
 
     expect(findByIdForUpdate).toHaveBeenCalledWith(order.id.value);
     expect(

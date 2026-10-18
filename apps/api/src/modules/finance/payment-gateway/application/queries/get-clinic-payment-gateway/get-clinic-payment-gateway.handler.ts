@@ -12,13 +12,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @QueryHandler(GetClinicPaymentGatewayQuery)
-export class GetClinicPaymentGatewayHandler
-  implements
-    IQueryHandler<
-      GetClinicPaymentGatewayQuery,
-      GetClinicPaymentGatewayResponse
-    >
-{
+export class GetClinicPaymentGatewayHandler implements IQueryHandler<
+  GetClinicPaymentGatewayQuery,
+  GetClinicPaymentGatewayResponse
+> {
   constructor(
     @Inject(CLINIC_PAYMENT_GATEWAY_QUERY_REPOSITORY)
     private readonly clinicPaymentGatewayRepo: IClinicPaymentGatewayQueryRepository,

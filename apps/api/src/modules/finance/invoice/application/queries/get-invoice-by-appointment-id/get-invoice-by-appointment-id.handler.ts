@@ -8,13 +8,10 @@ import {
 } from '@modules/finance/invoice/domain/repositories/invoice/invoice.query.repository';
 
 @QueryHandler(GetInvoiceByAppointmentIdQuery)
-export class GetInvoiceByAppointmentIdHandler
-  implements
-    IQueryHandler<
-      GetInvoiceByAppointmentIdQuery,
-      GetInvoiceByAppointmentIdResponse
-    >
-{
+export class GetInvoiceByAppointmentIdHandler implements IQueryHandler<
+  GetInvoiceByAppointmentIdQuery,
+  GetInvoiceByAppointmentIdResponse
+> {
   constructor(
     @Inject(INVOICE_QUERY_REPOSITORY)
     private readonly invoiceRepo: IInvoiceQueryRepository

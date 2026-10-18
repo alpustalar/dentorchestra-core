@@ -1,8 +1,12 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
+import { AccountingPeriodStatusSchema } from '@shared';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { LockPeriodCommand } from './lock-period.command';
-import { PeriodNotFoundException } from '@modules/finance/accounting/periods/domain/exceptions/period.exceptions';
+import {
+  PeriodConcurrentTransitionException,
+  PeriodNotFoundException,
+} from '@modules/finance/accounting/periods/domain/exceptions/period.exceptions';
 import {
   ACCOUNTING_PERIOD_COMMAND_REPOSITORY,
   IAccountingPeriodCommandRepository,
@@ -11,11 +15,13 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
+import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 @CommandHandler(LockPeriodCommand)
-export class LockPeriodHandler
-  implements ICommandHandler<LockPeriodCommand, void>
-{
+export class LockPeriodHandler implements ICommandHandler<
+  LockPeriodCommand,
+  void
+> {
   constructor(
     @Inject(ACCOUNTING_PERIOD_COMMAND_REPOSITORY)
     private readonly accountingPeriodRepo: IAccountingPeriodCommandRepository,
@@ -32,12 +38,27 @@ export class LockPeriodHandler
     // (istekteki bir alandan değil — o alan da saldırganın kontrolünde olurdu).
     this.policyFactory
       .finance(command.ctx.actor, command.ctx.source)
-      .evaluator.check((p) => p.actorCanManageTargetClinic(period.clinicId.value))
-      .orThrow('accounting.period.lock');
+      .evaluator.check((p) =>
+        p.actorCanManageTargetClinic(period.clinicId.value)
+      )
+      .orThrow(ACCOUNTING_EVENTS.PERIOD_LOCK);
 
-    period.lock();
+    // Durum geçişi + denetim damgası domain'de; DB'ye yazma koşullu (OPEN ise).
+    period.lock({
+      actorId: command.ctx.actor.userId,
+      source: command.ctx.actor.source,
+    });
+
     await this.txManager.run(async () => {
-      await this.accountingPeriodRepo.update(period);
+      // Koşulsuz `update(entity)` kullanılmaz: araya giren bir kapanışı geri alır
+      // (kapanış fişleri atılmış dönemi tekrar yazılabilir yapardı).
+      const claimed = await this.accountingPeriodRepo.claimForLocking(period);
+      if (!claimed) {
+        throw new PeriodConcurrentTransitionException(
+          period.id.value,
+          AccountingPeriodStatusSchema.enum.OPEN
+        );
+      }
     });
   }
 }

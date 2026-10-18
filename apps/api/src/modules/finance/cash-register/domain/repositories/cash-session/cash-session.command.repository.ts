@@ -9,8 +9,7 @@ import {
 export const CASH_SESSION_COMMAND_REPOSITORY = Symbol(
   'ICashSessionCommandRepository'
 );
-export interface ICashSessionCommandRepository
-  extends IBaseCommandRepository<CashSession> {
+export interface ICashSessionCommandRepository extends IBaseCommandRepository<CashSession> {
   /**
    * Oturumu `FOR UPDATE` ile kilitleyerek yükler — eşzamanlı kapanış/hareket
    * yarışını serialize eder. Yalnız aktif transaction içinde çağrılır.

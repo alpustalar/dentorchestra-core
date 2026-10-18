@@ -14,12 +14,13 @@ import {
 } from '@modules/finance/pos/physical/domain/interfaces/physical-pos-provider.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
+import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
 
 @CommandHandler(HandlePosCallbackCommand)
-export class HandlePosCallbackHandler
-  implements
-    ICommandHandler<HandlePosCallbackCommand, HandlePosCallbackResponse>
-{
+export class HandlePosCallbackHandler implements ICommandHandler<
+  HandlePosCallbackCommand,
+  HandlePosCallbackResponse
+> {
   private readonly logger = new Logger(HandlePosCallbackHandler.name);
 
   constructor(
@@ -86,15 +87,22 @@ export class HandlePosCallbackHandler
         await this.posTransactionRepo.update(transaction);
 
         if (transaction.paymentId) {
+          // Callback'i cihaz/banka sunucusu çağırır; aktör iç bağlamdır.
+          const ctx = ExecutionContextFactory.createInternal();
+
           if (posCallbackResult.status === PosCallbackStatuses.SUCCESS) {
             await this.posPaymentSync.markPaid({
               paymentId: transaction.paymentId,
               clinicId: transaction.clinicId.value,
+              amount: transaction.amount.value,
+              ctx,
             });
           } else if (posCallbackResult.status === PosCallbackStatuses.FAILED) {
             await this.posPaymentSync.markFailed({
               paymentId: transaction.paymentId,
               clinicId: transaction.clinicId.value,
+              amount: transaction.amount.value,
+              ctx,
             });
           }
         }

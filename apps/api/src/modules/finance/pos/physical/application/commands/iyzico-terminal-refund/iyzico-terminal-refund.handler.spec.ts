@@ -12,6 +12,7 @@ import {
 import { ResolveIyzicoTerminalCredentialsService } from '@modules/finance/pos/physical/application/services/resolve-iyzico-terminal-credentials.service';
 import { IyzicoTerminalService } from '@src/infrastructure/payment/pos/physical/providers/iyzico-terminal/iyzico-terminal.service';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
+import { PosAccountingBridgeService } from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
 import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
@@ -35,6 +36,7 @@ describe('IyzicoTerminalRefundHandler — iade (kilit + kümülatif tutar)', () 
       clinicId: CLINIC_ID,
       amount: SALE_AMOUNT,
       currency: CurrencySchema.enum.TRY,
+      initiatedById: 'firebase-staff-uid-1',
     });
     sale.markSuccess('IYZ-PAYMENT-1', { paymentDate: '2026-08-13 10:00:00' });
     return sale;
@@ -120,6 +122,13 @@ describe('IyzicoTerminalRefundHandler — iade (kilit + kümülatif tutar)', () 
       markRefunded: jest.fn(() => Promise.resolve()),
     } as unknown as PosPaymentSyncService;
 
+    // Muhasebe köprüsü: ters kayıt artık PAYMENT_REFUNDED olayını da yazar
+    // (120 / 108). Çağrıldığı testlerde girdisi doğrulanıyor.
+    const bridgeRecord = jest.fn(() => Promise.resolve());
+    const accountingBridge = {
+      recordBestEffort: bridgeRecord,
+    } as unknown as PosAccountingBridgeService;
+
     // Kiracı kapsamı kontrolü: aktör bu kliniğe erişebiliyor kabul edilir.
     // Reddedilme yolu ayrı testte doğrulanıyor.
     const policyFactory = {
@@ -138,6 +147,7 @@ describe('IyzicoTerminalRefundHandler — iade (kilit + kümülatif tutar)', () 
         iyzicoTerminalService,
         txManager,
         posPaymentSync,
+        accountingBridge,
         policyFactory
       ),
       posTransactionRepo,

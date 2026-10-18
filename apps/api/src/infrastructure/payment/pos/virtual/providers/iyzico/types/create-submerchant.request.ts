@@ -24,3 +24,16 @@ export interface UpdateSubMerchantRequest extends CreateSubMerchantRequest {
 export interface SubMerchantResult {
   subMerchantKey: string;
 }
+
+/**
+ * Alt üye işyerini **dış kimlikten** (bizim `clinicId`) sorgular.
+ *
+ * Kurtarma yolu için gerekli: alt üye işyeri iyzico'da açıldıktan sonra yerel
+ * yazma başarısız olursa, ikinci deneme `create` ile "zaten var" hatası alır ve
+ * klinik kalıcı olarak kurulamaz hale gelir. `retrieve` ile anahtar geri
+ * okunabildiği için akış idempotent olur.
+ */
+export interface RetrieveSubMerchantRequest {
+  conversationId: string;
+  subMerchantExternalId: string;
+}

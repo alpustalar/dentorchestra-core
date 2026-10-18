@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { MetaLeadReceivedEvent } from '@modules/crm/meta-ads/domain/events';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { LogType } from '@src/domain/constants/log-action.constant';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class MetaLeadReceivedListener {
@@ -10,7 +10,7 @@ export class MetaLeadReceivedListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(MetaLeadReceivedEvent.NAME, { async: true })
+  @OnDomainEvent(MetaLeadReceivedEvent.NAME)
   async handle(event: MetaLeadReceivedEvent): Promise<void> {
     const { log, metadata } = event;
 

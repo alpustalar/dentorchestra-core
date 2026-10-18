@@ -1,11 +1,7 @@
 import { StartTrialHandler } from './start-trial.handler';
 import { StartTrialCommand } from './start-trial.command';
-import {
-  ISubscriptionCommandRepository,
-} from '@modules/platform/subscription/domain/repositories/subscription/subscription.command.repository';
-import {
-  ISubscriptionItemCommandRepository,
-} from '@modules/platform/subscription/domain/repositories/subscription-item/subscription-item.command.repository';
+import { ISubscriptionCommandRepository } from '@modules/platform/subscription/domain/repositories/subscription/subscription.command.repository';
+import { ISubscriptionItemCommandRepository } from '@modules/platform/subscription/domain/repositories/subscription-item/subscription-item.command.repository';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
 import { Subscription } from '@modules/platform/subscription/domain/entities/subscription.entity';

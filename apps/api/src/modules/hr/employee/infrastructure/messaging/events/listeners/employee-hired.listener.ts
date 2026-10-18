@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { EmployeeHiredEvent } from '@modules/hr/employee/domain/events';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { LogType } from '@src/domain/constants/log-action.constant';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class EmployeeHiredListener {
@@ -10,7 +10,7 @@ export class EmployeeHiredListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(EmployeeHiredEvent.NAME, { async: true })
+  @OnDomainEvent(EmployeeHiredEvent.NAME)
   async handle(event: EmployeeHiredEvent): Promise<void> {
     const { log, metadata } = event;
     try {

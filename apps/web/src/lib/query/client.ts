@@ -8,7 +8,11 @@ import { ApiError } from '@/lib/api';
  * bekletir. 401 zaten istemci katmanında bir kez token yenilemesiyle deneniyor.
  */
 function shouldRetry(failureCount: number, error: unknown): boolean {
-  if (error instanceof ApiError && error.statusCode >= 400 && error.statusCode < 500) {
+  if (
+    error instanceof ApiError &&
+    error.statusCode >= 400 &&
+    error.statusCode < 500
+  ) {
     return false;
   }
   return failureCount < 2;

@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { FINANCIAL_EVENT_EVENTS } from '@src/domain/constants/events';
 import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { FinancialEventRecordedEvent } from '@modules/finance/accounting/financial-events/domain/events/financial-event-recorded.event';
 import { PostFinancialEventCommand } from '@modules/finance/accounting/posting/application/commands/post-financial-event/post-financial-event.command';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Bir ekonomik olay kaydedildiğinde fişi üretir.
@@ -20,7 +20,7 @@ export class FinancialEventRecordedListener {
     private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
-  @OnEvent(FINANCIAL_EVENT_EVENTS.RECORDED, { async: true })
+  @OnDomainEvent(FINANCIAL_EVENT_EVENTS.RECORDED)
   async handle(event: FinancialEventRecordedEvent): Promise<void> {
     const ctx = ExecutionContextFactory.createInternal();
 
@@ -47,11 +47,13 @@ export class FinancialEventRecordedListener {
         errorMessage: error instanceof Error ? error.message : String(error),
         context: {
           financialEventId: event.financialEventId,
+          clinicId: event.clinicId,
           organizationId: event.organizationId,
           eventType: event.type,
         },
-        // Bu event klinik taşımıyor (defter organizasyon kapsamında kaydediliyor).
-        clinicId: null,
+        // Defter sahibi şube: uyarının tek işi "hangi defterin mizanı eksik
+        // kaldı" sorusunu cevaplamak; kiracısız bir alarm yönlendirilemez.
+        clinicId: event.clinicId,
         dedupeKey: `posting-failed:${event.financialEventId}`,
       });
     }

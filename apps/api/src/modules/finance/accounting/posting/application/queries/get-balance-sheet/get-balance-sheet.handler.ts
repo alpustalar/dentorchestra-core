@@ -17,6 +17,7 @@ import {
 } from '@modules/finance/accounting/posting/domain/reporting/income-statement.calculator';
 import { BalanceSheetCalculator } from '@modules/finance/accounting/posting/domain/reporting/balance-sheet.calculator';
 import { GetChartOfAccountsQuery } from '@modules/finance/accounting/chart-of-accounts/application/queries/get-chart-of-accounts/get-chart-of-accounts.query';
+import { normalizeReportDateRange } from '@modules/finance/shared/domain/reporting/report-date-range';
 import { GetBalanceSheetQuery } from './get-balance-sheet.query';
 import {
   BalanceSheetReportSection,
@@ -37,7 +38,7 @@ export class GetBalanceSheetHandler implements IQueryHandler<
   ) {}
 
   async execute(query: GetBalanceSheetQuery): Promise<GetBalanceSheetResponse> {
-    const { clinicId, ctx, dateFrom, dateTo } = query.payload;
+    const { clinicId, ctx, asOf } = query.payload;
 
     const { evaluator, policy } = this.policyFactory.finance(
       ctx.actor,
@@ -53,10 +54,17 @@ export class GetBalanceSheetHandler implements IQueryHandler<
 
     const serializationOptions = policy.getSerializationOptions({ clinicId });
 
+    // Bilanço kümülatiftir: `dateFrom` YOK — bakiyeler defterin başından `asOf`
+    // tarihine kadar birikir. Alt sınır konulsaydı varlık/kaynak hesaplarının o
+    // tarihten önceki tüm hareketi (ve geçmiş yılların kârı) rapordan düşerdi.
+    //
+    // `kinds` de verilmez: kapanış fişi bilançoya AİTTİR — kârı öz kaynağa (590)
+    // taşıyan kayıt odur. Kapanmış bir yılda 6/7 zaten sıfırlanmış olur, o yüzden
+    // aşağıdaki `netProfit` doğru biçimde 0 çıkar ve kâr öz kaynak satırında
+    // görünür. Kapanış dışlansaydı aynı kâr iki kez sayılırdı (hem 6/7 hem 590).
     const rows = await this.journalQueryRepo.trialBalance({
       clinicId,
-      dateFrom,
-      dateTo,
+      dateTo: asOf,
     });
     const { data: accounts } = await this.queryBus.execute(
       new GetChartOfAccountsQuery(clinicId, ctx)
@@ -81,11 +89,16 @@ export class GetBalanceSheetHandler implements IQueryHandler<
     const { netProfit } = IncomeStatementCalculator.compute(balances);
     const r = BalanceSheetCalculator.compute(balances, netProfit);
 
+    // Rapor başlığı gün sonuna genişletilmiş anı gösterir: "31 Aralık" isteği
+    // 31 Aralık 23:59:59.999'u kapsar (repo aynı normalizasyonu uygular).
+    const { dateTo: normalizedAsOf } = normalizeReportDateRange({
+      dateTo: asOf,
+    });
+
     return {
       data: {
         clinicId,
-        dateFrom: dateFrom ?? null,
-        dateTo: dateTo ?? null,
+        asOf: normalizedAsOf ?? null,
         currentAssets: this.toSection(r.currentAssets),
         nonCurrentAssets: this.toSection(r.nonCurrentAssets),
         totalAssets: r.totalAssets.toFixed(2),

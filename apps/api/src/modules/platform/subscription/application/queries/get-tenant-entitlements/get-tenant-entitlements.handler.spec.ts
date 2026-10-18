@@ -1,11 +1,7 @@
 import { GetTenantEntitlementsHandler } from './get-tenant-entitlements.handler';
 import { GetTenantEntitlementsQuery } from './get-tenant-entitlements.query';
-import {
-  ISubscriptionQueryRepository,
-} from '@modules/platform/subscription/domain/repositories/subscription/subscription.query.repository';
-import {
-  IPlanQueryRepository,
-} from '@modules/platform/subscription/domain/repositories/plan/plan.query.repository';
+import { ISubscriptionQueryRepository } from '@modules/platform/subscription/domain/repositories/subscription/subscription.query.repository';
+import { IPlanQueryRepository } from '@modules/platform/subscription/domain/repositories/plan/plan.query.repository';
 import { EntitlementSource } from '@modules/platform/subscription/domain/contracts';
 import { randomUUID } from 'crypto';
 

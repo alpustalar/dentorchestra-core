@@ -10,8 +10,10 @@ import { ITransferCacheService } from '@modules/crm/health-tourism/transfer/doma
 
 const KEYS = {
   AVAILABILITY: (paramsHash: string) => `transfer:availability:${paramsHash}`,
-  // AI asistanı için kısa optionId → HotelBeds transfer rateKey + bağlam.
-  RATE_OPTION: (token: string) => `transfer:rate-option:${token}`,
+  // AI asistanı için optionId → HotelBeds transfer rateKey + bağlam. Anahtar
+  // **kiracı kapsamlı** (bkz. `HotelCacheService`): başka kliniğin teklifi burada yok.
+  RATE_OPTION: (clinicId: string, token: string) =>
+    `transfer:rate-option:${clinicId}:${token}`,
 };
 
 @Injectable()
@@ -56,14 +58,18 @@ export class TransferCacheService implements ITransferCacheService {
         ttlSeconds = this.rateOptionTtl
       ): Promise<void> => {
         await this.redis.set(
-          KEYS.RATE_OPTION(token),
+          // Anahtarın kiracısı kaydın sahibinden gelir: ikisi **ayrışamaz**.
+          KEYS.RATE_OPTION(data.owner.clinicId, token),
           JSON.stringify(data),
           'EX',
           ttlSeconds
         );
       },
-      get: async (token: string): Promise<TransferRateOptionToken | null> => {
-        const raw = await this.redis.get(KEYS.RATE_OPTION(token));
+      get: async (
+        clinicId: string,
+        token: string
+      ): Promise<TransferRateOptionToken | null> => {
+        const raw = await this.redis.get(KEYS.RATE_OPTION(clinicId, token));
         if (!raw) return null;
         try {
           return JSON.parse(raw) as TransferRateOptionToken;

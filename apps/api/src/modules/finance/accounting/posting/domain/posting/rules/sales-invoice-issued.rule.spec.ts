@@ -4,7 +4,6 @@ import { FinancialEventTypeSchema } from '@shared';
 
 describe('SalesInvoiceIssuedRule', () => {
   const rule = new SalesInvoiceIssuedRule();
-  const ctx = { clinicId: 'clinic-1', organizationId: 'org-1' };
 
   const makeEvent = (payload: Record<string, unknown>) =>
     new FinancialEvent({
@@ -33,8 +32,7 @@ describe('SalesInvoiceIssuedRule', () => {
         netTotal: '1000.00',
         vatTotal: '100.00',
         grandTotal: '1100.00',
-      }),
-      ctx
+      })
     );
 
     expect(draft.lines).toHaveLength(3);
@@ -64,8 +62,7 @@ describe('SalesInvoiceIssuedRule', () => {
         vatTotal: '100.00',
         grandTotal: '1100.00',
         withholdingTotal: '200.00',
-      }),
-      ctx
+      })
     );
 
     expect(draft.lines).toHaveLength(4);

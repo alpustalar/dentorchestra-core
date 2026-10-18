@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import {
   IMailService,
   MAIL_SERVICE,
 } from '@src/infrastructure/mail/interfaces/mail.service.interface';
 import { OrganizationDeletionRequestedEvent } from '@modules/organization/organization/domain/events';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class OrganizationDeletionRequestedListener {
@@ -17,7 +17,7 @@ export class OrganizationDeletionRequestedListener {
     private readonly mailService: IMailService
   ) {}
 
-  @OnEvent(OrganizationDeletionRequestedEvent.NAME, { async: true })
+  @OnDomainEvent(OrganizationDeletionRequestedEvent.NAME)
   async handle(event: OrganizationDeletionRequestedEvent) {
     const { organizationId, actorEmail, adminRequestId } = event;
     try {

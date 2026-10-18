@@ -20,8 +20,7 @@ export interface CreatePaxDeviceProps extends CreatePosDeviceBaseProps {
 }
 
 /** iyzico Terminal (Host API) cihazı — yalnız deviceUniqueId zorunlu. */
-export interface CreateIyzicoTerminalDeviceProps
-  extends CreatePosDeviceBaseProps {
+export interface CreateIyzicoTerminalDeviceProps extends CreatePosDeviceBaseProps {
   provider: 'IYZICO_TERMINAL';
   deviceUniqueId: string;
   terminalId?: undefined;

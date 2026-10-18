@@ -68,11 +68,11 @@ export class FinanceLedgerResponseDto {
   updatedAt: Date;
 }
 
-/**
- * Klinik finans özeti (LedgerSummary). Ciro/gider toplamı yönetim verisidir —
- * resepsiyonun göreceği bir alan yok, tamamı finans tier'ında.
- */
-export class LedgerSummaryResponseDto {
+/** Para birimi başına klinik toplamı. */
+export class LedgerCurrencyTotalResponseDto {
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  currency: string;
+
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   @Type(() => String)
   totalIncome: string;
@@ -90,10 +90,27 @@ export class LedgerSummaryResponseDto {
 }
 
 /**
- * Hasta cari özeti (PatientFinanceSummary). Kalan bakiye tahsilat yapan
- * resepsiyonun da görmesi gereken bilgidir → INTERNAL'a açık.
+ * Klinik finans özeti (LedgerSummary). Ciro/gider toplamı yönetim verisidir —
+ * resepsiyonun göreceği bir alan yok, tamamı finans tier'ında.
+ *
+ * Toplam **para birimi kırılımında** döner: tek bir `balance` alanı farklı
+ * para birimlerini topluyordu.
  */
-export class PatientFinanceSummaryResponseDto {
+export class LedgerSummaryResponseDto {
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => LedgerCurrencyTotalResponseDto)
+  totals: LedgerCurrencyTotalResponseDto[];
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  entryCount: number;
+}
+
+/** Hastanın para birimi başına bakiyesi. */
+export class PatientCurrencyBalanceResponseDto {
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  currency: string;
+
+  /** Kalan bakiye tahsilat yapan resepsiyonun da görmesi gereken bilgidir. */
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
   @Type(() => String)
   balance: string;
@@ -105,6 +122,13 @@ export class PatientFinanceSummaryResponseDto {
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   @Type(() => String)
   totalPayments: string;
+}
+
+/** Hasta cari özeti (PatientFinanceSummary). */
+export class PatientFinanceSummaryResponseDto {
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => PatientCurrencyBalanceResponseDto)
+  balances: PatientCurrencyBalanceResponseDto[];
 }
 
 /** Hasta cari hareketi (PatientLedgerItem read-model). */
@@ -134,4 +158,45 @@ export class PatientLedgerItemResponseDto {
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   @Type(() => String)
   amount: string;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  currency: string;
+}
+
+/**
+ * Cari defter mutabakat satırı (LedgerMismatchRow). Tamamı finans/yönetim
+ * verisidir: hangi tahsilatın defterde eksik olduğu operasyonel bir açıktır.
+ */
+export class LedgerMismatchResponseDto {
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  installmentId: string;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  paymentId: string;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  clinicId: string;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  patientId: string;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  kind: string;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  expectedStatus: LedgerStatus;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  ledgerStatus: LedgerStatus | null;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  settledAt: Date;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => String)
+  amount: string;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  currency: string;
 }

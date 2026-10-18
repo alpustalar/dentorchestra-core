@@ -11,22 +11,17 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
-import {
-  ITenantScopeResolver,
-  TENANT_SCOPE_RESOLVER,
-} from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
 
 @QueryHandler(FindPartiesQuery)
-export class FindPartiesHandler
-  implements IQueryHandler<FindPartiesQuery, FindPartiesResponse>
-{
+export class FindPartiesHandler implements IQueryHandler<
+  FindPartiesQuery,
+  FindPartiesResponse
+> {
   constructor(
     @Inject(PARTY_QUERY_REPOSITORY)
     private readonly partyRepo: IPartyQueryRepository,
     @Inject(POLICY_FACTORY)
-    private readonly policyFactory: IPolicyFactory,
-    @Inject(TENANT_SCOPE_RESOLVER)
-    private readonly tenantScopeResolver: ITenantScopeResolver
+    private readonly policyFactory: IPolicyFactory
   ) {}
 
   async execute(query: FindPartiesQuery): Promise<FindPartiesResponse> {
@@ -37,19 +32,17 @@ export class FindPartiesHandler
       ctx.source
     );
 
-    const organizationId = await this.tenantScopeResolver.resolve({
-      clinicId,
-    });
-
     evaluator
       .check(
         (p) => p.canAccessClinicFinances(clinicId),
-        'Bu organizasyonun cari taraflarına erişim yetkiniz yok.'
+        'Bu şubenin cari taraflarına erişim yetkiniz yok.'
       )
       .orThrow('party.list');
 
+    // Süzgeç yetkiyle aynı eksende: kapı şube seviyesinde açıldığı için liste
+    // de şube kapsamında döner (org geneli liste org kapısı ister).
     const { items, total } = await this.partyRepo.findMany(
-      { organizationId, role },
+      { clinicId, role },
       pagination
     );
 
@@ -57,9 +50,7 @@ export class FindPartiesHandler
       data: items,
       meta: {
         pagination: buildPaginationMeta(pagination, total),
-        serializationOptions: policy.getOrganizationSerializationOptions({
-          organizationId,
-        }),
+        serializationOptions: policy.getSerializationOptions({ clinicId }),
       },
     };
   }

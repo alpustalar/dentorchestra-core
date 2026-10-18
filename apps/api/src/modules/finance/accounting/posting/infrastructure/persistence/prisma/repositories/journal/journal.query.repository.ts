@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { JournalEntryStatus, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { Pagination, JournalEntry as IJournalEntry } from '@shared';
 import { BaseRepository } from '@src/infrastructure/persistence/prisma/base.repository';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
@@ -21,11 +21,18 @@ import {
   VatDeclarationFilter,
 } from '@modules/finance/accounting/posting/domain/repositories/journal.repository';
 import { queryTrialBalance } from './journal-trial-balance.query';
+import { buildLedgerEntryWhere } from './ledger-entry-where.builder';
 
 /**
  * Okuma tarafı: entity hidrate edilmez. Defter append-only olduğu için raporlarda
  * domain davranışı gerekmez; storno/kapanış gibi yazma kararını besleyen okumalar
  * Command Repo'dadır.
+ *
+ * Bütün rapor sorguları fiş filtresini `buildLedgerEntryWhere` ile kurar — durum
+ * süzgeci (POSTED + REVERSED), gün sınırına genişletilmiş tarih aralığı ve açılış
+ * devri ↔ hareket bölüşümü oradan, tek yerden gelir. Üçü burada elle tekrarlanıyordu
+ * ve her yeni rapor metodu birini atlayabiliyordu; atlanınca sonuç yine "dengeli"
+ * görüneceği için hata sessiz kalırdı.
  */
 @Injectable()
 export class JournalQueryRepository
@@ -58,19 +65,15 @@ export class JournalQueryRepository
   }
 
   async accountLedger(filter: AccountLedgerFilter): Promise<AccountLedger> {
-    const baseEntryWhere: Prisma.JournalEntryWhereInput = {
-      clinicId: filter.clinicId,
-      status: JournalEntryStatus.POSTED,
-    };
+    const { entry, opening } = buildLedgerEntryWhere(filter);
 
-    // Açılış devri: dateFrom öncesi POSTED satırların net bakiyesi.
+    // Açılış devri: aralık başlangıcından önceki etkili satırların net bakiyesi.
+    // `opening` ile `entry` aynı normalize edilmiş `dateFrom`'dan türer → bir fiş
+    // ya devirde ya hareketlerde, asla ikisinde birden ya da hiçbirinde değil.
     let openingBalance = new Prisma.Decimal(0);
-    if (filter.dateFrom) {
+    if (opening) {
       const agg = await this.db.journalLine.aggregate({
-        where: {
-          accountId: filter.accountId,
-          entry: { ...baseEntryWhere, entryDate: { lt: filter.dateFrom } },
-        },
+        where: { accountId: filter.accountId, entry: opening },
         _sum: { debit: true, credit: true },
       });
       openingBalance = (agg._sum.debit ?? new Prisma.Decimal(0)).minus(
@@ -78,13 +81,8 @@ export class JournalQueryRepository
       );
     }
 
-    const entryWhere: Prisma.JournalEntryWhereInput = { ...baseEntryWhere };
-    if (filter.dateFrom || filter.dateTo) {
-      entryWhere.entryDate = { gte: filter.dateFrom, lte: filter.dateTo };
-    }
-
     const rows = await this.db.journalLine.findMany({
-      where: { accountId: filter.accountId, entry: entryWhere },
+      where: { accountId: filter.accountId, entry },
       include: {
         entry: {
           select: {
@@ -116,16 +114,12 @@ export class JournalQueryRepository
     filter: JournalReportFilter,
     pagination: Pagination
   ): Promise<{ items: JournalReportRow[]; total: number }> {
-    const where: Prisma.JournalEntryWhereInput = {
-      clinicId: filter.clinicId,
-      status: JournalEntryStatus.POSTED,
-    };
-    if (filter.dateFrom || filter.dateTo) {
-      where.entryDate = { gte: filter.dateFrom, lte: filter.dateTo };
-    }
+    const { entry: where } = buildLedgerEntryWhere(filter);
 
     // Yevmiye sırası entryDate + entryNo'dur; paginate helper tek kolon desteklediği
-    // için sorgu burada elle kurulur.
+    // için sorgu burada elle kurulur. Storno edilmiş fişler de listelenir: resmî
+    // yevmiye defteri kronolojik ve eksiksizdir, iptal edilen kayıt gizlenmez
+    // (`status` alanı hangi fişin storno edildiğini söyler).
     const [rows, total] = await Promise.all([
       this.db.journalEntry.findMany({
         where,
@@ -160,19 +154,14 @@ export class JournalQueryRepository
       return { openingBalance: new Prisma.Decimal(0), movements: [] };
     }
 
-    const baseEntryWhere: Prisma.JournalEntryWhereInput = {
-      clinicId: filter.clinicId,
-      status: JournalEntryStatus.POSTED,
-    };
+    const { entry, opening } = buildLedgerEntryWhere(filter);
 
-    // Açılış nakit pozisyonu: dateFrom öncesi nakit hesap satırlarının net bakiyesi.
+    // Açılış nakit pozisyonu: aralık başlangıcından önceki nakit hareketlerinin
+    // net bakiyesi (devir ↔ hareket bölüşümü kurucuda garanti edilir).
     let openingBalance = new Prisma.Decimal(0);
-    if (filter.dateFrom) {
+    if (opening) {
       const agg = await this.db.journalLine.aggregate({
-        where: {
-          accountId: { in: filter.accountIds },
-          entry: { ...baseEntryWhere, entryDate: { lt: filter.dateFrom } },
-        },
+        where: { accountId: { in: filter.accountIds }, entry: opening },
         _sum: { debit: true, credit: true },
       });
       openingBalance = (agg._sum.debit ?? new Prisma.Decimal(0)).minus(
@@ -180,13 +169,8 @@ export class JournalQueryRepository
       );
     }
 
-    const entryWhere: Prisma.JournalEntryWhereInput = { ...baseEntryWhere };
-    if (filter.dateFrom || filter.dateTo) {
-      entryWhere.entryDate = { gte: filter.dateFrom, lte: filter.dateTo };
-    }
-
     const rows = await this.db.journalLine.findMany({
-      where: { accountId: { in: filter.accountIds }, entry: entryWhere },
+      where: { accountId: { in: filter.accountIds }, entry },
       include: { entry: { select: { entryDate: true } } },
       orderBy: { entry: { entryDate: 'asc' } },
     });
@@ -202,13 +186,7 @@ export class JournalQueryRepository
   }
 
   async vatDeclaration(filter: VatDeclarationFilter): Promise<VatDeclaration> {
-    const entryWhere: Prisma.JournalEntryWhereInput = {
-      clinicId: filter.clinicId,
-      status: JournalEntryStatus.POSTED,
-    };
-    if (filter.dateFrom || filter.dateTo) {
-      entryWhere.entryDate = { gte: filter.dateFrom, lte: filter.dateTo };
-    }
+    const { entry: entryWhere } = buildLedgerEntryWhere(filter);
 
     const fetch = (accountIds: string[]) =>
       accountIds.length === 0
@@ -255,15 +233,10 @@ export class JournalQueryRepository
   ): Promise<BankLedgerLineRow[]> {
     if (filter.accountIds.length === 0) return [];
 
+    const { entry } = buildLedgerEntryWhere(filter);
+
     const rows = await this.db.journalLine.findMany({
-      where: {
-        accountId: { in: filter.accountIds },
-        entry: {
-          clinicId: filter.clinicId,
-          status: JournalEntryStatus.POSTED,
-          entryDate: { gte: filter.dateFrom, lte: filter.dateTo },
-        },
-      },
+      where: { accountId: { in: filter.accountIds }, entry },
       select: {
         id: true,
         debit: true,

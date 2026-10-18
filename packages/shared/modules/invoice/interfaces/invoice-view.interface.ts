@@ -33,6 +33,14 @@ export interface InvoiceDetailView {
   status?: string;
   issuedAt?: string | null;
 
+  /**
+   * İptal izi. `status === 'CANCELLED'` belgenin hükümsüz olduğunu söyler;
+   * kullanıcıya gösterilecek "ne zaman / neden" bu iki alandan gelir. İptal
+   * edilmemiş faturada `null`.
+   */
+  cancelledAt?: string | null;
+  cancelReason?: string | null;
+
   // --- Finans tier'ı ---
   netTotal?: string;
   vatTotal?: string;

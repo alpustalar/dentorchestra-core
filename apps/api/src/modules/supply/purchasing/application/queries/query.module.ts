@@ -4,6 +4,7 @@ import { GetPurchaseRequestByIdHandler } from './get-purchase-request-by-id/get-
 import { GetPurchaseOrdersHandler } from './get-purchase-orders/get-purchase-orders.handler';
 import { GetPurchaseOrderByIdHandler } from './get-purchase-order-by-id/get-purchase-order-by-id.handler';
 import { GetPurchaseOrderMatchSummaryHandler } from './get-purchase-order-match-summary/get-purchase-order-match-summary.handler';
+import { GetGoodsReceivedNotInvoicedHandler } from './get-goods-received-not-invoiced/get-goods-received-not-invoiced.handler';
 import { PurchasingInfrastructureModule } from '@modules/supply/purchasing/infrastructure/infrastructure.module';
 
 export const PURCHASING_QUERY_HANDLERS = [
@@ -12,6 +13,7 @@ export const PURCHASING_QUERY_HANDLERS = [
   GetPurchaseOrdersHandler,
   GetPurchaseOrderByIdHandler,
   GetPurchaseOrderMatchSummaryHandler,
+  GetGoodsReceivedNotInvoicedHandler,
 ];
 
 @Module({

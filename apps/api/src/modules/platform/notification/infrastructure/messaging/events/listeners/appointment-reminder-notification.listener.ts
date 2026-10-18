@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentReminderDueEvent } from '@modules/clinical/appointment/domain/events/appointment-reminder-due.event';
 import { NotificationDispatcherService } from '@modules/platform/notification/application/services/notification-dispatcher.service';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Yaklaşan randevu hatırlatması geldiğinde hastaya dış kanaldan bildirim dağıtır
@@ -18,7 +18,7 @@ export class AppointmentReminderNotificationListener {
 
   constructor(private readonly dispatcher: NotificationDispatcherService) {}
 
-  @OnEvent(APPOINTMENT_EVENTS.REMINDER_DUE, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.REMINDER_DUE)
   async handle(event: AppointmentReminderDueEvent): Promise<void> {
     try {
       await this.dispatcher.notifyAppointmentReminder({

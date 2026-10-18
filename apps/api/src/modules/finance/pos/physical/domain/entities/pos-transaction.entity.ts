@@ -1,6 +1,8 @@
 import { PosTransaction as IPosTransaction } from '@shared';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { PosTransactionSucceededEvent } from '../events/pos-transaction-succeeded.event';
+import { PosTransactionReversedEvent } from '../events/pos-transaction-reversed.event';
+import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 import { PosTransactionFailedEvent } from '../events/pos-transaction-failed.event';
 import { PosTransactionCancelledEvent } from '../events/pos-transaction-cancelled.event';
 import { PosTransactionTimeoutEvent } from '../events/pos-transaction-timeout.event';
@@ -14,24 +16,31 @@ import { JsonValueType } from '@input-type-schemas/JsonValueSchema';
 import { Money } from '@src/domain/value-objects/money.vo';
 import { CreatePosTransactionProps } from '@modules/finance/pos/physical/domain/contracts/pos-transaction';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { FirebaseUid } from '@src/domain/value-objects/firebase-uid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { JsonValue } from '@common/interfaces';
 import {
+  PosAmountInvalidPrecisionException,
   PosTransactionAlreadySettledException,
   PosTransactionClinicMismatchException,
+  PosTransactionMissingExternalRefException,
 } from '@modules/finance/pos/physical/domain/exceptions/pos.exceptions';
 import { isNotUndefined } from '@common/utils/is-not-undefined';
+import { redactSensitive } from '@common/utils';
 import { PosTransactionReversalRequiresOriginalException } from '@modules/finance/pos/physical/domain/exceptions/pos.exceptions';
 
 /**
  * Fiziksel POS işlemini temsil eden domain entity.
  *
- * Durum geçişleri yalnızca `mark*` metodları üzerinden yapılır; her geçiş
- * PENDING → terminal durum invariant'ını korur ve idempotenttir (terminal
- * bir işlem tekrar işaretlenmeye çalışılırsa sessizce yok sayılır — reconcile
- * ve callback yarışlarına karşı güvenli).
+ * Durum geçişleri yalnızca `mark*` metodları üzerinden yapılır ve her geçiş
+ * PENDING → terminal durum invariant'ını korur.
+ *
+ * ⚠️ Geçişler **sessizce yok saymaz**: terminal bir işlem tekrar işaretlenmeye
+ * çalışılırsa `PosTransactionAlreadySettledException` fırlatılır. Tekrarlanan
+ * callback/mutabakat yarışında sessiz davranmak isteyen çağıran, önce
+ * `validate.status.isPending().value` ile kontrol eder (bkz. handle-pos-callback,
+ * reconcile). Yorumun tersini söylediği bu fark, "zaten idempotent" sanılan
+ * yeni bir çağıranın 500 üretmesine yol açardı.
  *
  */
 export class PosTransaction extends AggregateRoot {
@@ -40,7 +49,11 @@ export class PosTransaction extends AggregateRoot {
     this._id = UUID.fromTrusted(data.id);
     this._posDeviceId = data.posDeviceId;
     this._clinicId = UUID.fromTrusted(data.clinicId);
-    this._patientId = FirebaseUid.create(data.patientId).instance ?? null;
+    // `FirebaseUid` ile okunuyordu: `Patient.id` bir UUID olduğu için
+    // (firebaseUid ayrı/nullable bir kolon) hasta taşıyan HER işlem kaydı
+    // hidrasyonda `InvalidFirebaseUidException` ile patlıyordu — iptal/iade ve
+    // mutabakat yolları o kayıtlar için tamamen kapalıydı.
+    this._patientId = UUID.create(data.patientId).instance ?? null;
     this._appointmentId = UUID.create(data.appointmentId).instance ?? null;
     this._paymentId = data.paymentId;
     this._amount = Money.fromTrusted(data.amount, data.currency);
@@ -51,6 +64,7 @@ export class PosTransaction extends AggregateRoot {
     this._externalRef = data.externalRef;
     this._rawRequest = data.rawRequest;
     this._rawResponse = data.rawResponse;
+    this._initiatedById = data.initiatedById;
     this._initiatedAt = data.initiatedAt;
     this._completedAt = data.completedAt;
     this._createdAt = data.createdAt;
@@ -93,9 +107,9 @@ export class PosTransaction extends AggregateRoot {
     return this._clinicId;
   }
 
-  private _patientId: FirebaseUid | null;
+  private _patientId: UUID | null;
 
-  get patientId(): FirebaseUid | null {
+  get patientId(): UUID | null {
     return this._patientId;
   }
 
@@ -165,6 +179,13 @@ export class PosTransaction extends AggregateRoot {
     return this._rawResponse;
   }
 
+  /** Personel kimliği ham string (Firebase UID) — UUID VO'suna sarılmaz. */
+  private _initiatedById: string | null;
+
+  get initiatedById(): string | null {
+    return this._initiatedById;
+  }
+
   private _initiatedAt: Date;
 
   get initiatedAt(): Date {
@@ -201,7 +222,7 @@ export class PosTransaction extends AggregateRoot {
           return Guard.monitor(
             exRef,
             !!exRef,
-            () => error ?? new Error('externalRef mevcut değil')
+            () => error ?? new PosTransactionMissingExternalRefException()
           );
         },
       },
@@ -212,6 +233,13 @@ export class PosTransaction extends AggregateRoot {
     const now = DateTimeManager.create();
 
     const money = Money.create(props.amount, props.currency).orThrow();
+
+    // Kuruştan ince tutar hem DB kolonunda (`Decimal(10,2)`) hem cihaza giden
+    // minor-unit çevriminde sessizce yuvarlanır: çekilen tutar ile kayda geçen
+    // tutar ayrışır ve mutabakat sonradan çözülemez.
+    if (money.value.decimalPlaces() > Money.PRECISION) {
+      throw new PosAmountInvalidPrecisionException(money.value.toString());
+    }
 
     const kind = props.kind ?? PosTransactionKindSchema.enum.SALE;
     const isSale = kind === PosTransactionKindSchema.enum.SALE;
@@ -247,6 +275,7 @@ export class PosTransaction extends AggregateRoot {
       externalRef: props.externalRef ?? null,
       rawRequest: props.rawRequest as JsonValue,
       rawResponse: null,
+      initiatedById: props.initiatedById,
       initiatedAt: now,
       completedAt: null,
       createdAt: now,
@@ -269,9 +298,7 @@ export class PosTransaction extends AggregateRoot {
 
     if (externalRef) this._externalRef = externalRef;
 
-    if (isNotUndefined(rawResponse)) {
-      this._rawResponse = rawResponse as JsonValue;
-    }
+    this._applyRawResponse(rawResponse);
     this._completedAt = DateTimeManager.create();
 
     this.addDomainEvent(
@@ -284,6 +311,30 @@ export class PosTransaction extends AggregateRoot {
         currency: this.amount.currency,
       })
     );
+
+    // İptal/iade yüksek etkili bir para hareketidir: "kim geri aldı" izi kolonun
+    // yanında audit log'da da durmalı (CLAUDE.md kural 7 — event + kolon).
+    // Satışta fırlatılmaz: her başarılı çekim için ters-kayıt izi üretmek
+    // asıl olayları gürültüye boğar.
+    if (this.kind !== PosTransactionKindSchema.enum.SALE) {
+      this.addDomainEvent(
+        new PosTransactionReversedEvent({
+          posTransactionId: this.id.value,
+          originalPosTransactionId: this.originalPosTransactionId,
+          clinicId: this.clinicId.value,
+          kind: this.kind,
+          paymentId: this.paymentId,
+          externalRef: this.externalRef,
+          amount: this.amount.value.toString(),
+          currency: this.amount.currency,
+          action: LogAction.POS_TRANSACTION_REVERSED,
+          type: LogType.INFO,
+          // Aktör KALICI kolondan okunur: olay rehidrasyon sonrası (callback
+          // yolu) fırlatılsa bile damga eksilmez.
+          actorId: this.initiatedById ?? undefined,
+        })
+      );
+    }
   }
 
   public markFailed(rawResponse?: unknown): void {
@@ -291,9 +342,7 @@ export class PosTransaction extends AggregateRoot {
 
     this._status = PosTransactionStatusSchema.enum.FAILED;
     this.releaseVoidGuard();
-    if (isNotUndefined(rawResponse)) {
-      this._rawResponse = rawResponse as JsonValue;
-    }
+    this._applyRawResponse(rawResponse);
     this._completedAt = DateTimeManager.create();
     this.addDomainEvent(
       new PosTransactionFailedEvent({
@@ -308,9 +357,7 @@ export class PosTransaction extends AggregateRoot {
     this.assertPending();
     this._status = PosTransactionStatusSchema.enum.CANCELLED;
     this.releaseVoidGuard();
-    if (isNotUndefined(rawResponse)) {
-      this._rawResponse = rawResponse as JsonValue;
-    }
+    this._applyRawResponse(rawResponse);
     this._completedAt = DateTimeManager.create();
     this.addDomainEvent(
       new PosTransactionCancelledEvent({
@@ -324,9 +371,10 @@ export class PosTransaction extends AggregateRoot {
   public markTimeout(): void {
     this.assertPending();
     this._status = PosTransactionStatusSchema.enum.TIMEOUT;
-    // Zaman aşımı da kilidi bırakır: mutabakat taraması bir işlemi TIMEOUT'a ancak
-    // cihazın onu tanımadığını doğruladıktan sonra düşürür, dolayısıyla iptal
-    // gerçekleşmemiştir ve tekrar denenebilir olmalıdır.
+    // Zaman aşımı da kilidi bırakır ki aynı satış için yeni bir iptal denenebilsin.
+    // DİKKAT: mutabakat taraması bir işlemi cihaza sormadan, yalnız YAŞINA bakarak
+    // da TIMEOUT'a düşürebilir (bkz. reconcile STALE_THRESHOLD). Bu durumda kart
+    // çekilmiş olabilir; o yüzden tarama bu geçişi CRITICAL alarmla birlikte yapar.
     this.releaseVoidGuard();
     this._completedAt = DateTimeManager.create();
     this.addDomainEvent(
@@ -354,6 +402,7 @@ export class PosTransaction extends AggregateRoot {
       externalRef: this.externalRef,
       rawRequest: this.rawRequest,
       rawResponse: this.rawResponse,
+      initiatedById: this.initiatedById,
       initiatedAt: this.initiatedAt,
       completedAt: this.completedAt,
       createdAt: this.createdAt,
@@ -375,7 +424,9 @@ export class PosTransaction extends AggregateRoot {
     return Guard.monitor(
       is,
       is,
-      () => error ?? new Error('Pos işlemi başarılı değil')
+      () =>
+        error ??
+        new PosTransactionAlreadySettledException(this._id.value, this._status)
     );
   }
 
@@ -384,6 +435,21 @@ export class PosTransaction extends AggregateRoot {
    * gönderilebilir; ikinci kez sonuçlandırmak ödeme tarafında bir sonraki
    * bekleyen taksiti kapatıyordu (tek çekim → iki taksit).
    */
+  /**
+   * Sağlayıcı yanıtı tanı amacıyla saklanır — **maskelenerek**.
+   *
+   * Üç geçiş (başarılı/başarısız/iptal) aynı atamayı tekrarlıyordu; maskeleme
+   * tek bir yere konuyor ki yeni bir geçiş eklenirken atlanamasın. Bugünkü
+   * fiziksel POS yanıtları yalnız maskeli kart bilgisi taşıyor (`maskedCardNumber`,
+   * `lastFourDigits`), ama gerçek sağlayıcı adapter'ı yazıldığında ne döneceği
+   * bilinmiyor — kapı o yüzden şimdiden burada.
+   */
+  private _applyRawResponse(rawResponse?: unknown): void {
+    if (isNotUndefined(rawResponse)) {
+      this._rawResponse = redactSensitive(rawResponse) as JsonValue;
+    }
+  }
+
   private assertPending(): void {
     if (this._status !== PosTransactionStatusSchema.enum.PENDING) {
       throw new PosTransactionAlreadySettledException(
@@ -398,7 +464,9 @@ export class PosTransaction extends AggregateRoot {
     return Guard.monitor(
       is,
       is,
-      () => error ?? new Error('Pos işlemi beklemede değil')
+      () =>
+        error ??
+        new PosTransactionAlreadySettledException(this._id.value, this._status)
     );
   }
 }

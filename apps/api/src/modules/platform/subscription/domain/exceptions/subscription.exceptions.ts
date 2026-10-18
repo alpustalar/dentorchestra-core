@@ -94,3 +94,39 @@ export class SubscriptionModuleRequiredException extends DomainException<Subscri
     super(message, meta);
   }
 }
+
+/**
+ * Tahsilat satırı beklenen durumda değil.
+ *
+ * Satır `PENDING` doğar ve sonucu bir kez yazılır; ikinci kez yazmaya çalışmak
+ * (ör. aynı sağlayıcı bildirimi iki kez işlenirse) mükerrer bir para kaydı
+ * üretme girişimidir ve sessizce geçilmez.
+ */
+export class SubscriptionChargeNotPendingException extends DomainException {
+  public readonly errorCode = ERROR_CODES.SUBSCRIPTION.CHARGE_NOT_PENDING;
+
+  constructor(chargeId: string, status: string) {
+    super(
+      `Abonelik tahsilat kaydı beklenen durumda değil (id: ${chargeId}, durum: ${status}).`
+    );
+  }
+}
+
+/**
+ * Aboneliğin kalemleri farklı para birimleri taşıyor.
+ *
+ * Tahsil edilecek tutar kalemlerin toplamıdır; farklı para birimli kalemleri
+ * toplamak **anlamsız bir sayı** üretir (eskiden toplanıp ilk kalemin para
+ * birimiyle etiketleniyordu). Çekim yapmak yerine durulur: doğru çözüm ya tek
+ * para birimi zorlamak ya da para birimi başına ayrı tahsilattır — ikisi de
+ * ürün kararıdır.
+ */
+export class SubscriptionChargeCurrencyMismatchException extends DomainException {
+  public readonly errorCode = ERROR_CODES.SUBSCRIPTION.CHARGE_CURRENCY_MISMATCH;
+
+  constructor(subscriptionId: string, currencies: string[]) {
+    super(
+      `Abonelik kalemleri farklı para birimleri taşıyor; otomatik tahsilat yapılamaz (id: ${subscriptionId}, para birimleri: ${currencies.join(', ')}).`
+    );
+  }
+}

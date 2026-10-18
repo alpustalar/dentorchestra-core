@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { SubscriptionChargeCurrencyMismatchException } from '@modules/platform/subscription/domain/exceptions/subscription.exceptions';
 import { Prisma } from '@prisma/client';
 import { Module as IModule, SubStatusSchema } from '@shared';
 import { Decimal } from 'decimal.js';
@@ -92,19 +93,33 @@ export class SubscriptionCommandRepository
   async findRenewalCharge(
     subscriptionId: string
   ): Promise<RenewalChargeModel | null> {
-    // Aylık tutar = aboneliğin tüm kalemlerinin (plan + eklenti modüller) toplamı; tek para birimi.
+    // Aylık tutar = aboneliğin tüm kalemlerinin (plan + eklenti modüller) toplamı.
     const items = await this.db.subscriptionItem.findMany({
       where: { subscriptionId },
       select: { priceAtPurchase: true, currency: true },
     });
     if (items.length === 0) return null;
 
+    // Farklı para birimli kalemleri toplamak ANLAMSIZ bir sayı üretir. Eskiden
+    // toplanıp `items[0].currency` ile etiketleniyordu: 100 TRY + 20 EUR = 120 TRY
+    // olarak karttan çekilirdi. Modül fiyatları plan para biriminden bağımsız
+    // tanımlanabildiği için bu ulaşılabilir bir durumdur → çekim yapmak yerine
+    // durulur (doğru çözüm tek para birimi zorlamak ya da para birimi başına
+    // ayrı tahsilat; ikisi de ürün kararı).
+    const currencies = [...new Set(items.map((item) => item.currency))];
+    if (currencies.length > 1) {
+      throw new SubscriptionChargeCurrencyMismatchException(
+        subscriptionId,
+        currencies
+      );
+    }
+
     const amount = items.reduce(
       (sum, item) => sum.add(new Decimal(item.priceAtPurchase.toString())),
       new Decimal(0)
     );
 
-    return { amount, currency: items[0].currency };
+    return { amount, currency: currencies[0] };
   }
   async findByOrganizationId(
     organizationId: string

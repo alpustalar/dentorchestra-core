@@ -10,11 +10,13 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
+import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetChartOfAccountsQuery)
-export class GetChartOfAccountsHandler
-  implements IQueryHandler<GetChartOfAccountsQuery, GetChartOfAccountsResponse>
-{
+export class GetChartOfAccountsHandler implements IQueryHandler<
+  GetChartOfAccountsQuery,
+  GetChartOfAccountsResponse
+> {
   constructor(
     @Inject(ACCOUNT_QUERY_REPOSITORY)
     private readonly accountRepo: IAccountQueryRepository,
@@ -27,7 +29,14 @@ export class GetChartOfAccountsHandler
   ): Promise<GetChartOfAccountsResponse> {
     const { clinicId, ctx } = query;
 
-    const { policy } = this.policyFactory.finance(ctx.actor, ctx.source);
+    const { evaluator, policy } = this.policyFactory.finance(
+      ctx.actor,
+      ctx.source
+    );
+
+    evaluator
+      .check((p) => p.canAccessClinicFinances(clinicId))
+      .orThrow(ACCOUNTING_EVENTS.CHART_OF_ACCOUNTS);
 
     const accounts = await this.accountRepo.findAllByClinicId(clinicId);
 

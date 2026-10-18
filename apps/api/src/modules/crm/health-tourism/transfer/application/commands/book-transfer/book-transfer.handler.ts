@@ -1,6 +1,7 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { BookTransferCommand } from './book-transfer.command';
 import { BookTransferResponse } from './book-transfer.response';
 import {
@@ -38,7 +39,8 @@ export class BookTransferHandler
     private readonly tenantScopeResolver: ITenantScopeResolver,
     private readonly txManager: TransactionManager,
     @Inject(POLICY_FACTORY)
-    private readonly policyFactory: IPolicyFactory
+    private readonly policyFactory: IPolicyFactory,
+    private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
   async execute(command: BookTransferCommand): Promise<BookTransferResponse> {
@@ -69,28 +71,53 @@ export class BookTransferHandler
       remark: data.remark,
     });
 
-    const transferBooking = HotelbedsTransferBooking.create({
-      reference: result.reference,
-      clientReference,
-      status: HotelbedsTransferBookingStatusSchema.parse(result.status),
-      holderName: data.holderName,
-      holderSurname: data.holderSurname,
-      holderEmail: data.holderEmail,
-      holderPhone: data.holderPhone,
-      transfers: result.transfers as JsonValueType,
-      totalAmount: result.totalAmount,
-      currency: Currency.create(result.currency).orThrow().value,
-      remarks: data.remark,
-      clinicId: data.clinicId,
-      organizationId,
-      patientId: data.patientId,
-      leadId: data.leadId,
-    });
+    // Buradan sonrası GERİ ALINAMAZ bir yan etkinin ardındadır: transfer
+    // sağlayıcıda açıldı. Yerel doğrulamalar (sağlayıcının döndürdüğü `status`
+    // ve `currency` bizim enum'larımızda olmak zorunda) ya da DB yazımı patlarsa
+    // yalnız KAYIT düşer; hizmet satın alınmış kalır ve ödeme iade edilir.
+    try {
+      const transferBooking = HotelbedsTransferBooking.create({
+        reference: result.reference,
+        clientReference,
+        status: HotelbedsTransferBookingStatusSchema.parse(result.status),
+        holderName: data.holderName,
+        holderSurname: data.holderSurname,
+        holderEmail: data.holderEmail,
+        holderPhone: data.holderPhone,
+        transfers: result.transfers as JsonValueType,
+        totalAmount: result.totalAmount,
+        currency: Currency.create(result.currency).orThrow().value,
+        remarks: data.remark,
+        clinicId: data.clinicId,
+        organizationId,
+        patientId: data.patientId,
+        leadId: data.leadId,
+      });
 
-    const booking = await this.txManager.run(async () => {
-      return this.hotelbedsTransferBookingRepo.create(transferBooking);
-    });
+      const booking = await this.txManager.run(async () => {
+        return this.hotelbedsTransferBookingRepo.create(transferBooking);
+      });
 
-    return booking.id.value;
+      return {
+        bookingId: booking.id.value,
+        supplierAmount: booking.totalAmount.toApiFormat(),
+        supplierCurrency: booking.totalAmount.currency,
+      };
+    } catch (err) {
+      this.criticalFailure.publish({
+        operation: 'health-tourism.transfer.booking-record',
+        severity: 'CRITICAL',
+        summary:
+          'Transfer sağlayıcıda açıldı ama yerel kayıt yazılamadı — rezervasyon elle iptal edilmeli.',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        context: {
+          providerReference: result.reference,
+          clientReference,
+        },
+        clinicId: data.clinicId,
+        dedupeKey: `transfer-booking-record-failed:${result.reference}`,
+      });
+      throw err;
+    }
   }
 }

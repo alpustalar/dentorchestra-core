@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { JournalEntryStatusSchema } from '../inputTypeSchemas/JournalEntryStatusSchema'
+import { JournalEntryKindSchema } from '../inputTypeSchemas/JournalEntryKindSchema'
 
 /////////////////////////////////////////
 // JOURNAL ENTRY SCHEMA
@@ -7,6 +8,7 @@ import { JournalEntryStatusSchema } from '../inputTypeSchemas/JournalEntryStatus
 
 export const JournalEntrySchema = z.object({
   status: JournalEntryStatusSchema,
+  kind: JournalEntryKindSchema,
   id: z.string(),
   clinicId: z.string(),
   organizationId: z.string(),

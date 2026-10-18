@@ -1,3 +1,4 @@
+import { redactSensitive } from '@common/utils';
 import { IyzicoTransaction as IIyzicoTransaction } from '@shared';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import IyzicoTransactionStatusSchema, {
@@ -185,9 +186,21 @@ export class IyzicoTransaction extends AggregateRoot {
     };
   }
 
+  /**
+   * Sağlayıcı yanıtı tanı amacıyla saklanır — ama **maskelenerek**.
+   *
+   * iyzico checkout yanıtı `cardToken` + `cardUserKey` taşıyor ve bu ikisi
+   * non-3DS çekim yapmaya yeten bir kimlik bilgisidir (abonelik yenilemesi tam
+   * olarak bunu kullanıyor). Ham saklamak, kontrollü kart saklama tablosunun
+   * yanında **ikinci, denetlenmeyen** bir kopya üretir: kimse döndürmez, kimse
+   * arayıp bulamaz, saklama süresi olmaz. Maskeleme yazma sınırında yapılır ki
+   * DB'ye bakan her okuyucu (operatör, yedek, ileride eklenecek rapor) korunsun.
+   */
   private _applyRawResponse(rawResponse?: unknown): void {
     if (rawResponse !== undefined) {
-      this._rawResponse = rawResponse as IIyzicoTransaction['rawResponse'];
+      this._rawResponse = redactSensitive(
+        rawResponse
+      ) as IIyzicoTransaction['rawResponse'];
     }
   }
 }

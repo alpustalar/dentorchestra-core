@@ -13,6 +13,7 @@ import { GetHotelBookingsQuery } from '@modules/crm/health-tourism/hotel/applica
 import { GetTransferBookingsQuery } from '@modules/crm/health-tourism/transfer/application/queries/get-transfer-bookings/get-transfer-bookings.query';
 import { GetFlightBookingsQuery } from '@modules/crm/health-tourism/flight/application/queries/get-flight-bookings/get-flight-bookings.query';
 import { RefundBookingPaymentCommand } from '@modules/crm/health-tourism/booking-payment/application/commands/refund-booking-payment/refund-booking-payment.command';
+import { SupplierRetainedCost } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
 import { InitiateBookingPaymentResponse } from '@modules/crm/health-tourism/booking-payment/application/commands/initiate-booking-payment/initiate-booking-payment.response';
 import {
   GetFlightBookingsDto,
@@ -28,6 +29,15 @@ import { Currency } from '@src/domain/value-objects/currency.vo';
  * render). Her araç yalnız ihtiyacı kadarını çağırır; tüm dağıtımlar CommandBus/QueryBus
  * üzerinden yapılır (cross-module kural: yalnız bus).
  */
+/**
+ * İade tetikleyicisinin girdisi. `retained` iptal komutunun yanıtından gelir
+ * (sağlayıcının alıkoyduğu ceza); bilinmiyorsa `null`.
+ */
+interface RefundForCancelledBookingProps {
+  readonly bookingId: string;
+  readonly retained: SupplierRetainedCost | null;
+}
+
 @Injectable()
 export class AiToolSupport {
   private readonly logger = new Logger(AiToolSupport.name);
@@ -135,16 +145,29 @@ export class AiToolSupport {
   /**
    * İptal edilen rezervasyon için ödeme iadesini (varsa) tetikler. Ödeme kaydı yoksa (B7
    * öncesi/ödemesiz rezervasyon) veya iade başarısızsa false döner — iptal mesajı yine de döner.
+   *
+   * `retained` **zorunlu**: iptal komutunun döndürdüğü ekonomi buradan geçmezse
+   * defter cezasız ters kayıt yazar ve fark sessizce kaybolur. Alanı opsiyonel
+   * bırakmak, üç aracın birinde unutulduğunda derleyicinin susması demekti.
    */
-  async refundForCancelledBooking(bookingId: string): Promise<boolean> {
+  async refundForCancelledBooking(
+    props: RefundForCancelledBookingProps
+  ): Promise<boolean> {
     try {
       await this.commandBus.execute(
-        new RefundBookingPaymentCommand(bookingId, 'Rezervasyon iptal edildi.')
+        new RefundBookingPaymentCommand({
+          bookingId: props.bookingId,
+          // Sağlayıcının alıkoyduğu ceza iptal yanıtından geliyor ve BURADAN
+          // geçmek zorunda: platform defteri cezayı zarar olarak tanıyacak,
+          // tedarikçi borcunu da yalnız serbest kalan kadar düşecek.
+          retained: props.retained,
+          reason: 'Rezervasyon iptal edildi.',
+        })
       );
       return true;
     } catch (err) {
       this.logger.warn(
-        `İptal sonrası iade tetiklenemedi (bookingId=${bookingId}): ${
+        `İptal sonrası iade tetiklenemedi (bookingId=${props.bookingId}): ${
           err instanceof Error ? err.message : err
         }`
       );

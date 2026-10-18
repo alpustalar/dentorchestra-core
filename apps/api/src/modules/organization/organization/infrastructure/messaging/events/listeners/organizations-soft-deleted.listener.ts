@@ -1,8 +1,8 @@
-import { OnEvent } from '@nestjs/event-emitter';
 import { Injectable, Logger } from '@nestjs/common';
 import { OrganizationSoftDeleteEvent } from '@modules/organization/organization/domain/events';
 import { LogType } from '@src/domain/constants/log-action.constant';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class OrganizationsSoftDeletedListener {
@@ -12,7 +12,7 @@ export class OrganizationsSoftDeletedListener {
     // private readonly cleanupProducer: OrganizationCleanupProducer, // Muhtemelen buraya gelecek
   }
 
-  @OnEvent(OrganizationSoftDeleteEvent.NAME, { async: true })
+  @OnDomainEvent(OrganizationSoftDeleteEvent.NAME)
   async handle(event: OrganizationSoftDeleteEvent) {
     const { organizationId, metadata, log } = event;
 

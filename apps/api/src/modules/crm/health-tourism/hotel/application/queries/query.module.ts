@@ -4,6 +4,7 @@ import { GetHotelBookingsHandler } from './get-hotel-bookings/get-hotel-bookings
 import { GetHotelBookingByIdHandler } from './get-hotel-booking-by-id/get-hotel-booking-by-id.handler';
 import { GetHotelRateOptionHandler } from './get-hotel-rate-option/get-hotel-rate-option.handler';
 import { HotelInfrastructureModule } from '@modules/crm/health-tourism/hotel/infrastructure/infrastructure.module';
+import { QuoteOptionModule } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.module';
 
 export const HOTEL_QUERY_HANDLERS = [
   SearchHotelsHandler,
@@ -13,7 +14,7 @@ export const HOTEL_QUERY_HANDLERS = [
 ];
 
 @Module({
-  imports: [HotelInfrastructureModule],
+  imports: [HotelInfrastructureModule, QuoteOptionModule],
   providers: [...HOTEL_QUERY_HANDLERS],
   exports: [...HOTEL_QUERY_HANDLERS],
 })

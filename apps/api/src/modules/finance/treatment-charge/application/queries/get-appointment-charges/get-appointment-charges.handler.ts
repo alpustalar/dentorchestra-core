@@ -15,10 +15,10 @@ import { ChargeTotalsCalculator } from '@modules/finance/treatment-charge/domain
 import { TREATMENT_CHARGE_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetAppointmentChargesQuery)
-export class GetAppointmentChargesHandler
-  implements
-    IQueryHandler<GetAppointmentChargesQuery, GetAppointmentChargesResponse>
-{
+export class GetAppointmentChargesHandler implements IQueryHandler<
+  GetAppointmentChargesQuery,
+  GetAppointmentChargesResponse
+> {
   constructor(
     @Inject(TREATMENT_CHARGE_QUERY_REPOSITORY)
     private readonly chargeRepo: ITreatmentChargeQueryRepository,

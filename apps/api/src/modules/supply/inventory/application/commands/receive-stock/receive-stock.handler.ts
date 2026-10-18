@@ -12,7 +12,11 @@ import {
 import { StockMovementDirectionSchema, StockMovementTypeSchema } from '@shared';
 import { Quantity } from '@src/domain/value-objects/quantity.vo';
 import { Money } from '@src/domain/value-objects/money.vo';
-import { ProductNotFoundException } from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
+import {
+  ProductNotFoundException,
+  ProductNotUsableInClinicException,
+} from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
+import { findProductUnusableReason } from '@modules/supply/inventory/domain/rules/catalog-usability.rules';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import {
   IProductCommandRepository,
@@ -75,6 +79,28 @@ export class ReceiveStockHandler implements ICommandHandler<
 
     const product = await this.productRepo.findById(dto.productId);
     if (!product) throw new ProductNotFoundException();
+
+    // Ürünün bu klinikte kullanılabilir olması zorunlu. Yoksa parti `clinicId`
+    // bu kliniğe yazılırken **başka kliniğin** ürün kaydına bağlanıyordu: iki
+    // tarafın listeleri de kendi kliniğiyle süzdüğü için parti hiçbir ekranda
+    // görünmüyor, ödenen mal bedeli envanter değerinden düşüyordu. Silinmiş /
+    // pasif ürün de aynı sonuca yol açar (listeler `deletedAt: null` süzer) —
+    // kural 10: okunmayan bayrak kolonu güvence değil süstür.
+    const unusableReason = findProductUnusableReason(
+      {
+        id: product.id.value,
+        clinicId: product.clinicId.value,
+        isActive: product.isActive,
+        deletedAt: product.deletedAt,
+      },
+      clinicId
+    );
+    if (unusableReason) {
+      throw new ProductNotUsableInClinicException({
+        productId: dto.productId,
+        reason: unusableReason,
+      });
+    }
 
     const batch = ProductBatch.createFromPurchase({
       productId: product.id.value,

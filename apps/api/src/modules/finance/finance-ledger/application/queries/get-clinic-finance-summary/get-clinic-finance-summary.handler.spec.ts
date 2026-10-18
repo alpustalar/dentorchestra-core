@@ -28,7 +28,14 @@ describe('GetClinicFinanceSummaryHandler', () => {
       repo as never,
       policyFactory as never
     );
-    return { handler, repo, policyFactory, check, orThrow, serializationOptions };
+    return {
+      handler,
+      repo,
+      policyFactory,
+      check,
+      orThrow,
+      serializationOptions,
+    };
   };
 
   const ctx = { actor: { id: 'u1' }, source: 'API' } as never;

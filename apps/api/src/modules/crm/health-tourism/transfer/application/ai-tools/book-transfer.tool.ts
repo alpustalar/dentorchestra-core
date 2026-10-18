@@ -112,7 +112,10 @@ export class BookTransferTool implements IAiSubToolHandler {
     } = parsed.data;
 
     const { data: option } = await this.queryBus.execute(
-      new GetTransferRateOptionQuery(optionId)
+      new GetTransferRateOptionQuery(optionId, {
+        clinicId: context.clinicId,
+        conversationId: context.conversationId,
+      })
     );
     if (!option) {
       return {

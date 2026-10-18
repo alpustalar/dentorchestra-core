@@ -12,9 +12,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @QueryHandler(ListPlansQuery)
-export class ListPlansHandler
-  implements IQueryHandler<ListPlansQuery, ListPlansResponse>
-{
+export class ListPlansHandler implements IQueryHandler<
+  ListPlansQuery,
+  ListPlansResponse
+> {
   constructor(
     @Inject(PLAN_QUERY_REPOSITORY)
     private readonly planRepo: IPlanQueryRepository,

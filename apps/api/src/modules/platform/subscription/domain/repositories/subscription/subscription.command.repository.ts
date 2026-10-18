@@ -13,8 +13,7 @@ export interface SubscriptionOwnerRef {
   clinicId: string | null;
 }
 
-export interface ISubscriptionCommandRepository
-  extends IBaseCommandRepository<Subscription> {
+export interface ISubscriptionCommandRepository extends IBaseCommandRepository<Subscription> {
   sync(subscription: Subscription): Promise<Subscription | null>;
   syncMany(subscriptions: Subscription[]): Promise<void>;
   /**

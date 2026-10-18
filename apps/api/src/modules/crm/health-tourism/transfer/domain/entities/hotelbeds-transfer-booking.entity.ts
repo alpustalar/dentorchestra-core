@@ -153,6 +153,13 @@ export class HotelbedsTransferBooking extends AggregateRoot {
         ? Money.create(props.totalAmount, currencyValue.value).orThrow()
         : props.totalAmount;
 
+    // Tutar pozitif olmak ZORUNDA: fiyatı okunamayan bir sağlayıcı yanıtı
+    // (`?? 0`) eskiden buradan geçip "bedava rezervasyon" olarak kaydediliyordu.
+    // Otel rezervasyonunda aynı kapı zaten vardı; eksik olan buydu.
+    amountValue.validate.greaterThanZero.orThrow(
+      'Rezervasyon tutarı pozitif olmalıdır.'
+    );
+
     const id = UUID.createOrGenerate(props.id);
 
     const now = DateTimeManager.create();

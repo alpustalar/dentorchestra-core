@@ -39,9 +39,10 @@ export interface SubscribeToPlanResult {
 }
 
 @CommandHandler(SubscribeToPlanCommand)
-export class SubscribeToPlanHandler
-  implements ICommandHandler<SubscribeToPlanCommand, SubscribeToPlanResult>
-{
+export class SubscribeToPlanHandler implements ICommandHandler<
+  SubscribeToPlanCommand,
+  SubscribeToPlanResult
+> {
   constructor(
     @Inject(SUBSCRIPTION_COMMAND_REPOSITORY)
     private readonly subscriptionRepo: ISubscriptionCommandRepository,

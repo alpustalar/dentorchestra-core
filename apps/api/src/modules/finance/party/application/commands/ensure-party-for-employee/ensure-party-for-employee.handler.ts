@@ -20,13 +20,10 @@ import { Inject } from '@nestjs/common';
 import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
 
 @CommandHandler(EnsurePartyForEmployeeCommand)
-export class EnsurePartyForEmployeeHandler
-  implements
-    ICommandHandler<
-      EnsurePartyForEmployeeCommand,
-      EnsurePartyForEmployeeResponse
-    >
-{
+export class EnsurePartyForEmployeeHandler implements ICommandHandler<
+  EnsurePartyForEmployeeCommand,
+  EnsurePartyForEmployeeResponse
+> {
   constructor(
     private readonly commandBus: TSCommandBus,
     private readonly queryBus: TSQueryBus,

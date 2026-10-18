@@ -13,17 +13,24 @@ import {
   CreateChildAccountProps,
 } from '@modules/finance/accounting/chart-of-accounts/domain/contracts/account';
 import {
-  AccountTemplateMismatchException,
+  AccountCodeHierarchyMismatchException,
   CannotCreateChildException,
 } from '@modules/finance/accounting/chart-of-accounts/domain/exceptions/chart-of-accounts.exceptions';
+import { ChartTemplateIntegrity } from '@modules/finance/accounting/chart-of-accounts/domain/services/template-integrity/chart-template-integrity';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Name } from '@src/domain/value-objects/name.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
-import { Guard } from '@common/domain/guards';
 
 export interface BuildChartInput {
   clinicId: string;
   organizationId: string;
+  /**
+   * Şubede zaten duran hesapların `code -> id` eşlemesi. Şablon büyüdüğünde eksik
+   * hesapların eklenebilmesi için şart: yeni bir alt hesabın `parentId`'si, üst
+   * hesabın DB'deki GERÇEK id'sine işaret etmeli — yeniden üretilen bir UUID'ye
+   * değil (aksi hâlde FK ihlali ya da ağacın kopması).
+   */
+  existingIdByCode?: Readonly<Record<string, string>>;
 }
 
 export class Account extends AggregateRoot {
@@ -32,7 +39,7 @@ export class Account extends AggregateRoot {
     this._id = UUID.fromTrusted(data.id);
     this._clinicId = UUID.fromTrusted(data.clinicId);
     this._organizationId = UUID.fromTrusted(data.organizationId);
-    this._code = AccountCode.create(data.code);
+    this._code = AccountCode.fromTrusted(data.code);
     this._name = Name.fromTrusted(data.name);
     this._parentId = data.parentId;
     this._type = data.type;
@@ -116,15 +123,6 @@ export class Account extends AggregateRoot {
     return this._updatedAt;
   }
 
-  public get validate() {
-    return {
-      isDebitNormal: (() => {
-        const isNormal = this.isDebitNormal();
-        return Guard.monitor(isNormal, isNormal, () => new Error(''));
-      })(),
-    };
-  }
-
   public static create(props: CreateAccountProps): Account {
     const accountCode = AccountCode.create(props.code);
     const currencyStr =
@@ -160,34 +158,30 @@ export class Account extends AggregateRoot {
     input: BuildChartInput,
     template: readonly AccountTemplateNode[] = CLINIC_CHART_OF_ACCOUNTS_TEMPLATE
   ): Account[] {
-    const { clinicId, organizationId } = input;
+    const { clinicId, organizationId, existingIdByCode = {} } = input;
+
+    // Mevcut hesaplar kimliklerini KORUR; yalnız eksik olanlara yeni UUID üretilir.
     const idByCode = new Map<string, string>();
-    template.forEach((node) => idByCode.set(node.code, crypto.randomUUID()));
+    template.forEach((node) =>
+      idByCode.set(
+        node.code,
+        existingIdByCode[node.code] ?? UUID.generate().value
+      )
+    );
+
+    // Şablon bozuksa sessizce kök hesap üretmek yerine sesli hata ver: ağacın
+    // kopması mizanı bozar ve kimse fark etmez. Doğrulama tek yerde
+    // (`ChartTemplateIntegrity`) — aynı kontrol açılışta da çalışıyor.
+    ChartTemplateIntegrity.assertTemplateIsConsistent(template);
 
     return template.map((node) => {
-      const parentNode = node.parentCode
-        ? template.find((t) => t.code === node.parentCode)
-        : null;
-      if (parentNode) {
-        if (
-          parentNode.type !== node.type ||
-          parentNode.normalSide !== node.normalSide
-        ) {
-          throw new AccountTemplateMismatchException(
-            node.code,
-            parentNode.code
-          );
-        }
-      }
       return Account.create({
         id: idByCode.get(node.code),
         clinicId,
         organizationId,
         code: node.code,
         name: node.name,
-        parentId: node.parentCode
-          ? (idByCode.get(node.parentCode) ?? null)
-          : null,
+        parentId: node.parentCode ? idByCode.get(node.parentCode)! : null,
         type: node.type,
         normalSide: node.normalSide,
         isPostable: node.isPostable,
@@ -201,6 +195,17 @@ export class Account extends AggregateRoot {
     // altına çocuk açıldığı an bu hesap artık "kolektif/ana" hesap olur ve doğrudan kayıt kabul etmez.
     if (this._isPostable) {
       throw new CannotCreateChildException(this._code.value);
+    }
+
+    // Kod, üst hesabın kodunu önek olarak taşımalı. Aksi hâlde ağaç (`parentId`)
+    // ile kod hiyerarşisi ayrışır: kod önekine göre toplayan rapor ile ağaca göre
+    // toplayan rapor aynı defterde farklı sonuç verir.
+    const childCode = AccountCode.create(props.code);
+    if (childCode.parentCode !== this._code.value) {
+      throw new AccountCodeHierarchyMismatchException(
+        childCode.value,
+        this._code.value
+      );
     }
 
     return Account.create({
@@ -220,19 +225,16 @@ export class Account extends AggregateRoot {
 
   public deactivate(): void {
     this._isActive = false;
+    this._updatedAt = DateTimeManager.create();
   }
 
   public activate(): void {
     this._isActive = true;
+    this._updatedAt = DateTimeManager.create();
   }
 
   public rename(newName: string): void {
     this._name = Name.create(newName).orThrow();
-    this._updatedAt = DateTimeManager.create();
-  }
-
-  public togglePostable(status: boolean): void {
-    this._isPostable = status;
     this._updatedAt = DateTimeManager.create();
   }
 
@@ -251,7 +253,9 @@ export class Account extends AggregateRoot {
       currency: this.currency ? this.currency.value : null,
       isActive: this.isActive,
       createdAt: this.createdAt,
-      updatedAt: DateTimeManager.create(),
+      // Saf okuma: iki çağrı aynı sonucu vermeli. `now()` burada üretilirse
+      // entity'nin kendi `_updatedAt` damgası hiç yazılmaz.
+      updatedAt: this._updatedAt,
     };
   }
 }

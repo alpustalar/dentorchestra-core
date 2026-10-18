@@ -3,7 +3,6 @@ import { FinancialEvent } from '@shared';
 import {
   DraftJournalEntry,
   DraftJournalLine,
-  PostingContext,
   PostingRule,
 } from '../posting-rule.interface';
 import { PurchaseInvoiceReceivedEventPayload } from '../event-payloads';
@@ -20,7 +19,7 @@ import { FinancialEventTypeSchema } from '@shared';
 export class PurchaseInvoiceReceivedRule implements PostingRule {
   readonly eventType = FinancialEventTypeSchema.enum.PURCHASE_INVOICE_RECEIVED;
 
-  build(event: FinancialEvent, _ctx: PostingContext): DraftJournalEntry {
+  build(event: FinancialEvent): DraftJournalEntry {
     const payload =
       event.payload as unknown as PurchaseInvoiceReceivedEventPayload;
 

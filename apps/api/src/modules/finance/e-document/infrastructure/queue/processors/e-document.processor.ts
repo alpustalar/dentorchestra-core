@@ -17,12 +17,27 @@ import { MarkInvoiceEDocumentResultCommand } from '@modules/finance/invoice/appl
 import { GetClinicGovernmentSpecsQuery } from '@modules/organization/clinic-governance/application/queries/get-clinic-government-specs/get-clinic-government-specs.query';
 import { EnsurePartyForPatientCommand } from '@modules/finance/party/application/commands/ensure-party-for-patient/ensure-party-for-patient.command';
 import { GetPartyByIdQuery } from '@modules/finance/party/application/queries/get-party-by-id/get-party-by-id.query';
-import { EDocumentRequest } from '@modules/finance/e-document/domain/contracts/e-document.contracts';
+import {
+  EDocumentRequest,
+  EDocumentResult,
+} from '@modules/finance/e-document/domain/contracts/e-document.contracts';
+import { ClaimInvoiceEDocumentDispatchCommand } from '@modules/finance/invoice/application/commands/claim-invoice-edocument-dispatch/claim-invoice-edocument-dispatch.command';
+import { MarkInvoiceEDocumentFailedCommand } from '@modules/finance/invoice/application/commands/mark-invoice-edocument-failed/mark-invoice-edocument-failed.command';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 
 interface SendJobData {
   invoiceId: string;
 }
+
+interface CancelJobData {
+  invoiceId: string;
+  uuid: string;
+  reason: string;
+  clinicId: string;
+}
+
+type EDocumentJobData = SendJobData | CancelJobData;
 
 /**
  * e-Belge gönderim işleyicisi (doc 07 §5). Faturayı, satıcı (klinik) ve alıcı (hasta
@@ -38,19 +53,64 @@ export class EDocumentProcessor extends WorkerHost {
   constructor(
     @Inject(E_INVOICE_PORT) private readonly eInvoicePort: EInvoicePort,
     private readonly commandBus: TSCommandBus,
-    private readonly queryBus: TSQueryBus
+    private readonly queryBus: TSQueryBus,
+    private readonly criticalFailure: CriticalFailurePublisher
   ) {
     super();
   }
 
-  async process(job: Job<SendJobData>): Promise<void> {
+  async process(job: Job<EDocumentJobData>): Promise<void> {
     switch (job.name) {
       case E_DOCUMENT_JOBS.SEND:
         await this.handleSend(job.data.invoiceId);
         break;
+      case E_DOCUMENT_JOBS.CANCEL:
+        await this.handleCancel(job.data as CancelJobData);
+        break;
       default:
         this.logger.warn(`Bilinmeyen e-belge job'u: ${job.name}`);
     }
+  }
+
+  /**
+   * Entegratörde iptal bildirimi. Fatura **yerelde zaten iptal edilmiştir**
+   * (storno atıldı, belge CANCELLED damgalandı); bu adım yalnız vergi
+   * idaresindeki belgeyi hükümsüz kılar — doc 07 §5 uyarınca outbound ve
+   * muhasebeden bağımsızdır.
+   *
+   * Hata YUTULMAZ: yükselir, BullMQ yeniden dener (5 deneme) ve tükenirse job
+   * dead-letter'da kalır + CRITICAL alarm düşer. Yutulsaydı "yerelde iptal, vergi
+   * idaresinde geçerli" belge kalıcı ve görünmez olurdu (CLAUDE.md finans
+   * kuralı 4).
+   */
+  private async handleCancel(data: CancelJobData): Promise<void> {
+    try {
+      await this.eInvoicePort.cancel(data.uuid, data.reason);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      this.criticalFailure.publish({
+        operation: 'finance.e-document.cancel',
+        severity: 'CRITICAL',
+        summary:
+          'Fatura yerelde iptal edildi ama entegratörde iptal bildirimi yapılamadı.',
+        errorMessage,
+        context: {
+          invoiceId: data.invoiceId,
+          einvoiceUuid: data.uuid,
+          clinicId: data.clinicId,
+        },
+        clinicId: data.clinicId,
+        dedupeKey: `edocument-cancel-failed:${data.invoiceId}`,
+      });
+
+      throw error;
+    }
+
+    this.logger.log(
+      `e-Belge entegratörde iptal edildi: invoiceId=${data.invoiceId}, uuid=${data.uuid}`
+    );
   }
 
   private async handleSend(invoiceId: string): Promise<void> {
@@ -86,9 +146,31 @@ export class EDocumentProcessor extends WorkerHost {
       buyerIsEInvoiceUser: buyer?.isEInvoiceUser ?? false,
     });
 
+    // GÖNDERİM HAKKI: entegratöre belge göndermek geri alınamaz. Koşullu tek
+    // UPDATE ile hak sahiplenilir; kazanamayan çalıştırma (job retry, elle
+    // yeniden tetikleme) gönderimi ATLAR. Aksi halde port çağrısı başarılı olup
+    // sonucu yazma adımı patladığında retry ikinci bir yasal belge üretirdi.
+    const claimed = await this.commandBus.execute(
+      new ClaimInvoiceEDocumentDispatchCommand(invoice.id)
+    );
+    if (!claimed) {
+      this.logger.warn(
+        `e-Belge gönderimi atlandı — hak başka bir çalıştırmada: invoiceId=${invoice.id}`
+      );
+      return;
+    }
+
     const request: EDocumentRequest = {
       type: documentType,
       invoiceId: invoice.id,
+      // Gerçek entegratör adapter'ları bu anahtarı sağlayıcı tarafında da
+      // tekilleştirme için kullanır (çekirdek tarafındaki kapı claim'dir).
+      idempotencyKey: invoice.id,
+      // Belge tarihi = faturanın kendi `issuedAt` damgası = defterdeki ekonomik
+      // olayın tarihi (hepsi fatura kesilirken tek anda yazılır). `now`'a düşmek
+      // yalnız bu damganın eklenmesinden ÖNCE kesilmiş kayıtlar için geçerli bir
+      // yoldur; yoksa kuyrukta bekleyen bir gönderim, belgeyi gönderim gününe
+      // tarihleyip defterden koparırdı.
       issueDate: invoice.issuedAt ?? DateTimeManager.create(),
       seller: {
         // TODO(gerçek-adapter): kliniğin yasal unvanını çöz; Noop kullanmıyor.
@@ -118,7 +200,16 @@ export class EDocumentProcessor extends WorkerHost {
       currency: invoice.currency,
     };
 
-    const result = await this.eInvoicePort.issue(request);
+    let result: EDocumentResult;
+    try {
+      result = await this.eInvoicePort.issue(request);
+    } catch (error) {
+      // Belge entegratörde oluştu mu bilinmiyor (timeout/5xx ayrımı yapılamaz).
+      // Bu yüzden FAILED işaretlenir ve gönderim hakkı bir daha otomatik
+      // sahiplenilemez: mükerrer yasal belge riski, elde kalan belgeden ağırdır.
+      await this.markFailed(invoice.id, invoice.clinicId, error);
+      throw error;
+    }
 
     await this.commandBus.execute(
       new MarkInvoiceEDocumentResultCommand(
@@ -128,6 +219,7 @@ export class EDocumentProcessor extends WorkerHost {
           uuid: result.uuid,
           status: result.status,
           invoiceNumber: result.invoiceNumber,
+          rawResponse: result.rawResponse,
         },
         this.internalCtx
       )
@@ -136,5 +228,47 @@ export class EDocumentProcessor extends WorkerHost {
     this.logger.log(
       `e-Belge işlendi: invoiceId=${invoice.id}, tür=${result.documentType}, durum=${result.status}`
     );
+  }
+
+  /**
+   * Gönderim hatasını faturaya ve alarma yazar. Hata yutulmaz (çağıran yeniden
+   * fırlatır) — amaç, elde kalmış belgeyi görünür kılmak: FAILED durumundan
+   * çıkış otomatik değil, bilinçli bir insan kararıdır.
+   */
+  private async markFailed(
+    invoiceId: string,
+    clinicId: string,
+    error: unknown
+  ): Promise<void> {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    try {
+      await this.commandBus.execute(
+        new MarkInvoiceEDocumentFailedCommand({
+          invoiceId,
+          reason: errorMessage,
+          ctx: this.internalCtx,
+        })
+      );
+    } catch (markError) {
+      this.logger.error(
+        `e-Belge hatası faturaya işlenemedi: invoiceId=${invoiceId}`,
+        markError
+      );
+    }
+
+    this.criticalFailure.publish({
+      operation: 'finance.e-document.send',
+      severity: 'CRITICAL',
+      summary:
+        'e-Belge entegratöre gönderilemedi; belgenin oluşup oluşmadığı bilinmiyor.',
+      errorMessage,
+      // Uyarı kiracısıyla gidiyor: elde kalmış yasal belgeyi hangi şubenin
+      // takip edeceği, alarmın tek pratik sorusudur (fatura iki satır yukarıda
+      // elimizde olduğu hâlde `null` geçiliyordu).
+      context: { invoiceId, clinicId },
+      clinicId,
+      dedupeKey: `edocument-send-failed:${invoiceId}`,
+    });
   }
 }

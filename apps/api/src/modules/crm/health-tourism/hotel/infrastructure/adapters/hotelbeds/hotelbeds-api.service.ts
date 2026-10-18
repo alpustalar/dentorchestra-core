@@ -2,6 +2,7 @@ import * as crypto from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  CancelHotelBookingResult,
   CheckRateResult,
   CreateHotelbedsBookingParams,
   HotelbedsBookingResult,
@@ -125,7 +126,11 @@ export class HotelbedsApiService implements IHotelbedsApiService {
       hotelCode: String(booking.hotel?.code ?? ''),
       checkIn: booking.hotel?.checkIn ?? '',
       checkOut: booking.hotel?.checkOut ?? '',
-      totalNet: parseFloat(booking.totalNet ?? '0'),
+      // `?? '0'` YOK: sağlayıcı ücretlendirdiği tutarı bildirmediyse maliyet
+      // BİLİNMİYOR demektir, sıfır değil. NaN entity kapısında durur (`Money` +
+      // pozitiflik); sıfır o kapıdan geçerdi ve defterdeki tedarikçi borcunu
+      // sıfırlayıp komisyonu satışın tamamı gibi gösterirdi.
+      totalNet: parseFloat(booking.totalNet as string),
       currency: booking.currency ?? 'USD',
       status: booking.status ?? 'CONFIRMED',
       holderName: booking.holder?.name ?? '',
@@ -134,7 +139,22 @@ export class HotelbedsApiService implements IHotelbedsApiService {
     };
   }
 
-  async cancelBooking(reference: string): Promise<void> {
+  /**
+   * Rezervasyonu iptal eder ve sağlayıcı referansını döner.
+   *
+   * **İptal cezası bilinçli olarak OKUNMUYOR.** Yanıt gövdesinde iptal edilmiş
+   * rezervasyonun `totalNet`/`pendingAmount` alanları geliyor ama bu alanların
+   * iptal sonrası semantiği (kalan ceza mı, orijinal tutar mı) canlı/sandbox
+   * yanıtına karşı **doğrulanmadı**. Yanlış yorum pahalıya patlar: orijinal
+   * tutarı ceza sanmak, her iptalde maliyetin tamamını zarar (689) yazıp
+   * tedarikçi borcunu (320) hiç düşürmemek demektir. Bu yüzden ceza "bilinmiyor"
+   * olarak taşınır; iade akışı cezasız ters kayıt yazar ve farkı alarmla
+   * duyurur (transferde alan `cancellationAmount` adıyla geldiği için okunuyor).
+   *
+   * Doğrulandığında değişiklik tek satırdır: yanıt gövdesi parse edilip
+   * `retained` doldurulur.
+   */
+  async cancelBooking(reference: string): Promise<CancelHotelBookingResult> {
     const res = await fetch(
       `${HOTELS_API_BASE}/bookings/${reference}?cancellationFlag=CANCELLATION`,
       {
@@ -148,6 +168,8 @@ export class HotelbedsApiService implements IHotelbedsApiService {
       const err = await res.text();
       throw new Error(`Hotelbeds iptal hatası: ${res.status} ${err}`);
     }
+
+    return { reference, retainedAmount: null, currency: null };
   }
 
   async getHotelContent(params: {

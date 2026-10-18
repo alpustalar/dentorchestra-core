@@ -156,7 +156,10 @@ export class BookFlightTool implements IAiSubToolHandler {
     const { optionId, passengers, contactEmail, contactPhone } = parsed.data;
 
     const { data: option } = await this.queryBus.execute(
-      new GetFlightOfferQuery(optionId)
+      new GetFlightOfferQuery(optionId, {
+        clinicId: context.clinicId,
+        conversationId: context.conversationId,
+      })
     );
     if (!option) {
       return {

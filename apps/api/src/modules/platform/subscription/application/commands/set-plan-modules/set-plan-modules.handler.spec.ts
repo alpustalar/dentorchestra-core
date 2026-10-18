@@ -2,9 +2,7 @@ import { SetPlanModulesHandler } from './set-plan-modules.handler';
 import { SetPlanModulesCommand } from './set-plan-modules.command';
 import { Plan } from '@modules/platform/subscription/domain/entities/plan.entity';
 import { SubscriptionPlanNotFoundException } from '@modules/platform/subscription/domain/exceptions/subscription.exceptions';
-import {
-  IPlanCommandRepository,
-} from '@modules/platform/subscription/domain/repositories/plan/plan.command.repository';
+import { IPlanCommandRepository } from '@modules/platform/subscription/domain/repositories/plan/plan.command.repository';
 
 describe('SetPlanModulesHandler', () => {
   const build = (plan: Plan | null) => {

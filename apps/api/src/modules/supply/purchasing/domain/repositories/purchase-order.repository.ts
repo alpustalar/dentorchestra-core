@@ -30,4 +30,19 @@ export interface IPurchaseOrderQueryRepository {
   findByClinic(
     filter: FindPurchaseOrdersFilter
   ): Promise<Paginated<PurchaseOrderWithItems>>;
+
+  /**
+   * Mal kabul ↔ fatura sapması taşıyabilecek siparişler: **herhangi** bir teslim
+   * ya da **herhangi** bir fatura eşleşmesi olanlar. Hiç teslim alınmamış ve hiç
+   * faturalanmamış siparişin (taslak / gönderilmiş / iptal) sapması tanım gereği
+   * sıfırdır.
+   *
+   * `paginate` **kullanılmaz** (bkz. `findExistingSourceRefIds` deseni): bu bir
+   * liste ekranı değil, bir **bakiye** mutabakatının girdi kümesidir. Sayfalansaydı
+   * para birimi başına toplamlar yalnız o sayfanın toplamı olurdu — ay sonunda
+   * tahakkuk edilecek tutar sessizce eksik çıkardı.
+   */
+  findReceiptVarianceCandidates(
+    clinicId: string
+  ): Promise<PurchaseOrderWithItems[]>;
 }

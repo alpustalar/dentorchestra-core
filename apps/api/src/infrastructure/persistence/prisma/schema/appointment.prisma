@@ -98,17 +98,39 @@ model Appointment {
   patient   Patient    @relation(fields: [patientId], references: [id])
   resource  Resource?  @relation(fields: [resourceId], references: [id])
 
-  medicalFile     MedicalFile[]
-  payment         Payment?
-  productUsages   ProductUsage[]
-  diagnoses       AppointmentDiagnosis[]
-  procedures      AppointmentProcedure[]
-  eNabizSync      ENabizSync?
-  invoice         Invoice?
-  posTransactions PosTransaction[]
-  charges         TreatmentCharge[]
+  medicalFile           MedicalFile[]
+  payment               Payment?
+  productUsages         ProductUsage[]
+  diagnoses             AppointmentDiagnosis[]
+  procedures            AppointmentProcedure[]
+  eNabizSync            ENabizSync?
+  /// Çoklu: iptal edilmiş faturalar yerinde kalır (storno defterden silmez), bu
+  /// yüzden bir randevunun **en fazla bir etkin** faturası olur ama geçmişinde
+  /// birden çok iptal edilmiş fatura bulunabilir. Tekillik kısmî unique index'te.
+  invoices              Invoice[]
+  posTransactions       PosTransaction[]
+  charges               TreatmentCharge[]
+  appointmentEmbeddings AppointmentEmbedding[]
 
   @@index([patientPhone])
   @@index([startTime])
   @@map("appointments")
+}
+
+model AppointmentEmbedding {
+  id            String @id
+  appointmentId String @map("appointment_id")
+  clinicId      String @map("clinic_id")
+
+  contentChunk String                      @map("content_chunk") @db.Text // Vektörleştirilen metin parçası (örn: randevu notu)
+  embedding    Unsupported("vector(1536)") // pgvector kolonu
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@index([clinicId])
+  @@index([appointmentId])
+  @@map("appointment_embeddings")
 }

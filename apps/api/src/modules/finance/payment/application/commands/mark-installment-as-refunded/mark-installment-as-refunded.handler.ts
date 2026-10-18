@@ -13,9 +13,10 @@ import {
 } from '@modules/finance/payment/domain/repositories/payment/payment.command.repository';
 
 @CommandHandler(MarkInstallmentAsRefundedCommand)
-export class MarkInstallmentAsRefundedHandler
-  implements ICommandHandler<MarkInstallmentAsRefundedCommand, void>
-{
+export class MarkInstallmentAsRefundedHandler implements ICommandHandler<
+  MarkInstallmentAsRefundedCommand,
+  void
+> {
   constructor(
     @Inject(PAYMENT_COMMAND_REPOSITORY)
     private readonly paymentRepo: IPaymentCommandRepository,

@@ -19,6 +19,7 @@ import {
   FlightOfferToken,
 } from '@modules/crm/health-tourism/flight/domain/contracts';
 import { SearchFlightsDto } from '@shared/modules/health-tourism/dto/queries';
+import { QuoteOptionOwner } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.contracts';
 
 const SearchFlightsInputSchema = z.object({
   origin: z.string().trim().length(3),
@@ -154,12 +155,21 @@ export class SearchFlightsTool implements IAiSubToolHandler {
       };
     }
 
+    // Teklifin sahibi: bu kiracı + bu görüşme. Okuma anında doğrulanır
+    // (`QuoteOptionOwnershipService`) — önbellek anahtarı yetki değildir.
+    const owner: QuoteOptionOwner = {
+      clinicId: context.clinicId,
+      conversationId: context.conversationId,
+    };
+
     const options: SearchedFlightOption[] = [];
     for (const offer of top) {
-      const optionId = `fl_${randomUUID().slice(0, 8)}`;
+      // Kısaltma YOK — gerekçe `search_hotels` ile aynı (çarpışma üzerine yazar).
+      const optionId = `fl_${randomUUID()}`;
       const summary = buildSummary(offer);
 
       const token: FlightOfferToken = {
+        owner,
         offerId: offer.offerId,
         totalAmount: offer.totalAmount,
         currency: offer.currency,

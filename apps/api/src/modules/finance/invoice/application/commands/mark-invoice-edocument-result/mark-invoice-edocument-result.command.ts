@@ -8,6 +8,8 @@ export interface MarkInvoiceEDocumentResultInput {
   uuid: string | null;
   status: EDocumentStatus;
   invoiceNumber?: string | null;
+  providerRef?: string | null;
+  rawResponse?: unknown;
 }
 
 /**

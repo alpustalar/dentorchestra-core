@@ -13,9 +13,10 @@ import {
 import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(FindPeriodByDateQuery)
-export class FindPeriodByDateHandler
-  implements IQueryHandler<FindPeriodByDateQuery, FindPeriodByDateResponse>
-{
+export class FindPeriodByDateHandler implements IQueryHandler<
+  FindPeriodByDateQuery,
+  FindPeriodByDateResponse
+> {
   constructor(
     @Inject(ACCOUNTING_PERIOD_QUERY_REPOSITORY)
     private readonly accountingPeriodRepo: IAccountingPeriodQueryRepository,

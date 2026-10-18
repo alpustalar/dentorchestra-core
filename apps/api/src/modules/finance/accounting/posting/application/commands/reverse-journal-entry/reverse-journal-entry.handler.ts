@@ -18,8 +18,13 @@ import {
 } from '@modules/finance/accounting/posting/domain/repositories/journal.repository';
 import { ReverseJournalEntryCommand } from './reverse-journal-entry.command';
 import { AccountingPeriodStatusSchema } from '@shared';
+import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
+import {
+  IJournalEntryNumberingService,
+  JOURNAL_ENTRY_NUMBERING_SERVICE,
+} from '@modules/finance/accounting/periods/domain/services/entry-numbering/journal-entry-numbering.service.interface';
 
 @CommandHandler(ReverseJournalEntryCommand)
 export class ReverseJournalEntryHandler implements ICommandHandler<
@@ -29,6 +34,8 @@ export class ReverseJournalEntryHandler implements ICommandHandler<
   constructor(
     @Inject(JOURNAL_COMMAND_REPOSITORY)
     private readonly journalCommandRepo: IJournalCommandRepository,
+    @Inject(JOURNAL_ENTRY_NUMBERING_SERVICE)
+    private readonly entryNumbering: IJournalEntryNumberingService,
     private readonly queryBus: TSQueryBus,
     private readonly txManager: TransactionManager,
     @Inject(POLICY_FACTORY)
@@ -54,10 +61,8 @@ export class ReverseJournalEntryHandler implements ICommandHandler<
       // ters kaydedip o defteri bozabiliyordu.
       this.policyFactory
         .finance(ctx.actor, ctx.source)
-        .evaluator.check((p) =>
-          p.actorCanManageTargetClinic(original.clinicId)
-        )
-        .orThrow('accounting.journal.reverse');
+        .evaluator.check((p) => p.actorCanManageTargetClinic(original.clinicId))
+        .orThrow(ACCOUNTING_EVENTS.JOURNAL_REVERSE);
 
       // Storno bugünün açık dönemine girer; kilitli dönemdeki orijinal kayda dokunulmaz.
       const { data: period } = await this.queryBus.execute(
@@ -79,10 +84,16 @@ export class ReverseJournalEntryHandler implements ICommandHandler<
         description: reason,
         performedById: ctx.actor.userId,
       });
-      original.markReversed(generatedReversalUUID.value);
+      original.markReversed({
+        reversalId: generatedReversalUUID.value,
+        actorId: ctx.actor.userId,
+        reason,
+        source: ctx.actor.source,
+      });
 
-      const entryNo = await this.journalCommandRepo.nextEntryNo(
-        original.clinicId,
+      // Numara dönem satırındaki sayaçtan, kilit altında (aynı tx): iki eşzamanlı
+      // storno aynı numarayı alamaz ve dönem bu arada kapanmışsa tahsis reddedilir.
+      const entryNo = await this.entryNumbering.lockAndAllocateEntryNo(
         period.id
       );
       reversal.post(entryNo);

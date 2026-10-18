@@ -27,11 +27,14 @@ export class ProductQueryController {
   list(
     @Query() pagination: PaginationDto,
     @Query('clinicId', ParseUUIDPipe) clinicId: string,
-    @GetContext() ctx: IGetContext,
-    @Query('organizationId', ParseUUIDPipe) organizationId?: string | null
+    @GetContext() ctx: IGetContext
   ) {
+    // `organizationId` ALINMAZ: kiracı kimliği istemciden gelmez, `clinicId`'den
+    // çözülür. Üstelik `ParseUUIDPipe` opsiyonel parametrede `optional: true`
+    // olmadan kullanıldığı için parametre gönderilmediğinde istek 400'e
+    // düşüyordu — yani liste fiilen org kimliği göndermeye zorluyordu.
     return this.queryBus.execute(
-      new FindProductsQuery({ pagination, ctx, clinicId, organizationId })
+      new FindProductsQuery({ pagination, ctx, clinicId })
     );
   }
 }

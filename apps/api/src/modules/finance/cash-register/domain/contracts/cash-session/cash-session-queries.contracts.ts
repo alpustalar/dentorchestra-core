@@ -12,6 +12,8 @@ export interface FindCashSessionsFilter {
   clinicId: string;
   cashRegisterId?: string;
   status?: CashSessionStatusType;
+  /** Yalnız sayım farkı sıfırdan farklı olan kapanışlar (fazla veya açık). */
+  hasDifference?: boolean;
   pagination: Pagination;
 }
 

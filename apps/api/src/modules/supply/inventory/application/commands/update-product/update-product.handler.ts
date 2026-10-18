@@ -8,19 +8,26 @@ import {
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { ProductNotFoundException } from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
 import {
+  IInventoryCatalogService,
+  INVENTORY_CATALOG_SERVICE,
+} from '@modules/supply/inventory/domain/services/catalog/inventory-catalog.service.interface';
+import {
   IProductCommandRepository,
   PRODUCT_COMMAND_REPOSITORY,
 } from '@modules/supply/inventory/domain/repositories/product/product.command.repository';
 
 @CommandHandler(UpdateProductCommand)
-export class UpdateProductHandler
-  implements ICommandHandler<UpdateProductCommand, void>
-{
+export class UpdateProductHandler implements ICommandHandler<
+  UpdateProductCommand,
+  void
+> {
   constructor(
     @Inject(PRODUCT_COMMAND_REPOSITORY)
     private readonly productRepo: IProductCommandRepository,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
+    @Inject(INVENTORY_CATALOG_SERVICE)
+    private readonly catalog: IInventoryCatalogService,
     private readonly txManager: TransactionManager
   ) {}
 
@@ -37,6 +44,21 @@ export class UpdateProductHandler
         p.actorCanAccessTargetClinic(product.clinicId.value)
       )
       .orThrow();
+
+    // Bağlar güncellemede de kiracıya kapalı olmalı: kapı yalnız oluşturmada
+    // olsaydı aynı yabancı kayıt bir güncellemeyle bağlanabilirdi.
+    if (data.categoryId) {
+      await this.catalog.assertCategoryUsable({
+        clinicId: product.clinicId.value,
+        categoryId: data.categoryId,
+      });
+    }
+    if (data.supplierId) {
+      await this.catalog.assertSupplierUsable({
+        clinicId: product.clinicId.value,
+        supplierId: data.supplierId,
+      });
+    }
 
     product.update({
       name: data.name,

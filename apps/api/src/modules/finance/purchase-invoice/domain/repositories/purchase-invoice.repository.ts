@@ -10,8 +10,7 @@ export const PURCHASE_INVOICE_QUERY_REPOSITORY = Symbol(
   'IPurchaseInvoiceQueryRepository'
 );
 
-export interface IPurchaseInvoiceCommandRepository
-  extends IBaseCommandRepository<PurchaseInvoice> {
+export interface IPurchaseInvoiceCommandRepository extends IBaseCommandRepository<PurchaseInvoice> {
   /**
    * Satır kilidiyle okur. Sipariş eşleştirme/koparma faturanın `purchaseOrderId`
    * alanına bakıp siparişin kümülatif `invoicedTotal` sayacını değiştiriyor;

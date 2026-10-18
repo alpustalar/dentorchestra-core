@@ -10,7 +10,8 @@ export class RevertInvoiceFromPurchaseOrderCommand implements ICommand {
     public readonly payload: {
       readonly orderId: string;
       readonly invoiceId: string;
-      readonly grandTotal: number;
+      /** Geri alınacak KDV dahil toplam — kuruş ölçeğinde ondalık string. */
+      readonly grandTotal: string;
       readonly ctx: IGetContext;
     }
   ) {}

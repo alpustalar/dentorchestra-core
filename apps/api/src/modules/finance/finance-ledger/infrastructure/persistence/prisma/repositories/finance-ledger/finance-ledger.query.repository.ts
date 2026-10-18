@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  Currency,
   FinanceLedger,
   LedgerType,
   PaymentMethod,
@@ -12,7 +13,10 @@ import { paginate } from '@src/infrastructure/persistence/prisma/helpers/paginat
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import {
   GetSummaryFilter,
+  LedgerCurrencyTotal,
+  LedgerEntryStatusRow,
   LedgerSummary,
+  PatientCurrencyBalance,
   PatientFinanceSummary,
   PatientLedgerItem,
   PatientRevenue,
@@ -20,6 +24,24 @@ import {
 } from '@modules/finance/finance-ledger/domain/contracts/finance-ledger';
 import { IFinanceLedgerQueryRepository } from '@modules/finance/finance-ledger/domain/repositories/finance-ledger/finance-ledger.query.repository';
 import { Paginated } from '@common/interfaces/paginated.type';
+import { normalizeReportDateRange } from '@modules/finance/shared/domain/reporting/report-date-range';
+
+/**
+ * Hastanın "hizmet tutarı" sayılan ödeme planı durumları.
+ *
+ * CANCELLED ve FAILED dışında REFUNDED de hariçtir: iade edilmiş bir plan
+ * hastanın borcu değildir. Tahsilat tarafı (defter) iadeyi düşürdüğü için
+ * planı düşürmemek, iade edilen tutarı hastaya **yeniden borç** yazıyordu.
+ * Kısmi iadede plan REFUNDED olmaz (PARTIAL kalır), o yüzden bu hariç tutma
+ * yalnız tamamı iade edilmiş planları etkiler.
+ */
+const SERVICE_AMOUNT_EXCLUDED_PAYMENT_STATUSES = [
+  PaymentStatus.CANCELLED,
+  PaymentStatus.FAILED,
+  PaymentStatus.REFUNDED,
+];
+
+const ZERO = new Prisma.Decimal(0);
 
 @Injectable()
 export class FinanceLedgerQueryRepository
@@ -48,6 +70,7 @@ export class FinanceLedgerQueryRepository
     type RawRow = {
       id: string;
       amount: Prisma.Decimal;
+      currency: Currency;
       category: FinanceLedger['category'];
       entryDate: Date;
       status: FinanceLedger['status'];
@@ -77,6 +100,7 @@ export class FinanceLedgerQueryRepository
       items: result.items.map((row) => ({
         id: row.id,
         amount: row.amount.toFixed(2),
+        currency: row.currency,
         category: row.category,
         entryDate: row.entryDate,
         status: row.status,
@@ -87,44 +111,81 @@ export class FinanceLedgerQueryRepository
     };
   }
 
+  /**
+   * Hasta bakiyesi **para birimi başına** üretilir. Sağlık turizmi hastası aynı
+   * dosyada TRY ve EUR ödüyor; tek bir toplam 1.000 EUR ile 1.000 TRY'yi
+   * toplayıp bakiyeyi uyduruyordu. Kur çevrimi burada YAPILMAZ (fonksiyonel
+   * para çevrimi yalnız fişleme anında, bkz. doc 07).
+   */
   async getPatientSummary(patientId: string): Promise<PatientFinanceSummary> {
-    const [ledgerRows, paymentAgg] = await Promise.all([
+    const [ledgerRows, paymentRows] = await Promise.all([
       this.db.financeLedger.groupBy({
-        by: ['type'],
+        by: ['type', 'currency'],
         where: { patientId, status: 'COMPLETED' },
         _sum: { amount: true },
       }),
-      this.db.payment.aggregate({
+      this.db.payment.groupBy({
+        by: ['currency'],
         where: {
           patientId,
-          status: { notIn: [PaymentStatus.CANCELLED, PaymentStatus.FAILED] },
+          status: { notIn: SERVICE_AMOUNT_EXCLUDED_PAYMENT_STATUSES },
         },
         _sum: { totalAmount: true },
       }),
     ]);
 
-    let totalPayments = new Prisma.Decimal(0);
+    const byCurrency = new Map<
+      Currency,
+      { payments: Prisma.Decimal; service: Prisma.Decimal }
+    >();
+
+    const bucket = (currency: Currency) => {
+      const existing = byCurrency.get(currency);
+      if (existing) return existing;
+      const created = { payments: ZERO, service: ZERO };
+      byCurrency.set(currency, created);
+      return created;
+    };
+
     for (const row of ledgerRows) {
-      if (row.type === LedgerType.INCOME) {
-        totalPayments = totalPayments.add(row._sum.amount ?? 0);
-      }
+      if (row.type !== LedgerType.INCOME) continue;
+      const target = bucket(row.currency);
+      target.payments = target.payments.add(row._sum.amount ?? ZERO);
     }
 
-    const totalServiceAmount =
-      paymentAgg._sum?.totalAmount ?? new Prisma.Decimal(0);
-    const balance = totalPayments.sub(totalServiceAmount);
+    for (const row of paymentRows) {
+      const target = bucket(row.currency);
+      target.service = target.service.add(row._sum.totalAmount ?? ZERO);
+    }
 
-    return {
-      balance: balance.toFixed(2),
-      totalServiceAmount: totalServiceAmount.toFixed(2),
-      totalPayments: totalPayments.toFixed(2),
-    };
+    const balances: PatientCurrencyBalance[] = [...byCurrency.entries()].map(
+      ([currency, totals]) => ({
+        currency,
+        totalServiceAmount: totals.service.toFixed(2),
+        totalPayments: totals.payments.toFixed(2),
+        balance: totals.payments.sub(totals.service).toFixed(2),
+      })
+    );
+
+    return { balances };
   }
 
+  /**
+   * Klinik özeti **para birimi başına**. `totalExpenses` bugün daima 0: gider
+   * tarafı (alış faturası, bordro, kasa gideri) bu deftere değil muhasebe
+   * defterine yazılıyor — bkz. denetim notu §26 P1-5. Alan kaldırılmadı çünkü
+   * defter tipi EXPENSE'i taşıyor; kaynak eklendiğinde sorgu değişmez.
+   */
   async getClinicSummary(
     clinicId: string,
-    { dateFrom, dateTo }: GetSummaryFilter
+    filter: GetSummaryFilter
   ): Promise<LedgerSummary> {
+    // Aralık gün sınırlarına genişletilir: `entryDate` tam bir zaman damgasıdır,
+    // istek ise bir gün taşır (`?dateTo=2026-01-31` → 00:00:00). Ham `lte` ile
+    // ayın **son günü** özetten tamamen düşüyordu — ekrandaki ciro kartı eksik
+    // rakam gösteriyor ve hata hiçbir kontrole yakalanmıyordu.
+    const { dateFrom, dateTo } = normalizeReportDateRange(filter);
+
     const dateFilter =
       dateFrom || dateTo
         ? {
@@ -136,32 +197,48 @@ export class FinanceLedgerQueryRepository
         : {};
 
     const rows = await this.db.financeLedger.groupBy({
-      by: ['type'],
+      by: ['type', 'currency'],
       where: { clinicId, status: 'COMPLETED', ...dateFilter },
       _sum: { amount: true },
       _count: { id: true },
     });
 
-    let totalIncome = new Prisma.Decimal(0);
-    let totalExpenses = new Prisma.Decimal(0);
-    let entryCount = 0;
+    const byCurrency = new Map<
+      Currency,
+      { income: Prisma.Decimal; expenses: Prisma.Decimal; count: number }
+    >();
 
     for (const row of rows) {
-      const sum = row._sum.amount ?? new Prisma.Decimal(0);
-      entryCount += row._count.id;
+      const sum = row._sum.amount ?? ZERO;
+      const target = byCurrency.get(row.currency) ?? {
+        income: ZERO,
+        expenses: ZERO,
+        count: 0,
+      };
 
       if (row.type === LedgerType.INCOME) {
-        totalIncome = totalIncome.add(sum);
+        target.income = target.income.add(sum);
       } else {
-        totalExpenses = totalExpenses.add(sum);
+        target.expenses = target.expenses.add(sum);
       }
+      target.count += row._count.id;
+
+      byCurrency.set(row.currency, target);
     }
 
+    const totals: LedgerCurrencyTotal[] = [...byCurrency.entries()].map(
+      ([currency, t]) => ({
+        currency,
+        totalIncome: t.income.toFixed(2),
+        totalExpenses: t.expenses.toFixed(2),
+        balance: t.income.sub(t.expenses).toFixed(2),
+        entryCount: t.count,
+      })
+    );
+
     return {
-      totalIncome: totalIncome.toFixed(2),
-      totalExpenses: totalExpenses.toFixed(2),
-      balance: totalIncome.sub(totalExpenses).toFixed(2),
-      entryCount,
+      totals,
+      entryCount: totals.reduce((acc, t) => acc + t.entryCount, 0),
     };
   }
 
@@ -171,7 +248,7 @@ export class FinanceLedgerQueryRepository
     if (filter.patientIds.length === 0) return [];
 
     const rows = await this.db.financeLedger.groupBy({
-      by: ['patientId'],
+      by: ['patientId', 'currency'],
       where: {
         patientId: { in: filter.patientIds },
         type: LedgerType.INCOME,
@@ -185,7 +262,26 @@ export class FinanceLedgerQueryRepository
       .filter((r) => r.patientId !== null)
       .map((r) => ({
         patientId: r.patientId as string,
-        revenue: (r._sum.amount ?? new Prisma.Decimal(0)).toFixed(2),
+        currency: r.currency,
+        revenue: (r._sum.amount ?? ZERO).toFixed(2),
+      }));
+  }
+
+  async findEntryStatusesByInstallmentIds(
+    installmentIds: string[]
+  ): Promise<LedgerEntryStatusRow[]> {
+    if (installmentIds.length === 0) return [];
+
+    const rows = await this.db.financeLedger.findMany({
+      where: { installmentId: { in: installmentIds } },
+      select: { installmentId: true, status: true },
+    });
+
+    return rows
+      .filter((row) => row.installmentId !== null)
+      .map((row) => ({
+        installmentId: row.installmentId as string,
+        status: row.status,
       }));
   }
 }

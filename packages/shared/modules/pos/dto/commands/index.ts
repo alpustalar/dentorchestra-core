@@ -8,3 +8,4 @@ export { IyzicoTerminalVoidDto } from './iyzico-terminal-void.dto';
 export { IyzicoTerminalEodDto } from './iyzico-terminal-eod.dto';
 export { RegisterClinicIyzicoTerminalConfigDto } from './register-clinic-iyzico-terminal-config.dto';
 export { RegisterPosDeviceDto } from './register-pos-device.dto';
+export { BackfillPosAccountingEventsDto } from './backfill-pos-accounting-events.dto';

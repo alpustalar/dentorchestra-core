@@ -17,6 +17,7 @@ import {
   CONTEXT_SERVICE,
   IContextService,
 } from '@src/infrastructure/context/context.service.interface';
+import { emitDetached } from '@common/utils';
 
 @Injectable()
 export class ClinicEventPublisher implements IClinicEventPublisher {
@@ -31,7 +32,8 @@ export class ClinicEventPublisher implements IClinicEventPublisher {
   }
 
   requestClinicSoftDelete(payload: ClinicSoftDeleteRequestedEventPayload) {
-    this.eventEmitter.emit(
+    emitDetached(
+      this.eventEmitter,
       ClinicSoftDeleteRequestedEvent.NAME,
       new ClinicSoftDeleteRequestedEvent(payload)
     );

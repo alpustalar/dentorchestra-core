@@ -4,6 +4,7 @@ import { SubscriptionItemRepositoryModule } from '@modules/platform/subscription
 import { SubscriptionModuleRepositoryModule } from '@modules/platform/subscription/infrastructure/persistence/prisma/repositories/module/module.repository.module';
 import { PlanRepositoryModule } from '@modules/platform/subscription/infrastructure/persistence/prisma/repositories/plan/plan.repository.module';
 import { SubscriptionPaymentMethodRepositoryModule } from '@modules/platform/subscription/infrastructure/persistence/prisma/repositories/subscription-payment-method/subscription-payment-method.repository.module';
+import { SubscriptionChargeRepositoryModule } from '@modules/platform/subscription/infrastructure/persistence/prisma/repositories/subscription-charge/subscription-charge.repository.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { SubscriptionPaymentMethodRepositoryModule } from '@modules/platform/sub
     SubscriptionModuleRepositoryModule,
     PlanRepositoryModule,
     SubscriptionPaymentMethodRepositoryModule,
+    SubscriptionChargeRepositoryModule,
   ],
   exports: [
     SubscriptionRepositoryModule,
@@ -19,6 +21,7 @@ import { SubscriptionPaymentMethodRepositoryModule } from '@modules/platform/sub
     SubscriptionModuleRepositoryModule,
     PlanRepositoryModule,
     SubscriptionPaymentMethodRepositoryModule,
+    SubscriptionChargeRepositoryModule,
   ],
 })
 export class SubscriptionRepositoriesModule {}

@@ -119,9 +119,11 @@ describe('ExternalWorkOrder entity', () => {
     expect(workOrder.actualCost?.toNumber()).toBe(1750);
     expect(workOrder.receivedAt).not.toBeNull();
 
-    const event = workOrder.getDomainEvents().find(
-      (e): e is WorkOrderReceivedEvent => e instanceof WorkOrderReceivedEvent
-    );
+    const event = workOrder
+      .getDomainEvents()
+      .find(
+        (e): e is WorkOrderReceivedEvent => e instanceof WorkOrderReceivedEvent
+      );
     expect(event?.cost).toBe('1750');
     expect(event?.delayInDays).toBe(3);
   });
@@ -132,9 +134,11 @@ describe('ExternalWorkOrder entity', () => {
 
     workOrder.receive();
 
-    const event = workOrder.getDomainEvents().find(
-      (e): e is WorkOrderReceivedEvent => e instanceof WorkOrderReceivedEvent
-    );
+    const event = workOrder
+      .getDomainEvents()
+      .find(
+        (e): e is WorkOrderReceivedEvent => e instanceof WorkOrderReceivedEvent
+      );
     expect(workOrder.actualCost).toBeNull();
     expect(event?.cost).toBe('1500');
     expect(event?.delayInDays).toBe(0);
@@ -215,9 +219,11 @@ describe('ExternalWorkOrder entity', () => {
     workOrder.markOverdueNotified();
 
     expect(workOrder.overdueNotifiedAt).not.toBeNull();
-    const event = workOrder.getDomainEvents().find(
-      (e): e is WorkOrderOverdueEvent => e instanceof WorkOrderOverdueEvent
-    );
+    const event = workOrder
+      .getDomainEvents()
+      .find(
+        (e): e is WorkOrderOverdueEvent => e instanceof WorkOrderOverdueEvent
+      );
     expect(event?.daysOverdue).toBe(4);
     expect(event?.workOrderId).toBe(workOrder.id.value);
   });

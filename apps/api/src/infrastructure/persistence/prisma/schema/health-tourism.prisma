@@ -159,8 +159,16 @@ model BookingPayment {
   saleCurrency Currency @map("sale_currency") // Stripe bu para biriminde çeker (EUR/USD)
   saleAmount   Decimal  @map("sale_amount") @db.Decimal(12, 2)
   tryAmount    Decimal  @map("try_amount") @db.Decimal(12, 2) // iyzico TRY çeker (saleAmount × fxRate)
-  netAmount    Decimal  @map("net_amount") @db.Decimal(12, 2) // HotelBeds net maliyet (mutabakat/defter)
+  netAmount    Decimal  @map("net_amount") @db.Decimal(12, 2) // TEKLİF edilen net maliyet: satış fiyatı bundan türetildi
   fxRate       Decimal? @map("fx_rate") @db.Decimal(12, 6) // saleCurrency→TRY oranı
+
+  // Sağlayıcının rezervasyonu açarken FİİLEN ücretlendirdiği maliyet. `netAmount`
+  // teklif anındaki fiyattır ve ödeme linki saatlerce açık kalabilir; sağlayıcı
+  // rezervasyonu yeni fiyatla açarsa aradaki fark komisyonu sessizce yer. Defter
+  // bu kolondan yazılır (320 tedarikçi borcu = sağlayıcının faturalayacağı tutar),
+  // `netAmount` yalnız sapmanın ölçülebilmesi için durur.
+  supplierAmount   Decimal?  @map("supplier_amount") @db.Decimal(12, 2)
+  supplierCurrency Currency? @map("supplier_currency")
 
   // Rezervasyon niyeti — ödeme onaylanınca HotelBeds'e replay edilen BookHotel/BookTransfer payload'ı
   intent Json
@@ -174,6 +182,21 @@ model BookingPayment {
   paidProvider         BookingPaymentProvider? @map("paid_provider")
   paidProviderRef      String?                 @map("paid_provider_ref") // iade için: iyzico paymentTransactionId / stripe payment_intent
   paidAt               DateTime?               @map("paid_at")
+
+  // İptal sonrası sağlayıcının ALIKOYDUĞU tutar (iptal cezası). Rezervasyon iptal
+  // edilince tedarikçi borcunun (320) tamamı düşmez: sağlayıcı cezayı yine
+  // faturalar. Müşteriye tam iade yapıldığı için bu tutar platformun üstlendiği
+  // zarardır (689) ve defterin onu görmesi için burada durur. Sağlayıcı cezayı
+  // bildirmediyse **null** kalır — 0 yazmak "ücretsiz iptal" demek olurdu.
+  supplierRetainedAmount   Decimal?  @map("supplier_retained_amount") @db.Decimal(12, 2)
+  supplierRetainedCurrency Currency? @map("supplier_retained_currency")
+
+  // İadenin KENDİ tarihi: iade tahsilatın storno'su değil, ayrı bir ekonomik
+  // olaydır (aylar sonra gelebilir). `refundReason` ayrı kolondur çünkü
+  // `failureReason` book hatasının nedenini taşır; iade nedenini oraya yazmak
+  // FAILED → REFUNDED yolunda "book neden başarısız oldu" izini siliyordu.
+  refundedAt   DateTime? @map("refunded_at")
+  refundReason String?   @map("refund_reason") @db.Text
 
   // Sonuç (ödeme sonrası rezervasyon)
   bookingReference String? @map("booking_reference") // HotelBeds referansı

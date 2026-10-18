@@ -13,9 +13,10 @@ import {
 } from '@modules/supply/inventory/domain/repositories/supplier/supplier.query.repository';
 
 @QueryHandler(FindSuppliersQuery)
-export class FindSuppliersHandler
-  implements IQueryHandler<FindSuppliersQuery, FindSuppliersResponse>
-{
+export class FindSuppliersHandler implements IQueryHandler<
+  FindSuppliersQuery,
+  FindSuppliersResponse
+> {
   constructor(
     @Inject(SUPPLIER_QUERY_REPOSITORY)
     private readonly supplierRepo: ISupplierQueryRepository,

@@ -1,11 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { BaseEvent } from '@common/interfaces';
 import {
   UserManagedClinicsAssignedEvent,
   UserOrganizationOwnershipGrantedEvent,
 } from '@modules/identity/user/domain/events/user-scope-changed.event';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Kapsam devirlerini güvenlik denetim kanalına yazar. Bu kayıtlar sıradan
@@ -22,14 +22,14 @@ export class UserScopeChangedListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(UserManagedClinicsAssignedEvent.NAME, { async: true })
+  @OnDomainEvent(UserManagedClinicsAssignedEvent.NAME)
   async handleManagedClinics(
     event: UserManagedClinicsAssignedEvent
   ): Promise<void> {
     await this.write(event);
   }
 
-  @OnEvent(UserOrganizationOwnershipGrantedEvent.NAME, { async: true })
+  @OnDomainEvent(UserOrganizationOwnershipGrantedEvent.NAME)
   async handleOrganizationOwnership(
     event: UserOrganizationOwnershipGrantedEvent
   ): Promise<void> {

@@ -12,9 +12,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @QueryHandler(ListModulesQuery)
-export class ListModulesHandler
-  implements IQueryHandler<ListModulesQuery, ListModulesResponse>
-{
+export class ListModulesHandler implements IQueryHandler<
+  ListModulesQuery,
+  ListModulesResponse
+> {
   constructor(
     @Inject(SUBSCRIPTION_QUERY_REPOSITORY)
     private readonly subscriptiobRepo: ISubscriptionQueryRepository,

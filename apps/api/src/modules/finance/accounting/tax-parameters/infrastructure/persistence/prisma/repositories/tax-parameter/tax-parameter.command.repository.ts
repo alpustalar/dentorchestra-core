@@ -1,10 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { TaxParameterKeyType as TaxParameterKey } from '@input-type-schemas/TaxParameterKeySchema';
 import { BaseCommandRepository } from '@src/infrastructure/persistence/prisma/base-command.repository';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { txStorage } from '@src/infrastructure/persistence/prisma/transaction';
 import { TaxParameter } from '@modules/finance/accounting/tax-parameters/domain/entities/tax-parameter.entity';
 import { ITaxParameterCommandRepository } from '@modules/finance/accounting/tax-parameters/domain/repositories/tax-parameter/tax-parameter.command.repository';
+import { TaxParameterConcurrentUpdateException } from '@modules/finance/accounting/tax-parameters/domain/exceptions';
 
 @Injectable()
 export class TaxParameterCommandRepository
@@ -46,9 +48,26 @@ export class TaxParameterCommandRepository
 
   async create(entity: TaxParameter): Promise<TaxParameter> {
     const data = entity.toPersistence();
-    const raw = await this.db.taxParameter.create({ data });
-    entity.flushEvents();
-    return new TaxParameter(raw);
+    try {
+      const raw = await this.db.taxParameter.create({ data });
+      entity.flushEvents();
+      return new TaxParameter(raw);
+    } catch (error) {
+      // Kısmî unique index (`(clinic_id, key) WHERE valid_to IS NULL`) ikinci açık
+      // sürümü reddeder. Bu kısıt tek gerçek korumadır: ilk sürüm henüz yokken
+      // kilitlenecek satır da olmadığı için iki eşzamanlı istek arasında
+      // serileştirilecek bir şey kalmıyor.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new TaxParameterConcurrentUpdateException(
+          data.clinicId,
+          data.key
+        );
+      }
+      throw error;
+    }
   }
 
   async update(entity: TaxParameter) {

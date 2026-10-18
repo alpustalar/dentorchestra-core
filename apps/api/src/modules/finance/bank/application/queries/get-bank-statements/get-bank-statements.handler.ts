@@ -13,9 +13,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @QueryHandler(GetBankStatementsQuery)
-export class GetBankStatementsHandler
-  implements IQueryHandler<GetBankStatementsQuery, GetBankStatementsResponse>
-{
+export class GetBankStatementsHandler implements IQueryHandler<
+  GetBankStatementsQuery,
+  GetBankStatementsResponse
+> {
   constructor(
     @Inject(BANK_STATEMENT_QUERY_REPOSITORY)
     private readonly bankStatementRepo: IBankStatementQueryRepository,

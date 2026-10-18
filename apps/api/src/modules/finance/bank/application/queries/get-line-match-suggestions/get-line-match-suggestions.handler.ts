@@ -29,13 +29,10 @@ import {
  * görür ve seçimi kendisi yapar.
  */
 @QueryHandler(GetLineMatchSuggestionsQuery)
-export class GetLineMatchSuggestionsHandler
-  implements
-    IQueryHandler<
-      GetLineMatchSuggestionsQuery,
-      GetLineMatchSuggestionsResponse
-    >
-{
+export class GetLineMatchSuggestionsHandler implements IQueryHandler<
+  GetLineMatchSuggestionsQuery,
+  GetLineMatchSuggestionsResponse
+> {
   constructor(
     @Inject(BANK_STATEMENT_LINE_COMMAND_REPOSITORY)
     private readonly bankStatementLineRepo: IBankStatementLineCommandRepository,

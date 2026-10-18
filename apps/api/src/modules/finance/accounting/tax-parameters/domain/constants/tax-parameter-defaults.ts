@@ -19,4 +19,3 @@ export const TAX_PARAMETER_DEFAULTS: readonly TaxParameterDefault[] = [
   { key: TaxParameterKeySchema.enum.WHT_RENT, rate: 20 },
   { key: TaxParameterKeySchema.enum.CORP_TAX, rate: 25 },
 ];
-

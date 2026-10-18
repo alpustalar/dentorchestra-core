@@ -4,7 +4,6 @@ import { FinancialEvent, FinancialEventTypeSchema } from '@shared';
 import {
   DraftJournalEntry,
   DraftJournalLine,
-  PostingContext,
   PostingRule,
 } from '../posting-rule.interface';
 import { SalesInvoiceIssuedEventPayload } from '../event-payloads';
@@ -27,7 +26,7 @@ import { SalesInvoiceIssuedEventPayload } from '../event-payloads';
 export class SalesInvoiceIssuedRule implements PostingRule {
   readonly eventType = FinancialEventTypeSchema.enum.SALES_INVOICE_ISSUED;
 
-  build(event: FinancialEvent, _ctx: PostingContext): DraftJournalEntry {
+  build(event: FinancialEvent): DraftJournalEntry {
     const payload = event.payload as unknown as SalesInvoiceIssuedEventPayload;
     const revenueCode = payload.revenueAccountCode ?? '600.01';
 

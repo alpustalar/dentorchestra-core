@@ -23,13 +23,22 @@ describe('GetIncomeStatementHandler — dönem karşılaştırması', () => {
 
   /** Dönem başlangıcına göre brüt satış üreten sahte mizan. */
   const build = (salesByPeriodStart: Record<string, number>) => {
-    const trialBalanceCalls: { dateFrom?: Date; dateTo?: Date }[] = [];
+    const trialBalanceCalls: {
+      dateFrom?: Date;
+      dateTo?: Date;
+      kinds?: readonly string[];
+    }[] = [];
 
     const trialBalance = jest.fn(
-      (filter: { dateFrom?: Date; dateTo?: Date }) => {
+      (filter: {
+        dateFrom?: Date;
+        dateTo?: Date;
+        kinds?: readonly string[];
+      }) => {
         trialBalanceCalls.push({
           dateFrom: filter.dateFrom,
           dateTo: filter.dateTo,
+          kinds: filter.kinds,
         });
 
         const key = filter.dateFrom?.toISOString() ?? 'open';
@@ -206,5 +215,34 @@ describe('GetIncomeStatementHandler — dönem karşılaştırması', () => {
 
     expect(data.comparison).toBeNull();
     expect(trialBalance).toHaveBeenCalledTimes(1);
+  });
+
+  /**
+   * Kapanış fişi 6/7 hesaplarını ters kayıtla sıfırlar. Gelir tablosu onu sayarsa
+   * kapanmış yılın cirosu **sıfır** görünür — kapanış satırları gerçek satışları
+   * birebir götürür. Hata sessizdir: kapanış fişi kendi içinde dengeli olduğu için
+   * mizanın "Σborç = Σalacak" kontrolü de tutmaya devam eder. Süzgeç handler'ın
+   * HER mizan okumasında, karşılaştırma dönemi dahil, bulunmak zorundadır.
+   */
+  it('her mizan okumasında yalnız OPERATIONAL fişler sayılır (P0)', async () => {
+    const { handler, trialBalanceCalls } = build({
+      [APRIL_START.toISOString()]: 1000,
+      [MARCH_START.toISOString()]: 800,
+    });
+
+    await handler.execute(
+      new GetIncomeStatementQuery({
+        clinicId: CLINIC_ID,
+        ctx,
+        dateFrom: APRIL_START,
+        dateTo: MAY_START,
+        compare: true,
+      })
+    );
+
+    expect(trialBalanceCalls).toHaveLength(2);
+    for (const call of trialBalanceCalls) {
+      expect(call.kinds).toEqual(['OPERATIONAL']);
+    }
   });
 });

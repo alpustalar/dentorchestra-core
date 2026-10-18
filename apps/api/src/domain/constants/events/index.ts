@@ -13,6 +13,8 @@ import {
 } from '@src/domain/constants/events/treatment-package.constant';
 import { SubscriptionEvent } from '@src/domain/constants/events/subscription.constant';
 import { InvoiceEvent } from '@src/domain/constants/events/invoice.constant';
+import { PurchaseInvoiceEvent } from '@src/domain/constants/events/purchase-invoice.constant';
+import { PaymentGatewayEvent } from '@src/domain/constants/events/payment-gateway.constant';
 import { PosEvent } from '@src/domain/constants/events/pos.constant';
 import { MetaAdsEvent } from '@src/domain/constants/events/meta-ads.constant';
 import { LeadEvent } from '@src/domain/constants/events/lead.constant';
@@ -46,6 +48,8 @@ export type AppEventName =
   | UserEvent
   | SubscriptionEvent
   | InvoiceEvent
+  | PurchaseInvoiceEvent
+  | PaymentGatewayEvent
   | PosEvent
   | MetaAdsEvent
   | LeadEvent
@@ -78,6 +82,8 @@ export * from './treatment-charge.constant';
 export * from './user.constant';
 export * from './subscription.constant';
 export * from './invoice.constant';
+export * from './purchase-invoice.constant';
+export * from './payment-gateway.constant';
 export * from './pos.constant';
 export * from './meta-ads.constant';
 export * from './lead.constant';

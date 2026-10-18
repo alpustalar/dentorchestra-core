@@ -8,3 +8,4 @@ export type { IyzicoTerminalVoid } from './iyzico-terminal-void.type';
 export type { IyzicoTerminalEod } from './iyzico-terminal-eod.type';
 export type { RegisterClinicIyzicoTerminalConfig } from './register-clinic-iyzico-terminal-config.type';
 export type { RegisterPosDevice } from './register-pos-device.type';
+export type { BackfillPosAccountingEvents } from './backfill-pos-accounting-events.type';

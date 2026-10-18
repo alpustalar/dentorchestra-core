@@ -31,13 +31,10 @@ import {
 import { POS_EVENTS } from '@src/domain/constants/events';
 
 @CommandHandler(InitiatePosTransactionCommand)
-export class InitiatePosTransactionHandler
-  implements
-    ICommandHandler<
-      InitiatePosTransactionCommand,
-      InitiatePosTransactionResponse
-    >
-{
+export class InitiatePosTransactionHandler implements ICommandHandler<
+  InitiatePosTransactionCommand,
+  InitiatePosTransactionResponse
+> {
   constructor(
     @Inject(POS_DEVICE_COMMAND_REPOSITORY)
     private readonly posDeviceRepo: IPosDeviceCommandRepository,
@@ -102,6 +99,7 @@ export class InitiatePosTransactionHandler
         // TODO: burada logic hatası olabilir tekrar kontrol etmek gerekiyor
 
         const posTransaction = PosTransaction.create({
+          initiatedById: ctx.actor.userId,
           posDeviceId: device.id.value,
           clinicId: input.clinicId,
           patientId: input.patientId,

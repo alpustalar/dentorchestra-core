@@ -10,7 +10,14 @@ import {
   PURCHASE_REQUEST_COMMAND_REPOSITORY,
 } from '@modules/supply/purchasing/domain/repositories/purchase-request.repository';
 import { PurchaseOrder } from '@modules/supply/purchasing/domain/entities/purchase-order.entity';
-import { PurchaseRequestNotFoundException } from '@modules/supply/purchasing/domain/exceptions/purchasing.exceptions';
+import {
+  PurchaseRequestClinicMismatchException,
+  PurchaseRequestNotFoundException,
+} from '@modules/supply/purchasing/domain/exceptions/purchasing.exceptions';
+import {
+  IInventoryCatalogService,
+  INVENTORY_CATALOG_SERVICE,
+} from '@modules/supply/inventory/domain/services/catalog/inventory-catalog.service.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import {
   IPolicyFactory,
@@ -33,6 +40,8 @@ export class CreatePurchaseOrderHandler implements ICommandHandler<
     private readonly policyFactory: IPolicyFactory,
     @Inject(TENANT_SCOPE_RESOLVER)
     private readonly tenantScopeResolver: ITenantScopeResolver,
+    @Inject(INVENTORY_CATALOG_SERVICE)
+    private readonly inventoryCatalog: IInventoryCatalogService,
     private readonly txManager: TransactionManager
   ) {}
 
@@ -46,6 +55,26 @@ export class CreatePurchaseOrderHandler implements ICommandHandler<
       .purchasing(actor, ctx.source)
       .evaluator.check((p) => p.canManageClinicPurchasing(data.clinicId))
       .orThrow('purchase-order.create');
+
+    // Tedarikçi ve katalog ürünleri bu kliniğe ait ve kullanılabilir olmalı:
+    // ikisi de bounded-context gereği FK'siz skaler olarak taşınıyor, yani DB
+    // doğrulamıyor. Doğrulama **siparişten önce** yapılır; mal kabulde yapılsa
+    // sipariş yazılmış, gönderilmiş ve teslim alınmaya çalışılırken reddedilirdi.
+    await this.inventoryCatalog.assertSupplierUsable({
+      clinicId: data.clinicId,
+      supplierId: data.supplierId,
+    });
+
+    const productIds = data.items
+      .map((item) => item.productId)
+      .filter((productId): productId is string => !!productId);
+
+    if (productIds.length > 0) {
+      await this.inventoryCatalog.assertProductsUsable({
+        clinicId: data.clinicId,
+        productIds,
+      });
+    }
 
     const order = PurchaseOrder.create({
       clinicId: data.clinicId,
@@ -66,6 +95,19 @@ export class CreatePurchaseOrderHandler implements ICommandHandler<
         if (!request) {
           throw new PurchaseRequestNotFoundException(data.purchaseRequestId);
         }
+
+        // Talep siparişin kliniğine ait olmalı. Yetki kontrolü `data.clinicId`
+        // üzerinden yapılıyor; talebin kliniği doğrulanmadığı sürece aktör kendi
+        // kliniğinde sipariş açarken **başka bir kiracının** onaylı talebini
+        // ORDERED'a çekebiliyordu (o klinikte talep bir daha siparişe
+        // dönüştürülemez hâle gelirdi) ve sipariş yabancı bir talebe bağlanırdı.
+        if (request.clinicId.value !== data.clinicId) {
+          throw new PurchaseRequestClinicMismatchException({
+            requestClinicId: request.clinicId.value,
+            orderClinicId: data.clinicId,
+          });
+        }
+
         request.markOrdered();
         await this.purchaseRequestRepo.update(request);
       }

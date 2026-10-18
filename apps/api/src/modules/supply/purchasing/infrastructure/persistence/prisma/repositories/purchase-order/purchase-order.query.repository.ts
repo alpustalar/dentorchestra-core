@@ -46,4 +46,22 @@ export class PurchaseOrderQueryRepository
       total: result.total,
     };
   }
+
+  async findReceiptVarianceCandidates(
+    clinicId: string
+  ): Promise<PurchaseOrderWithItems[]> {
+    const rows = await this.db.purchaseOrder.findMany({
+      where: {
+        clinicId,
+        OR: [
+          { invoicedTotal: { gt: 0 } },
+          { items: { some: { quantityReceived: { gt: 0 } } } },
+        ],
+      },
+      include: { items: true },
+      orderBy: { orderDate: 'asc' },
+    });
+
+    return rows as unknown as PurchaseOrderWithItems[];
+  }
 }

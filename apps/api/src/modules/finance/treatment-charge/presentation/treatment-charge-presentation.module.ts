@@ -5,6 +5,9 @@ import { TreatmentChargeQueryController } from './http/controllers/treatment-cha
 
 @Module({
   imports: [CqrsModule],
-  controllers: [TreatmentChargeCommandController, TreatmentChargeQueryController],
+  controllers: [
+    TreatmentChargeCommandController,
+    TreatmentChargeQueryController,
+  ],
 })
 export class TreatmentChargePresentationModule {}

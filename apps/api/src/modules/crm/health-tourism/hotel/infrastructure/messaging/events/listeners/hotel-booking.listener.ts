@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { LogType } from '@src/domain/constants/log-action.constant';
 import {
@@ -7,6 +6,7 @@ import {
   HotelBookingCreatedEvent,
 } from '@modules/crm/health-tourism/hotel/domain/events';
 import { BaseEvent } from '@common/interfaces';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Otel rezervasyonu denetim kaydı.
@@ -22,12 +22,12 @@ export class HotelBookingListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(HotelBookingCreatedEvent.NAME, { async: true })
+  @OnDomainEvent(HotelBookingCreatedEvent.NAME)
   async handleCreated(event: HotelBookingCreatedEvent): Promise<void> {
     await this.writeAuditLog(event);
   }
 
-  @OnEvent(HotelBookingCancelledEvent.NAME, { async: true })
+  @OnDomainEvent(HotelBookingCancelledEvent.NAME)
   async handleCancelled(event: HotelBookingCancelledEvent): Promise<void> {
     await this.writeAuditLog(event);
   }

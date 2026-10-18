@@ -6,8 +6,7 @@ export const TAX_PARAMETER_COMMAND_REPOSITORY = Symbol(
   'ITaxParameterCommandRepository'
 );
 
-export interface ITaxParameterCommandRepository
-  extends IBaseCommandRepository<TaxParameter> {
+export interface ITaxParameterCommandRepository extends IBaseCommandRepository<TaxParameter> {
   /** Varsayılan oran setini tek seferde açar (şube kurulumu). */
   createMany(taxParameters: TaxParameter[]): Promise<void>;
 

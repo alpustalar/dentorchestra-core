@@ -145,15 +145,19 @@ export class AccountingReportsQueryController {
   balanceSheet(
     @GetContext() ctx: IGetContext,
     @Query('clinicId', ParseUUIDPipe) clinicId: string,
-    @Query('dateFrom') dateFrom?: string,
-    @Query('dateTo') dateTo?: string
+    /**
+     * Fotoğraf tarihi. Bilanço bir **an** raporudur: tek tarih alır, aralık almaz.
+     * `dateFrom` kasıtlı olarak kaldırıldı — alt sınır varlık/kaynak hesaplarının
+     * kümülatif bakiyesini keserdi ve hata `isBalanced` totolojik olduğu için
+     * sessiz kalırdı.
+     */
+    @Query('asOf') asOf?: string
   ) {
     return this.queryBus.execute(
       new GetBalanceSheetQuery({
         clinicId,
         ctx,
-        dateFrom: dateFrom ? DateTimeManager.create(dateFrom) : undefined,
-        dateTo: dateTo ? DateTimeManager.create(dateTo) : undefined,
+        asOf: asOf ? DateTimeManager.create(asOf) : undefined,
       })
     );
   }

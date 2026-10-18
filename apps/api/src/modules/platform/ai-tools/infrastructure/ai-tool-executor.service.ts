@@ -6,6 +6,7 @@ import {
   AiToolResult,
   IAiToolExecutor,
 } from '@common/ai-tools';
+import { DomainException } from '@src/domain/exceptions/domain.exception';
 import { AiToolRegistry } from './ai-tool.registry';
 
 /**
@@ -38,8 +39,19 @@ export class AiToolExecutor implements IAiToolExecutor {
     } catch (err) {
       const reason = err instanceof Error ? err.message : 'Bilinmeyen hata';
       this.logger.warn(`Araç çalıştırma hatası (${call.name}): ${reason}`);
+
+      // Araç sonucu **hastaya** gider (AI onu yanıtına alır). Bu yüzden yalnız
+      // domain hatasının mesajı aktarılır: o mesaj kullanıcı için yazılmıştır ve
+      // tiplidir. Diğer her şey (DB/sağlayıcı/kütüphane hatası) iç ayrıntı taşır —
+      // bağlantı dizgesi, tablo adı, sağlayıcı yanıtı — ve hasta kanalına
+      // kopyalanmamalı; gerçek sebep log'da durur.
+      const safeReason =
+        err instanceof DomainException
+          ? err.message
+          : 'Teknik bir sorun oluştu, lütfen daha sonra tekrar deneyin.';
+
       return {
-        content: `Bu işlem şu anda gerçekleştirilemedi: ${reason}`,
+        content: `Bu işlem şu anda gerçekleştirilemedi: ${safeReason}`,
       };
     }
   }

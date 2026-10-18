@@ -19,9 +19,10 @@ import { WORK_ORDER_EVENTS } from '@src/domain/constants/events';
  * ona bağlı yeni bir DRAFT açılır. Yeni iş emrinin id'si döner.
  */
 @CommandHandler(OpenRemakeWorkOrderCommand)
-export class OpenRemakeWorkOrderHandler
-  implements ICommandHandler<OpenRemakeWorkOrderCommand, string>
-{
+export class OpenRemakeWorkOrderHandler implements ICommandHandler<
+  OpenRemakeWorkOrderCommand,
+  string
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_COMMAND_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderCommandRepository,

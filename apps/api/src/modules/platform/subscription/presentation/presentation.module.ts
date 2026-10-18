@@ -3,9 +3,15 @@ import { SubscriptionController } from '@modules/platform/subscription/presentat
 import { SubscriptionAdminQueryController } from '@modules/platform/subscription/presentation/http/controllers/subscription-admin.query.controller';
 import { SubscriptionAdminCommandController } from '@modules/platform/subscription/presentation/http/controllers/subscription-admin.command.controller';
 import { ModuleEntitlementGuard } from '@modules/platform/subscription/presentation/guards/module-entitlement.guard';
+import { SubscriptionCacheModule } from '@modules/platform/subscription/infrastructure/cache/subscription-cache.module';
 
 @Module({
-  controllers: [SubscriptionController, SubscriptionAdminQueryController, SubscriptionAdminCommandController],
+  imports: [SubscriptionCacheModule],
+  controllers: [
+    SubscriptionController,
+    SubscriptionAdminQueryController,
+    SubscriptionAdminCommandController,
+  ],
   providers: [ModuleEntitlementGuard],
   exports: [ModuleEntitlementGuard],
 })

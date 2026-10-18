@@ -1,4 +1,7 @@
 import { CurrencyType } from '@input-type-schemas/CurrencySchema';
+// Barrel'dan DEĞİL: barrel yaprak NestJS modülünü ve uyarı yayıncısına bağlı
+// servisi de dışa açıyor; sözleşme dosyası yalnız TİPE bağımlı kalmalı.
+import { QuoteOptionOwner } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.contracts';
 
 // ==========================================
 // OKUMA MODELLERİ (READ MODELS)
@@ -56,6 +59,13 @@ export interface FlightOffer {
  * (otel `rateKey` / transfer `rateKey` kuralının aynısı).
  */
 export interface FlightOfferToken {
+  /**
+   * Teklifi üreten kiracı + görüşme. Okuma anında **doğrulanır**: önbellek
+   * anahtarını bilmek teklifi kullanma yetkisi vermez
+   * (`QuoteOptionOwnershipService`).
+   */
+  owner: QuoteOptionOwner;
+
   offerId: string;
   totalAmount: number;
   currency: CurrencyType;

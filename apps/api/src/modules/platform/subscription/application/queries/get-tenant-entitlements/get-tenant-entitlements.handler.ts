@@ -27,10 +27,10 @@ const EMPTY_ENTITLEMENTS: TenantEntitlements = {
 };
 
 @QueryHandler(GetTenantEntitlementsQuery)
-export class GetTenantEntitlementsHandler
-  implements
-    IQueryHandler<GetTenantEntitlementsQuery, GetTenantEntitlementsResponse>
-{
+export class GetTenantEntitlementsHandler implements IQueryHandler<
+  GetTenantEntitlementsQuery,
+  GetTenantEntitlementsResponse
+> {
   constructor(
     @Inject(SUBSCRIPTION_QUERY_REPOSITORY)
     private readonly subscriptionRepo: ISubscriptionQueryRepository,

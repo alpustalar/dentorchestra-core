@@ -4,7 +4,6 @@ import { FinancialEventTypeSchema } from '@shared';
 
 describe('PayrollAccruedRule', () => {
   const rule = new PayrollAccruedRule();
-  const ctx = { clinicId: 'clinic-1', organizationId: 'org-1' };
 
   const makeEvent = (payload: Record<string, unknown>) =>
     new FinancialEvent({
@@ -31,8 +30,7 @@ describe('PayrollAccruedRule', () => {
         netPayable: '7000.00',
         taxWithholding: '1500.00',
         employeeSgk: '1500.00',
-      }),
-      ctx
+      })
     );
 
     expect(draft.lines).toHaveLength(5);

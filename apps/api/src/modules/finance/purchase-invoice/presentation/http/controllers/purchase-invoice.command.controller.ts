@@ -10,6 +10,7 @@ import {
 import { AuthGuard, CapabilityGuard } from '@modules/identity/auth/auth/guards';
 import { GetContext, HasCapability, IGetContext } from '@common/decorators';
 import {
+  CancelPurchaseInvoiceDto,
   MatchPurchaseInvoiceDto,
   RecordPurchaseInvoiceDto,
 } from '@shared/modules/purchase-invoice/dto/commands';
@@ -17,6 +18,7 @@ import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { RecordPurchaseInvoiceCommand } from '@modules/finance/purchase-invoice/application/commands/record-purchase-invoice/record-purchase-invoice.command';
 import { MatchPurchaseInvoiceCommand } from '@modules/finance/purchase-invoice/application/commands/match-purchase-invoice/match-purchase-invoice.command';
 import { UnmatchPurchaseInvoiceCommand } from '@modules/finance/purchase-invoice/application/commands/unmatch-purchase-invoice/unmatch-purchase-invoice.command';
+import { CancelPurchaseInvoiceCommand } from '@modules/finance/purchase-invoice/application/commands/cancel-purchase-invoice/cancel-purchase-invoice.command';
 import { CAPABILITIES } from '@src/infrastructure/persistence/prisma/data/modules';
 
 const { PURCHASEINVOICE } = CAPABILITIES;
@@ -55,6 +57,26 @@ export class PurchaseInvoiceCommandController {
   ) {
     return this.commandBus.execute(
       new UnmatchPurchaseInvoiceCommand(invoiceId, ctx)
+    );
+  }
+
+  /**
+   * Alış faturası iptali (storno): 320 borcu ve gider/stok kaydı ters kayıtla
+   * götürülür, bağlı siparişin faturalanmış tutarı düşülür.
+   *
+   * Yetki `update` değil **`delete`**: bir borcu hükümsüz kılmak yıkıcı bir
+   * düzeltmedir ve fatura kaydetmekle aynı yetkiye bağlanmamalıdır (CLAUDE.md
+   * finans kuralı 7).
+   */
+  @HasCapability(PURCHASEINVOICE.delete)
+  @Post(':invoiceId/cancel')
+  cancel(
+    @Param('invoiceId', ParseUUIDPipe) invoiceId: string,
+    @Body() dto: CancelPurchaseInvoiceDto,
+    @GetContext() ctx: IGetContext
+  ) {
+    return this.commandBus.execute(
+      new CancelPurchaseInvoiceCommand({ invoiceId, data: dto, ctx })
     );
   }
 }

@@ -19,19 +19,13 @@
       }
     ],
     "paths": {
-      // Rotalar `app/`de, geri kalan her şey `src/`de (bkz.
-      // documents/frontend-architecture.md §6). `@/` yalnız `src/`i gösterir;
-      // `app/` içindeki dosyalar birbirine göreli yoldan bakar.
       "@/*": ["./src/*"],
-      // `@core-crm/shared` kendi içinde `@shared/*` alias'ıyla import ediyor
-      // (api'nin tsconfig'inden miras kalan bir konvansiyon). Paketi tüketen
-      // her uygulama bu eşlemeyi tanımlamak zorunda, yoksa paketin İÇ
-      // import'ları çözülemez.
       "@shared/*": ["../../packages/shared/*"]
     }
   },
   "include": [
     "next-env.d.ts",
+    "next.config.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",

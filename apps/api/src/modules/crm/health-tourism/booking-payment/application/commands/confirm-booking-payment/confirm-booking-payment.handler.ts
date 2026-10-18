@@ -13,6 +13,7 @@ import {
 import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment.entity';
 import {
   BookingPaymentProviderValue,
+  Currency as CurrencyValue,
   FlightInstantBookingIntent,
   HotelBookingIntent,
   TransferBookingIntent,
@@ -36,9 +37,7 @@ import {
 } from '@src/transport';
 import { ConfirmBookingPaymentCommand } from './confirm-booking-payment.command';
 import { PaymentProviders } from '@common/constants';
-import { CurrencySchema } from '@input-type-schemas/CurrencySchema';
-import { Currency } from '@src/domain/value-objects/currency.vo';
-import { BookingPaymentTypeSchema, FinancialEventTypeSchema } from '@shared';
+import { BookingPaymentTypeSchema } from '@shared';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import {
   IPolicyFactory,
@@ -48,16 +47,21 @@ import {
   BOOKING_PAYMENT_COMMAND_REPOSITORY,
   IBookingPaymentCommandRepository,
 } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.command.repository';
-import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
-import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
-import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
-import {
-  IPlatformTenantProvider,
-  PLATFORM_TENANT_PROVIDER,
-} from '@modules/finance/accounting/posting/domain/interfaces/platform-tenant.provider.interface';
-import { PlatformBookingSettledEventPayload } from '@modules/finance/accounting/posting/domain/posting/event-payloads';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
+import { BookingPlatformLedgerService } from '@modules/crm/health-tourism/booking-payment/application/services/booking-platform-ledger.service';
+
+/**
+ * Sağlayıcıda açılan rezervasyonun yerel kimliği **ve** sağlayıcının fiilen
+ * ücretlendirdiği maliyet. Maliyet buradan dönmezse satışın altında kalan bir
+ * rezervasyon sessizce komisyonu yer; defter de teklif tutarını tedarikçi borcu
+ * olarak yazıp sağlayıcı faturasıyla hiç mutabık kalmaz.
+ */
+type BookedSupplierResult = {
+  readonly bookingId: string;
+  readonly supplierAmount: string;
+  readonly supplierCurrency: CurrencyValue;
+};
 
 /** Kilitli claim adımının sonucu: ödeme bu webhook tarafından mı sahiplenildi? */
 type PaymentClaim =
@@ -65,9 +69,10 @@ type PaymentClaim =
   | { readonly claimed: false; readonly bp: BookingPayment };
 
 @CommandHandler(ConfirmBookingPaymentCommand)
-export class ConfirmBookingPaymentHandler
-  implements ICommandHandler<ConfirmBookingPaymentCommand, void>
-{
+export class ConfirmBookingPaymentHandler implements ICommandHandler<
+  ConfirmBookingPaymentCommand,
+  void
+> {
   private readonly logger = new Logger(ConfirmBookingPaymentHandler.name);
 
   constructor(
@@ -82,8 +87,7 @@ export class ConfirmBookingPaymentHandler
     private readonly policyFactory: IPolicyFactory,
     @Inject(NATS_CLIENT)
     private readonly natsClient: ClientProxy,
-    @Inject(PLATFORM_TENANT_PROVIDER)
-    private readonly platformTenant: IPlatformTenantProvider,
+    private readonly platformLedger: BookingPlatformLedgerService,
     private readonly txManager: TransactionManager,
     private readonly criticalFailure: CriticalFailurePublisher
   ) {}
@@ -104,15 +108,14 @@ export class ConfirmBookingPaymentHandler
 
     const claim = await this.claimPayment(command);
 
-    // Idempotency: bu webhook ödemeyi sahiplenemedi. Zaten ödenmiş bir kayda ikinci
-    // ödeme gelmişse (iki link de ödendi) → çift-çekim → ikinci ödemeyi iade et.
+    // Bu bildirim ödemeyi sahiplenemedi. İki ayrı olgu var ve ayırt edici YEREL
+    // DURUM DEĞİL, ÖDEME REFERANSIDIR (bkz. handleUnclaimedPayment).
     if (!claim.claimed) {
-      if (claim.bp.validate.status.isSettled.value) {
-        this.logger.warn(
-          `Çift ödeme tespit edildi (bp=${bookingPaymentId}, provider=${provider}). İkinci ödeme iade ediliyor.`
-        );
-        await this.refundCharge(provider, providerRef, claim.bp);
-      }
+      await this.handleUnclaimedPayment({
+        bp: claim.bp,
+        provider,
+        providerRef,
+      });
       return;
     }
 
@@ -123,17 +126,31 @@ export class ConfirmBookingPaymentHandler
 
     // intent'i HotelBeds'e replay et.
     try {
-      const bookingId = await this.book(paid);
-      const booked = await this.mutateInTx(bookingPaymentId, (bp) =>
-        bp.markBooked(bookingId, bookingId)
-      );
+      const result = await this.book(paid);
+      // Rezervasyon damgası ile FİİLÎ maliyet damgası aynı transaction'da atılır:
+      // ikisini ayırmak, araya düşen bir çökmede "rezervasyon açıldı ama maliyeti
+      // bilinmiyor" satırı bırakır ve defter sessizce teklif tutarına düşer.
+      const booked = await this.mutateInTx(bookingPaymentId, (bp) => {
+        bp.markBooked(result.bookingId, result.bookingId);
+        bp.recordSupplierCost({
+          amount: result.supplierAmount,
+          currency: result.supplierCurrency,
+        });
+      });
       this.logger.log(
-        `Rezervasyon tamamlandı (bp=${bookingPaymentId}, bookingId=${bookingId}).`
+        `Rezervasyon tamamlandı (bp=${bookingPaymentId}, bookingId=${result.bookingId}).`
       );
+      // Teklif ↔ fiilî maliyet sapması: defter fiilî tutardan yazılır ama fark
+      // bir fiyat/teklif sorununun belirtisidir, sessiz kalmaz.
+      this.alertOnSupplierCostDrift(booked);
       // Tahsilat kliniğin defterine YAZILMAZ; platform defterine yazılır. Otel/transfer
       // bir platform işlemidir (hasta platforma öder, platform HotelBeds'e öder) ve
       // komisyon platform geliridir — klinik bu işleme finansal olarak taraf değildir.
-      await this.postSettlementToPlatformLedger(booked, provider);
+      await this.platformLedger.recordBestEffort({
+        kind: 'SETTLED',
+        bp: booked,
+        provider,
+      });
       // Müşteriye mesajlaşma kanalından onay (AI dilinde / pencere dışı HSM); hatası bozmaz.
       this.notifyCustomer(booked);
     } catch (err) {
@@ -148,8 +165,12 @@ export class ConfirmBookingPaymentHandler
       // Tahsil edildi ama rezervasyon açılamadı → ödemeyi iade et (kilit dışında).
       try {
         await this.refundCharge(provider, providerRef, failed);
+        // `retained: null` — iptal diye bir şey olmadı: rezervasyon hiç
+        // açılmadı, sağlayıcının alıkoyacağı bir tutar yok. Platform defterine
+        // de ters kayıt YAZILMAZ çünkü ileri fiş (`PLATFORM_BOOKING_SETTLED`)
+        // hiç yazılmamıştı — `markBooked` çalışmadı.
         await this.mutateInTx(bookingPaymentId, (bp) =>
-          bp.markRefunded(reason)
+          bp.markRefunded({ reason, retained: null })
         );
       } catch (refundErr) {
         this.logger.error(
@@ -232,88 +253,75 @@ export class ConfirmBookingPaymentHandler
   }
 
   /**
-   * Tahsilatı **platform** defterine yazar (komisyon geliri + tedarikçi borcu).
+   * Teklif ↔ fiilî maliyet sapmasını duyurur.
    *
-   * Bilerek best-effort: buraya gelindiğinde para tahsil edilmiş ve rezervasyon
-   * açılmıştır. Muhasebe kaydı atılamadı diye hata fırlatmak, üstteki catch'i
-   * tetikleyip başarılı bir rezervasyonu iade akışına sokardı — kaydı sonradan
-   * tamamlamak, müşterinin rezervasyonunu iptal etmekten çok daha ucuz.
-   * `dedupeKey` sayesinde olay yeniden denendiğinde mükerrer yazılmaz.
+   * Sapma **kaçınılmazdır**: satış fiyatı teklif anında dondurulur, ödeme linki
+   * ise saatlerce açık kalabilir (iyzico linkinin expire API'si bile yok) ve
+   * sağlayıcı rezervasyonu o anki fiyatla açar. Bu yüzden amaç sapmayı yasaklamak
+   * değil, **görünür** kılmaktır: defter fiilî tutardan yazılır, fark buradan
+   * duyurulur. Eşikler bilinçli olarak yok — bir kuruş fark da bir fiyat
+   * uyuşmazlığının ilk belirtisi olabilir ve `dedupeKey` tekrarları susturur.
    */
-  private async postSettlementToPlatformLedger(
-    bp: BookingPayment,
-    provider: BookingPaymentProviderValue
-  ): Promise<void> {
-    try {
-      const target = await this.platformTenant.resolve();
+  private alertOnSupplierCostDrift(bp: BookingPayment): void {
+    const cost = bp.supplierCost;
+    if (cost.drift === 'NONE') return;
 
-      const sale = bp.saleAmount.value;
-      const supplier = bp.netAmount.value;
-      // `satisfies`: sözleşmeye uygunluk derleyicide doğrulanır ama literal tipi
-      // korunur — `Record<string, unknown>`'a genişletmek olayın JSON payload
-      // tipiyle (InputJsonValue) uyuşmuyor.
-      const payload = {
-        saleAmount: sale.toFixed(2),
-        supplierAmount: supplier.toFixed(2),
-        commission: sale.minus(supplier).toFixed(2),
-        currency: bp.saleCurrency.value,
-        bookingType: bp.bookingType,
-        provider,
-      } satisfies PlatformBookingSettledEventPayload;
+    const context = {
+      bookingPaymentId: bp.id.value,
+      bookingType: bp.bookingType,
+      quotedAmount: bp.netAmount.toApiFormat(),
+      quotedCurrency: bp.netAmount.currency,
+      supplierAmount: bp.supplierAmount?.toApiFormat() ?? null,
+      supplierCurrency: bp.supplierAmount?.currency ?? null,
+      saleAmount: bp.saleAmount.toApiFormat(),
+      postedSupplierAmount: cost.ledgerAmount.toApiFormat(),
+    };
 
-      await this.commandBus.execute(
-        new RecordFinancialEventCommand(
-          {
-            clinicId: target.clinicId,
-            type: FinancialEventTypeSchema.enum.PLATFORM_BOOKING_SETTLED,
-            payload,
-            sourceModule: FINANCIAL_EVENT_SOURCE_MODULES.BOOKING_PAYMENT,
-            sourceRefId: bp.id.value,
-            dedupeKey: FinancialEventDedupeKeys.platform_booking_settled(
-              bp.id.value
-            ),
-          },
-          this.buildPlatformContext(target.clinicId, target.organizationId)
-        )
-      );
-    } catch (err) {
-      this.logger.error(
-        `Platform defterine tahsilat yazılamadı (bp=${bp.id.value}); rezervasyon etkilenmedi, kayıt sonradan tamamlanmalı: ${
-          err instanceof Error ? err.message : String(err)
-        }`
-      );
-      // Rezervasyon açıldı ve para alındı ama platform defterine hiç düşmedi:
-      // komisyon geliri ve tedarikçi borcu kayıt dışı kalır.
+    // Maliyetin altında satış: komisyon negatif olurdu. Fiş yazılamaz (posting
+    // kuralı dengesiz/negatif hasılat satırını reddeder) ve zararın hangi hesaba
+    // alınacağı bir muhasebe kararıdır — kural 11: otomatik onarım yok.
+    if (cost.exceedsSale) {
       this.criticalFailure.publish({
-        operation: 'health-tourism.booking-payment.platform-ledger',
+        operation: 'health-tourism.booking-payment.supplier-cost',
         severity: 'CRITICAL',
         summary:
-          'Rezervasyon tahsilatı platform defterine yazılamadı (komisyon/tedarikçi kaydı eksik).',
-        errorMessage: err instanceof Error ? err.message : String(err),
-        context: { bookingPaymentId: bp.id.value },
+          'Rezervasyon maliyetin ALTINDA satıldı: sağlayıcının ücretlendirdiği tutar satış fiyatını aşıyor.',
+        errorMessage: null,
+        context,
         clinicId: bp.clinicId.value,
-        dedupeKey: `booking-platform-ledger-failed:${bp.id.value}`,
+        dedupeKey: `booking-cost-above-sale:${bp.id.value}`,
       });
+      return;
     }
-  }
 
-  /** Platform defterine yazarken kullanılacak sistem context'i. */
-  private buildPlatformContext(
-    clinicId: string,
-    organizationId: string
-  ): IGetContext {
-    const actor: ActorContext = {
-      ...SYSTEM_ACTOR,
-      clinicId,
-      organizationId,
-      managedClinics: [{ id: clinicId }],
-    };
-    return {
-      actor,
-      source: ExecutionSources.INTERNAL_CASCADE,
-      ip: '127.0.0.1',
-      userAgent: 'BOOKING_PAYMENT_WEBHOOK',
-    };
+    // Fiilî maliyet bilinmiyor ya da karşılaştırılamıyor → defter teklif
+    // tutarından yazıldı. Tedarikçi faturası geldiğinde fark 320'de kalır.
+    if (cost.drift === 'UNKNOWN' || cost.drift === 'CURRENCY_MISMATCH') {
+      this.criticalFailure.publish({
+        operation: 'health-tourism.booking-payment.supplier-cost',
+        severity: 'CRITICAL',
+        summary:
+          cost.drift === 'UNKNOWN'
+            ? 'Sağlayıcı maliyeti bildirmedi; defter teklif tutarından yazıldı.'
+            : 'Sağlayıcı maliyeti farklı para biriminde; defter teklif tutarından yazıldı.',
+        errorMessage: null,
+        context,
+        clinicId: bp.clinicId.value,
+        dedupeKey: `booking-cost-unresolved:${bp.id.value}`,
+      });
+      return;
+    }
+
+    this.criticalFailure.publish({
+      operation: 'health-tourism.booking-payment.supplier-cost',
+      severity: 'WARNING',
+      summary:
+        'Sağlayıcının ücretlendirdiği maliyet teklif edilenden farklı; komisyon beklenenden sapıyor.',
+      errorMessage: null,
+      context,
+      clinicId: bp.clinicId.value,
+      dedupeKey: `booking-cost-drift:${bp.id.value}`,
+    });
   }
 
   /**
@@ -374,7 +382,7 @@ export class ConfirmBookingPaymentHandler
    * düşüyordu (TypeScript `else`'i kalan üyelere daraltıyor, `as` cast'i de şekil
    * uyuşmazlığını yutuyordu). Artık kapsanmayan her yeni tür DERLEME hatasıdır.
    */
-  private async book(bp: BookingPayment): Promise<string> {
+  private async book(bp: BookingPayment): Promise<BookedSupplierResult> {
     const ctx = this.buildSystemContext(bp);
     const intent = bp.bookingIntent;
 
@@ -497,6 +505,87 @@ export class ConfirmBookingPaymentHandler
   }
 
   /** Belirtilen sağlayıcı ödemesini iade eder (durum değiştirmez — çağıran karar verir). */
+  /**
+   * Sahiplenilemeyen bir ödeme bildirimi geldi: ya **aynı ödemenin tekrarı** ya da
+   * **ikinci bir çekim**. Ayırt edici ödeme referansıdır — yerel durum değil.
+   *
+   * Önceki kod kararı `isSettled` (PAID|BOOKED) üzerinden veriyordu ve iki yönde
+   * de hatalıydı:
+   *
+   * 1. **Webhook tekrarı meşru ödemeyi iade ettiriyordu.** Stripe teslimatı
+   *    at-least-once'tır ve iyzico callback'i kullanıcı sayfayı yenilediğinde
+   *    tekrar çalışır; ikisi de AYNI `providerRef` ile gelir. Kayıt PAID/BOOKED
+   *    olduğu için `isSettled` tutuyor ve o referans iade ediliyordu: hizmet
+   *    verilmiş, para geri ödenmiş, kayıt hâlâ BOOKED.
+   * 2. **Terminal ama "settled" olmayan durumda gelen ödeme sessizce
+   *    tutuluyordu.** FAILED/REFUNDED/EXPIRED kayıtta `isSettled` false → ne iade
+   *    ne alarm. Bu ulaşılabilir: iyzico'nun expire API'si yok (`expireLink`
+   *    no-op), yani Stripe ödenip book başarısız olup iade edildikten sonra bile
+   *    iyzico linki **canlı** kalıyor ve sonradan ödenebiliyor.
+   *
+   * Doğru kural: sahiplenemediğimiz bir çekim BİZİM olmamalı. Aynı referanssa
+   * hiçbir şey yapılmaz (idempotent); farklı referanssa karşılığı verilemez →
+   * yerel durum ne olursa olsun iade edilir ve iz bırakılır.
+   */
+  private async handleUnclaimedPayment(input: {
+    bp: BookingPayment;
+    provider: BookingPaymentProviderValue;
+    providerRef: string;
+  }): Promise<void> {
+    const { bp, provider, providerRef } = input;
+    const bookingPaymentId = bp.id.value;
+
+    // (a) Aynı ödemenin yeniden bildirimi → idempotent yok-sayma.
+    if (bp.paidProviderRef === providerRef) {
+      this.logger.log(
+        `Ödeme bildirimi yinelenmiş, yok sayıldı (bp=${bookingPaymentId}, ref=${providerRef}).`
+      );
+      return;
+    }
+
+    // (b) Farklı bir çekim: bu paranın karşılığı verilemez.
+    this.logger.warn(
+      `İkinci tahsilat tespit edildi (bp=${bookingPaymentId}, provider=${provider}, durum=${bp.status}). İade ediliyor.`
+    );
+
+    try {
+      await this.refundCharge(provider, providerRef, bp);
+      // Başarılı iade de iz bırakır: çift çekim akışta bir sorunun belirtisidir
+      // (ör. ödenmiş kaydın diğer linki hâlâ canlı).
+      this.criticalFailure.publish({
+        operation: 'health-tourism.booking-payment.second-charge',
+        severity: 'WARNING',
+        summary: 'İkinci bir tahsilat alındı ve iade edildi.',
+        errorMessage: null,
+        context: {
+          bookingPaymentId,
+          provider,
+          providerRef,
+          status: bp.status,
+        },
+        clinicId: bp.clinicId.value,
+        dedupeKey: `booking-second-charge:${providerRef}`,
+      });
+    } catch (err) {
+      // Para bizde ve otomatik telafi yolu kalmadı.
+      this.criticalFailure.publish({
+        operation: 'health-tourism.booking-payment.second-charge',
+        severity: 'CRITICAL',
+        summary:
+          'İkinci bir tahsilat alındı ama iade başarısız — elle iade gerekiyor.',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        context: {
+          bookingPaymentId,
+          provider,
+          providerRef,
+          status: bp.status,
+        },
+        clinicId: bp.clinicId.value,
+        dedupeKey: `booking-second-charge-failed:${providerRef}`,
+      });
+    }
+  }
+
   private async refundCharge(
     provider: BookingPaymentProviderValue,
     providerRef: string,
@@ -504,15 +593,15 @@ export class ConfirmBookingPaymentHandler
   ): Promise<void> {
     const adapter =
       provider === PaymentProviders.IYZICO ? this.iyzicoLink : this.stripeLink;
-    const amount =
-      provider === PaymentProviders.IYZICO
-        ? bp.tryAmount.value.toNumber()
-        : bp.saleAmount.value.toNumber();
-    const currency =
-      provider === PaymentProviders.IYZICO
-        ? Currency.fromTrusted(CurrencySchema.enum.TRY).value
-        : bp.saleCurrency.value;
-    await adapter.refund({ providerRef, amount, currency });
+    // Hangi kanalın ne cinsten çektiği entity'de tek yerde durur; burada
+    // `provider` **iade edilen** kanaldır (çift-çekimde sahiplenilmiş kanal
+    // değil), bu yüzden parametreli biçim kullanılır.
+    const charged = bp.amountChargedBy(provider);
+    await adapter.refund({
+      providerRef,
+      amount: charged.value.toNumber(),
+      currency: charged.currency,
+    });
   }
 
   /** Webhook'ta actor yok → klinik-kapsamlı sistem context'i kurar (bus dispatch için). */

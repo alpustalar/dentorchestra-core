@@ -9,13 +9,18 @@ import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import {
+  AssertCashWithdrawalInput,
+  CashMovementTotals,
   CloseCashSessionInput,
   OpenCashSessionProps,
 } from '@modules/finance/cash-register/domain/contracts';
 import {
   CashInvalidAmountException,
+  CashInvalidPrecisionException,
   CashSessionNotOpenException,
+  InsufficientCashInDrawerException,
 } from '@modules/finance/cash-register/domain/exceptions/cash-register.exceptions';
+import { Money } from '@src/domain/value-objects/money.vo';
 
 /**
  * Kasa Oturumu (aggregate root). Bir kasanın günlük/vardiyalık nakit döngüsü:
@@ -41,6 +46,7 @@ export class CashSession extends AggregateRoot {
     this._difference = data.difference
       ? new Decimal(data.difference.toString())
       : null;
+    this._activeRegisterId = data.activeRegisterId;
     this._openedById = data.openedById;
     this._closedById = data.closedById;
     this._openedAt = data.openedAt;
@@ -102,6 +108,16 @@ export class CashSession extends AggregateRoot {
     return this._difference;
   }
 
+  /**
+   * Açık oturum kilidi: yalnız AÇIK oturumda doludur (kapanışta null'a çekilir).
+   * DB'deki `@unique` kısıt "bir kasada en fazla bir açık oturum" kuralını
+   * uygular.
+   */
+  private _activeRegisterId: string | null;
+  get activeRegisterId(): string | null {
+    return this._activeRegisterId;
+  }
+
   private _openedById: string;
   get openedById(): string {
     return this._openedById;
@@ -155,6 +171,8 @@ export class CashSession extends AggregateRoot {
       );
     }
 
+    const openingFloat = CashSession.toKurus(props.openingFloat);
+
     const now = DateTimeManager.create();
     const id = UUID.createOrGenerate(props.id).value;
 
@@ -165,14 +183,24 @@ export class CashSession extends AggregateRoot {
       organizationId: UUID.create(props.organizationId).orThrow().value,
       status: CashSessionStatusSchema.enum.OPEN,
       currency: props.currency,
-      openingFloat: new Decimal(props.openingFloat),
+      openingFloat,
       expectedAmount: null,
       countedAmount: null,
       difference: null,
-      openedById: UUID.create(props.openedById).orThrow().value,
+      // Aktör kimliği **ham string**: `ctx.actor.userId` bir Firebase UID'dir
+      // (`User.id = firebaseUid`), UUID değil. `UUID.create(...).orThrow()`
+      // burada her gerçek personel için `InvalidUuidException` atıyordu — kasa
+      // oturumu hiç açılamıyordu. Kardeş alan `closedById` zaten ham string;
+      // defter tarafı da (`FinancialEvent.performedById`) ham string tutuyor.
+      openedById: props.openedById,
       closedById: null,
       openedAt: now,
       closedAt: null,
+      // Tek-açık-oturum kuralının DB'deki karşılığı: alan yalnız AÇIK oturumda
+      // doludur ve `@unique`'tir (Postgres'te NULL'lar çakışmaz → kısmi index
+      // gibi davranır). Kilit ilk savunma, kısıt son savunmadır; POS iptal
+      // kilidiyle (`activeVoidOriginalId`) aynı kalıp.
+      activeRegisterId: UUID.create(props.cashRegisterId).orThrow().value,
       accountingEventId: null,
       postedToAccountingAt: null,
       note: props.note ?? null,
@@ -193,24 +221,75 @@ export class CashSession extends AggregateRoot {
   }
 
   /**
+   * Çekmecedeki nakit: açılış nakdi + girişler − çıkışlar.
+   *
+   * Kapanıştaki `expectedAmount` ile **aynı** formüldür ve bilerek aynı
+   * yerdedir: iki ayrı yerde yazılsa biri düzeltildiğinde çıkış kapısı ile
+   * kapanış beklentisi ayrışır ve kasa yine eksiye düşebilirdi.
+   */
+  public availableCash(totals: CashMovementTotals): Decimal {
+    return this._openingFloat.plus(totals.totalIn).minus(totals.totalOut);
+  }
+
+  /**
+   * Kasadan çıkış kapısı: çekmecedeki nakitten fazlası çıkarılamaz.
+   *
+   * Negatif kasa fiziken imkânsızdır; kayda girdiğinde iki uydurma iz bırakır:
+   * (1) kapanışta beklenen tutar negatif olduğu için gerçek olmayan bir "sayım
+   * fazlası" → 100 Kasa borç / 679 Diğer Olağandışı Gelir (hiç kazanılmamış
+   * gelir), (2) BANK_DEPOSIT yolunda hiç yatırılmamış bir para → 102 Bankalar
+   * borç. İkisi de dengeli fiş ürettiği için Σborç = Σalacak kontrolünde
+   * görünmez. Bu yüzden kontrol kaydın **önüne** konur.
+   *
+   * Çağıran, toplamları oturum satırı kilitliyken (`findByIdForUpdate`) ve aynı
+   * transaction içinde okumak zorundadır.
+   */
+  public assertCanWithdraw(input: AssertCashWithdrawalInput): void {
+    const available = this.availableCash(input);
+    if (input.requested.greaterThan(available)) {
+      throw new InsufficientCashInDrawerException({
+        available: available.toFixed(Money.PRECISION),
+        requested: input.requested.toFixed(Money.PRECISION),
+        currency: this._currency,
+      });
+    }
+  }
+
+  /**
    * Oturumu kapatır: beklenen tutar = açılış + net hareket; fark = sayım − beklenen.
    * Pozitif fark fazla, negatif fark açık (kasa eksiği) anlamına gelir.
    */
   public close(input: CloseCashSessionInput): void {
     this.assertOpen();
 
-    const expected = this._openingFloat
-      .plus(input.totalIn)
-      .minus(input.totalOut);
+    CashSession.assertKurusPrecision(input.countedAmount);
+
+    const expected = this.availableCash(input);
     const difference = input.countedAmount.minus(expected);
 
     this._expectedAmount = expected;
     this._countedAmount = input.countedAmount;
     this._difference = difference;
     this._status = CashSessionStatusSchema.enum.CLOSED;
+    // Kilit bırakılır: kasa yeni bir oturum açabilsin. Yazılmazsa kısıt DB'de
+    // takılı kalır ve kasa bir daha hiç açılamazdı.
+    this._activeRegisterId = null;
     this._closedById = input.closedById;
     this._closedAt = DateTimeManager.create();
     this._updatedAt = DateTimeManager.create();
+  }
+
+  /** Kuruş (2 hane) sınırı — DB `Decimal(14,2)` sessizce yuvarlar. */
+  private static assertKurusPrecision(amount: Decimal): void {
+    if (!Money.isKurusScaled(amount)) {
+      throw new CashInvalidPrecisionException(amount.toString());
+    }
+  }
+
+  private static toKurus(amount: number): Decimal {
+    const decimal = new Decimal(amount);
+    CashSession.assertKurusPrecision(decimal);
+    return decimal;
   }
 
   public isPostedToAccounting(): boolean {
@@ -242,6 +321,7 @@ export class CashSession extends AggregateRoot {
       expectedAmount: this._expectedAmount,
       countedAmount: this._countedAmount,
       difference: this._difference,
+      activeRegisterId: this._activeRegisterId,
       openedById: this._openedById,
       closedById: this._closedById,
       openedAt: this._openedAt,

@@ -44,15 +44,25 @@ export interface CreateInstallmentProps {
 }
 
 /**
- * Taksit iadesi. Event entity içinde raise edildiği için (bkz. CLAUDE.md) audit
- * alanları buradan taşınır; `details` verilmezse varsayılan metin yazılır.
+ * Taksit durum geçişlerinin ortak audit girdisi. Event'ler entity içinde raise
+ * edildiği için (bkz. CLAUDE.md "Events Raised in Entity") aktör/kanal bilgisi
+ * handler'dan buradan taşınır; `details` verilmezse varsayılan metin yazılır.
  */
-export interface RefundInstallmentProps {
+export interface InstallmentTransitionProps {
   installmentId: string;
   actorId: string;
   logSource: LogSource;
   details?: string;
 }
+
+/** Taksit tahsilatı (POS/sanal POS callback'i veya elle tahsilat). */
+export type CompleteInstallmentProps = InstallmentTransitionProps;
+
+/** Taksit tahsilat denemesinin başarısızlığı — taksit yeniden denenebilir olur. */
+export type FailInstallmentProps = InstallmentTransitionProps;
+
+/** Taksit iadesi. */
+export type RefundInstallmentProps = InstallmentTransitionProps;
 
 // ==========================================
 // ÖDEME VE TAHSİLAT

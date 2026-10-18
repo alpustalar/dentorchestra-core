@@ -14,9 +14,12 @@ export class AccountCommandRepository
     super(prisma);
   }
 
-  async existsForClinic(clinicId: string): Promise<boolean> {
-    const count = await this.db.account.count({ where: { clinicId } });
-    return count > 0;
+  async findIdByCodeMap(clinicId: string): Promise<Record<string, string>> {
+    const rows = await this.db.account.findMany({
+      where: { clinicId },
+      select: { id: true, code: true },
+    });
+    return Object.fromEntries(rows.map((row) => [row.code, row.id]));
   }
 
   async update(account: Account): Promise<Account> {
@@ -31,14 +34,14 @@ export class AccountCommandRepository
   }
 
   async updateMany(accounts: Account[]): Promise<void> {
+    // `update` — `upsert` DEĞİL. Daha önce upsert'ti: "güncelle" adı altında kayıt
+    // oluşturabiliyor, silinmiş bir hesabı geri diriltebiliyordu.
     const ops = accounts.map((account) => {
       const data = account.toPersistence();
-      return this.db.account.upsert({
-        where: { id: data.id },
-        create: data,
-        update: data,
-      });
+      const { id, ...update } = data;
+      return this.db.account.update({ where: { id }, data: update });
     });
+
     if (txStorage.getStore()?.tx) {
       await Promise.all(ops);
     } else {
@@ -48,12 +51,17 @@ export class AccountCommandRepository
   }
 
   async createChart(accounts: Account[]): Promise<void> {
-    // Self-FK ihlalini önlemek için kökleri (parentId=null) önce ekle.
-    const ordered = [...accounts].sort(
-      (a, b) => Number(a.parentId !== null) - Number(b.parentId !== null)
-    );
+    // Self-FK ihlalini önlemek için üst hesaplar önce eklenmeli. Sıralama kod
+    // DERİNLİĞİNE göre: eski hâli yalnız "kök mü değil mi" ayrımı yapıyordu, yani
+    // iki seviyeli şablonda çalışıyor ama üçüncü seviye (120.01.0001 — cari alt
+    // defteri) eklendiğinde torun, ebeveyninden önce gelebilip FK'yı ihlal
+    // edebilirdi.
+    const depth = (account: Account) => account.code.level;
+    const ordered = [...accounts].sort((a, b) => depth(a) - depth(b));
     const data = ordered.map((account) => account.toPersistence());
 
+    // `skipDuplicates` yarış koruması: iki eşzamanlı kurulum isteği de kaydı
+    // görmeden geçse bile `@@unique([clinicId, code])` ikinci yazımı düşürür.
     await this.db.account.createMany({ data, skipDuplicates: true });
 
     accounts.forEach((account) => account.flushEvents());

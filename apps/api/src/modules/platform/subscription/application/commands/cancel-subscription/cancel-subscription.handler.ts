@@ -13,9 +13,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @CommandHandler(CancelSubscriptionCommand)
-export class CancelSubscriptionHandler
-  implements ICommandHandler<CancelSubscriptionCommand, void>
-{
+export class CancelSubscriptionHandler implements ICommandHandler<
+  CancelSubscriptionCommand,
+  void
+> {
   constructor(
     @Inject(SUBSCRIPTION_COMMAND_REPOSITORY)
     private readonly subscriptionRepo: ISubscriptionCommandRepository,

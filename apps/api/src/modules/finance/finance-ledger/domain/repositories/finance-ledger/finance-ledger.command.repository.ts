@@ -1,24 +1,28 @@
 import { FinanceLedgerEntity } from '@modules/finance/finance-ledger/domain/entities/finance-ledger.entity';
-import { LedgerStatus } from '@prisma/client';
 
 export const FINANCE_LEDGER_COMMAND_REPOSITORY = Symbol(
   'IFinanceLedgerCommandRepository'
 );
 
+/**
+ * Cari defterin yazma tarafı.
+ *
+ * Durum değişikliği **entity üzerinden** yapılır (`findByInstallmentId` →
+ * `syncStatus` → `update`): daha önce `updateStatusByInstallmentId` adlı ham
+ * bir `updateMany` vardı ve entity'nin geçiş kurallarını baypas ederek iade
+ * edilmiş bir kaydı yeniden gelire çevirebiliyordu. Ayrıca 0 satır güncellemek
+ * sessizce "başarılı" sayılıyordu — kayıt henüz yazılmamışken gelen iade
+ * böyle kayboluyordu.
+ */
 export interface IFinanceLedgerCommandRepository {
   create(entry: FinanceLedgerEntity): Promise<FinanceLedgerEntity>;
-  updateMany(entries: FinanceLedgerEntity[]): Promise<void>;
-  updateStatus(id: string, status: LedgerStatus): Promise<void>;
+  update(entry: FinanceLedgerEntity): Promise<FinanceLedgerEntity>;
+
   /**
-   * Tek taksitin cari kaydını günceller. İade taksit bazlıdır: ödemenin tamamını
-   * çevirmek, kısmi iadede hâlâ tahsil edilmiş taksitlerin gelirini de siler.
+   * Taksitin cari kaydı (yazma kararını besler → Command Repo).
+   * `installmentId` DB'de unique: taksit başına en fazla bir kayıt.
    */
-  updateStatusByInstallmentId(
-    installmentId: string,
-    status: LedgerStatus
-  ): Promise<void>;
-  updateManyStatusByPaymentId(
-    paymentId: string,
-    status: LedgerStatus
-  ): Promise<void>;
+  findByInstallmentId(
+    installmentId: string
+  ): Promise<FinanceLedgerEntity | null>;
 }

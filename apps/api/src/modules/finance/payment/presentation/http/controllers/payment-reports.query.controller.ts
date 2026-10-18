@@ -32,10 +32,7 @@ export class PaymentReportsQueryController {
 
   @Get('ar-aging')
   @Serialize<ArAgingReport, ArAgingReportResponseDto>(ArAgingReportResponseDto)
-  arAging(
-    @GetContext() ctx: IGetContext,
-    @Query('asOf') asOf?: string
-  ) {
+  arAging(@GetContext() ctx: IGetContext, @Query('asOf') asOf?: string) {
     return this.queryBus.execute(
       new GetArAgingQuery(
         this.resolveClinicId(ctx),

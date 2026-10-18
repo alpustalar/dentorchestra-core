@@ -113,7 +113,9 @@ model Payment {
   installments   PaymentInstallment[]
   financeLedgers FinanceLedger[]
   patientPackage PatientTreatmentPackage?
-  invoice        Invoice?
+  /// Çoklu: iptal edilmiş fatura yerinde kalır; tahsilat için en fazla **bir
+  /// etkin** fatura olur (kısmî unique index), geçmişte iptal edilenler durur.
+  invoices       Invoice[]
 
   @@map("payments")
 }

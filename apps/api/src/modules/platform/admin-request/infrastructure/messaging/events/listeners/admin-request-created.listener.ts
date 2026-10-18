@@ -1,13 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { AdminRequestCreatedEvent } from '@modules/platform/admin-request/domain/events/admin-request-created.event';
 import { ADMIN_REQUEST_EVENTS } from '@src/domain/constants/events/admin-request.constant';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class AdminRequestCreatedListener {
   private readonly logger = new Logger(AdminRequestCreatedListener.name);
 
-  @OnEvent(ADMIN_REQUEST_EVENTS.CREATED, { async: true })
+  @OnDomainEvent(ADMIN_REQUEST_EVENTS.CREATED)
   async handle(event: AdminRequestCreatedEvent) {
     try {
       this.logger.log(

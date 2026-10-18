@@ -1,5 +1,7 @@
 import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { Decimal } from 'decimal.js';
+import { Currency } from '@src/domain/value-objects/currency.vo';
 import { ITenantScopeResolver } from '@shared';
 import { DuffelFlightBookingModeSchema } from '@input-type-schemas/DuffelFlightBookingModeSchema';
 import { JsonValueType } from '@input-type-schemas/JsonValueSchema';
@@ -53,7 +55,12 @@ export class HoldFlightHandler implements ICommandHandler<
       .orThrow('health-tourism.flight');
 
     const { data: offer } = await this.queryBus.execute(
-      new GetFlightOfferQuery(data.optionId)
+      // Görüşme bağlamı yok (personel ucu): iddia klinik kapsamlı. `data.clinicId`
+      // bir satır yukarıda policy ile doğrulandı — teklif de o kliniğin olmalı.
+      new GetFlightOfferQuery(data.optionId, {
+        clinicId: data.clinicId,
+        conversationId: null,
+      })
     );
     if (!offer) throw new FlightOfferExpiredException();
 
@@ -73,8 +80,12 @@ export class HoldFlightHandler implements ICommandHandler<
       mode: DuffelFlightBookingModeSchema.enum.HOLD,
       passengers: data.passengers as unknown as JsonValueType,
       slices: offer.slices as unknown as JsonValueType,
-      totalAmount: offer.totalAmount,
-      currency: offer.currency,
+      // Teklifin değil SİPARİŞİN tutarı. Bu kolon sonradan ödeme TALİMATIDIR
+      // (`pay-held-flight` Duffel'a bu tutarı gönderir); havayolu fiyatı teklif
+      // ile sipariş arasında değiştiyse bayat tutarla ödeme reddedilir ve hasta
+      // ödemesini aldığımız bir rezervasyon iadeye düşer.
+      totalAmount: new Decimal(order.totalAmount),
+      currency: Currency.create(order.currency).orThrow().value,
       holdExpiresAt: order.paymentRequiredBy
         ? new Date(order.paymentRequiredBy)
         : null,

@@ -75,11 +75,14 @@ export class CancelHotelBookingTool implements IAiSubToolHandler {
     const cancelDto: CancelHotelBookingDto = {
       bookingId,
     } as CancelHotelBookingDto;
-    await this.commandBus.execute(
+    const cancellation = await this.commandBus.execute(
       new CancelHotelBookingCommand(cancelDto, ctx)
     );
 
-    const refunded = await this.support.refundForCancelledBooking(bookingId);
+    const refunded = await this.support.refundForCancelledBooking({
+      bookingId,
+      retained: cancellation.retained,
+    });
 
     return {
       content: JSON.stringify({

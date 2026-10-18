@@ -16,6 +16,7 @@ import { SearchHotelsQuery } from '@modules/crm/health-tourism/hotel/application
 import { SearchHotelsDto } from '@shared/modules/health-tourism/dto/queries';
 import { CacheHotelRateOptionCommand } from '@modules/crm/health-tourism/hotel/application/commands/cache-hotel-rate-option/cache-hotel-rate-option.command';
 import { HotelRateOptionToken } from '@modules/crm/health-tourism/hotel/domain/contracts';
+import { QuoteOptionOwner } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.contracts';
 
 const SearchHotelsInputSchema = z.object({
   checkIn: z.string().trim().min(1),
@@ -112,12 +113,20 @@ export class SearchHotelsTool implements IAiSubToolHandler {
       new SearchHotelsQuery(dto, ctx)
     );
 
+    // Teklifin sahibi: bu kiracı + bu görüşme. Okuma anında doğrulanır
+    // (`QuoteOptionOwnershipService`) — önbellek anahtarı yetki değildir.
+    const owner: QuoteOptionOwner = {
+      clinicId: context.clinicId,
+      conversationId: context.conversationId,
+    };
+
     // Tüm otel/oda/rate kombinasyonlarını düzleştir, ucuzdan pahalıya sırala.
     const tokens: HotelRateOptionToken[] = [];
     for (const hotel of hotels) {
       for (const room of hotel.rooms) {
         for (const rate of room.rates) {
           tokens.push({
+            owner,
             hotelCode: hotel.code,
             hotelName: hotel.name,
             roomName: room.name ?? room.code,
@@ -149,7 +158,10 @@ export class SearchHotelsTool implements IAiSubToolHandler {
       currency: string;
     }> = [];
     for (const token of top) {
-      const optionId = `ht_${randomUUID().slice(0, 8)}`;
+      // Kısaltma YOK: 8 hex (32 bit) bir optionId, aynı 15 dakikada yaşayan
+      // binlerce teklif arasında çarpışabilir ve çarpışma **üzerine yazar** —
+      // hasta gördüğü odayı öder, sistem başka odayı rezerve eder.
+      const optionId = `ht_${randomUUID()}`;
       await this.commandBus.execute(
         new CacheHotelRateOptionCommand(optionId, token)
       );

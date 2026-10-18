@@ -1,36 +1,44 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { PAYMENT_EVENTS } from '@src/domain/constants/events';
 import { PaymentRefundedEvent } from '@modules/finance/payment/domain/events/payment-refunded.event';
-import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
-import { RefundLedgerEntriesCommand } from '@modules/finance/finance-ledger/application/commands/refund-ledger-entries/refund-ledger-entries.command';
-import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
+import { FinanceLedgerProducer } from '@modules/finance/finance-ledger/infrastructure/messaging/queue/producers/finance-ledger.producer';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
+import { OnDomainEvent } from '@common/decorators';
 
+/**
+ * İade olayını cari defter kuyruğuna taşır.
+ *
+ * İade **doğrudan** `updateMany` ile işaretleniyordu; kayıt henüz yazılmamışsa
+ * (tahsilat işi kuyrukta bekliyorsa) 0 satır güncellenip işlem "başarılı"
+ * sayılıyor, ardından tahsilat işi kaydı COMPLETED yazıyordu → iade defterde
+ * kalıcı olarak kayboluyordu. Artık iki olay da aynı idempotent komutu
+ * kuyruğa koyar; komut yazarken kaynağın nihai durumunu okuduğu için sıra
+ * önemsizdir.
+ */
 @Injectable()
 export class PaymentRefundedListener {
   private readonly logger = new Logger(PaymentRefundedListener.name);
 
   constructor(
-    private readonly commandBus: TSCommandBus,
+    private readonly financeLedgerProducer: FinanceLedgerProducer,
     private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
-  @OnEvent(PAYMENT_EVENTS.REFUNDED, { async: true })
+  @OnDomainEvent(PAYMENT_EVENTS.REFUNDED)
   async handlePaymentRefunded(event: PaymentRefundedEvent): Promise<void> {
     this.logger.log(`İade eventi yakalandı: taksit=${event.installmentId}`);
 
     try {
-      await this.commandBus.execute(
-        new RefundLedgerEntriesCommand(
-          event.installmentId,
-          ExecutionContextFactory.createInternal()
-        )
-      );
-      this.logger.log(`Cari kayıt iade edildi: taksit=${event.installmentId}`);
+      await this.financeLedgerProducer.addToLedgerQueue({
+        installmentId: event.installmentId,
+        paymentId: event.paymentId,
+        clinicId: event.clinicId,
+        reason: 'REFUNDED',
+        actorId: event.log?.actorId ?? null,
+      });
     } catch (error) {
       this.logger.error(
-        `Cari iade işlemi başarısız: taksit=${event.installmentId}`,
+        `Cari iade işi kuyruğa alınamadı: taksit=${event.installmentId}`,
         error
       );
       // İade fiilen yapıldı (para geri gitti) ama cari kayıt hâlâ tahsilat

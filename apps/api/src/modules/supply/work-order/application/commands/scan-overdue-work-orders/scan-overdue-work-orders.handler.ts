@@ -18,9 +18,10 @@ const OVERDUE_SCAN_BATCH_LIMIT = 500;
  * Sonuç mutasyona beslendiği için okuma Command repo'dan yapılır (CQRS).
  */
 @CommandHandler(ScanOverdueWorkOrdersCommand)
-export class ScanOverdueWorkOrdersHandler
-  implements ICommandHandler<ScanOverdueWorkOrdersCommand, void>
-{
+export class ScanOverdueWorkOrdersHandler implements ICommandHandler<
+  ScanOverdueWorkOrdersCommand,
+  void
+> {
   private readonly logger = new Logger(ScanOverdueWorkOrdersHandler.name);
 
   constructor(

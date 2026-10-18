@@ -10,9 +10,10 @@ import {
 } from '@modules/platform/subscription/domain/repositories/subscription/subscription.command.repository';
 
 @CommandHandler(ExpirePastDueSubscriptionsCommand)
-export class ExpirePastDueSubscriptionsHandler
-  implements ICommandHandler<ExpirePastDueSubscriptionsCommand, void>
-{
+export class ExpirePastDueSubscriptionsHandler implements ICommandHandler<
+  ExpirePastDueSubscriptionsCommand,
+  void
+> {
   private readonly logger = new Logger(ExpirePastDueSubscriptionsHandler.name);
 
   constructor(

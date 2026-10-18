@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { InventoryDomainServicesModule } from '@modules/supply/inventory/domain/services/services.module';
 
 import { CreateProductHandler } from './create-product/create-product.handler';
 import { UpdateProductHandler } from './update-product/update-product.handler';
@@ -24,7 +25,9 @@ export const INVENTORY_COMMAND_HANDLERS = [
 ];
 
 @Module({
-  imports: [InventoryInfrastructureModule],
+  // Katalog kapısı (ürün/tedarikçi/kategori kullanılabilirliği) envanterin kendi
+  // yaprak domain servis modülünden gelir.
+  imports: [InventoryInfrastructureModule, InventoryDomainServicesModule],
   providers: [...INVENTORY_COMMAND_HANDLERS],
 })
 export class InventoryCommandModule {}

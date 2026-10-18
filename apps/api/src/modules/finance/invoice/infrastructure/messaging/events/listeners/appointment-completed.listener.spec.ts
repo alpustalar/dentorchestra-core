@@ -1,10 +1,18 @@
+/*
+ * Jest mock'ları tiplenmemiş (`any`) nesneler taşır: bus/repo taklitleri gerçek
+ * sözleşmeyi değil yalnız testin ihtiyaç duyduğu yüzeyi kurar. Aşağıdaki kurallar
+ * YALNIZ bu dosyada kapatılır; üretim kodunda açık kalır.
+ */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import { Decimal } from 'decimal.js';
 import { AppointmentCompletedInvoiceListener } from './appointment-completed.listener';
 
 describe('AppointmentCompletedInvoiceListener', () => {
   const make = (payment: unknown) => {
     const commandBus = { execute: jest.fn().mockResolvedValue(undefined) };
-    const queryBus = { execute: jest.fn().mockResolvedValue({ data: payment }) };
+    const queryBus = {
+      execute: jest.fn().mockResolvedValue({ data: payment }),
+    };
     // Fatura kesilemezse operatöre uyarı gider; testte yalnız çağrıldığı doğrulanır.
     const criticalFailure = { publish: jest.fn() };
     const listener = new AppointmentCompletedInvoiceListener(
@@ -37,7 +45,6 @@ describe('AppointmentCompletedInvoiceListener', () => {
       patientId: 'patient-1',
       appointmentId: 'apt-1',
       paymentId: 'pay-1',
-      trigger: 'APPOINTMENT',
     });
     // Tutar artık Money VO olarak taşınır.
     expect(input.totalAmount.value.toNumber()).toBe(250);

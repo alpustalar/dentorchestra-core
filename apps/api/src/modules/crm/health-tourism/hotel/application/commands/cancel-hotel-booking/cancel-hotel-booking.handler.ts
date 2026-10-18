@@ -2,6 +2,8 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { HotelbedsBookingNotFoundException } from '@modules/crm/health-tourism/hotel/domain/exceptions/hotelbeds-booking.exceptions';
 import { CancelHotelBookingCommand } from './cancel-hotel-booking.command';
+import type { CancelHotelBookingResponse } from './cancel-hotel-booking.response';
+import { toSupplierRetainedCost } from '@modules/crm/health-tourism/booking-payment/domain/rules/supplier-retained-cost.rule';
 import {
   HOTELBEDS_API_SERVICE,
   IHotelbedsApiService,
@@ -13,9 +15,10 @@ import {
 } from '@modules/crm/health-tourism/hotel/domain/repositories/hotelbeds-booking/hotelbeds-booking.command.repository';
 
 @CommandHandler(CancelHotelBookingCommand)
-export class CancelHotelBookingHandler
-  implements ICommandHandler<CancelHotelBookingCommand, void>
-{
+export class CancelHotelBookingHandler implements ICommandHandler<
+  CancelHotelBookingCommand,
+  CancelHotelBookingResponse
+> {
   constructor(
     @Inject(HOTELBEDS_API_SERVICE)
     private readonly hotelbedsApi: IHotelbedsApiService,
@@ -32,7 +35,9 @@ export class CancelHotelBookingHandler
    * iptal isteği de rezervasyonu "aktif" görüp HotelBeds'e iki kez iptal (ve
    * arkasındaki iade akışını iki kez) tetiklerdi. Zaten iptalliyse sessizce çıkar.
    */
-  async execute(command: CancelHotelBookingCommand): Promise<void> {
+  async execute(
+    command: CancelHotelBookingCommand
+  ): Promise<CancelHotelBookingResponse> {
     const { dto, ctx } = command;
 
     // TODO: saga/outbox kullanıcaz. nest cqrs'in sagasını kullan. kullanıcıya direkt talebiniz alındı dön. kuyruğa al
@@ -55,8 +60,15 @@ export class CancelHotelBookingHandler
       return booking.reference;
     });
 
-    if (!reference) return;
+    // Zaten iptalliydi: sağlayıcıya gitmedik, dolayısıyla iptal ekonomisi de
+    // öğrenilemez. İade akışı bunu "bilinmiyor" olarak görür.
+    if (!reference) return { reference: null, retained: null };
 
-    await this.hotelbedsApi.cancelBooking(reference);
+    const result = await this.hotelbedsApi.cancelBooking(reference);
+
+    return {
+      reference: result.reference,
+      retained: toSupplierRetainedCost(result.retainedAmount, result.currency),
+    };
   }
 }

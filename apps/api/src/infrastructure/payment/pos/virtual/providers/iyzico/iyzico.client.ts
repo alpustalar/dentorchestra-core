@@ -8,6 +8,7 @@ import { WithIyzicoError } from '@src/infrastructure/payment/pos/virtual/provide
 import { CreateCheckoutFormRequest } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/create-checkout-form.request';
 import {
   CreateSubMerchantRequest,
+  RetrieveSubMerchantRequest,
   SubMerchantResult,
   UpdateSubMerchantRequest,
 } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/create-submerchant.request';
@@ -42,6 +43,9 @@ export class IyzicoClient {
   readonly updateSubMerchant: (
     request: UpdateSubMerchantRequest & { locale?: string; currency?: string }
   ) => Promise<WithIyzicoError<SubMerchantResult>>;
+  readonly retrieveSubMerchant: (
+    request: RetrieveSubMerchantRequest & { locale?: string }
+  ) => Promise<WithIyzicoError<SubMerchantResult>>;
 
   constructor(config: ConfigService) {
     const iyzipay = new Iyzipay({
@@ -70,6 +74,9 @@ export class IyzicoClient {
       iyzipay.subMerchant
     );
     this.updateSubMerchant = promisify(iyzipay.subMerchant.update).bind(
+      iyzipay.subMerchant
+    );
+    this.retrieveSubMerchant = promisify(iyzipay.subMerchant.retrieve).bind(
       iyzipay.subMerchant
     );
   }

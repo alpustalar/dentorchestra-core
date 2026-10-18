@@ -2,9 +2,9 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  patientEndpoints,
   type GetPatients,
   type PaginationInput,
+  patientEndpoints,
 } from '@core-crm/shared/client';
 
 import { apiWithMeta } from '@/lib/api';

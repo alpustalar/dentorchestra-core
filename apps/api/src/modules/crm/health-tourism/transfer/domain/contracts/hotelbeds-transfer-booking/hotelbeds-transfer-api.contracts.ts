@@ -149,5 +149,13 @@ export interface TransferBookingResult {
 export interface CancelTransferBookingResult {
   reference: string;
   status: string; // CANCELLED
-  cancellationAmount: number; // İptal ceza tutarı (0 veya daha fazla)
+  /**
+   * Sağlayıcının alıkoyduğu iptal ceza tutarı. **`null` = bildirilmedi**, `0` =
+   * ücretsiz iptal: iki hâl aynı şey değildir. `?? 0` yazmak bilinmeyen cezayı
+   * sessizce "ceza yok"a çevirir ve platform defteri tedarikçi borcunu olduğundan
+   * fazla düşürür (zarar hiç tanınmaz) — bkz. CLAUDE.md finans kuralı 9/11.
+   */
+  cancellationAmount: number | null;
+  /** Ceza tutarının para birimi; tutar yoksa null. */
+  currency: string | null;
 }

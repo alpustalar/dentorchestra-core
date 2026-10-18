@@ -13,8 +13,14 @@ export interface IAccountCommandRepository {
   createChart(accounts: Account[]): Promise<void>;
 
   /**
-   * Şubede hesap planı kurulmuş mu — açılış akışının idempotentlik kararı.
-   * Yazmayı kapıda durdurduğu için Command Context'e ait.
+   * Şubede halihazırda duran hesapların `code -> id` eşlemesi.
+   *
+   * Sadece "kurulmuş mu?" sorusuna evet/hayır demek yetmiyordu: şablona sonradan
+   * hesap eklendiğinde mevcut şubeler o hesabı hiç almıyordu (ve posting kuralı
+   * kodu arayınca `AccountNotFoundInChartException` veriyordu). Eşleme, eksik
+   * hesapların MEVCUT üst hesapların gerçek id'lerine bağlanarak eklenmesini sağlar.
+   *
+   * Yazmayı beslediği için Command Context'e aittir.
    */
-  existsForClinic(clinicId: string): Promise<boolean>;
+  findIdByCodeMap(clinicId: string): Promise<Record<string, string>>;
 }

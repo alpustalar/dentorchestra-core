@@ -7,6 +7,7 @@ import {
   AiToolDefinition,
   AiToolResult,
 } from '@common/ai-tools';
+import { QuoteOptionRejectedException } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option-rejected.exception';
 
 /**
  * Command+Strategy çekirdeği: registry adları toplar/çakışmayı reddeder; dispatcher
@@ -76,15 +77,31 @@ describe('AiTool dispatch (registry + executor)', () => {
     expect(res.content).toBe('pong');
   });
 
-  it('araç fırlatırsa hata dispatcher’da sarmalanır (akış bozulmaz)', async () => {
+  /**
+   * Araç sonucu hastaya gider. Teknik hatanın metni (bağlantı dizgesi, tablo adı,
+   * sağlayıcı yanıtı) o kanala kopyalanmamalı; akış da bozulmamalı.
+   */
+  it('araç teknik hata fırlatırsa akış bozulmaz ama hata METNİ hastaya gitmez', async () => {
     const registry = buildRegistry([
       tool('boom', async () => {
-        throw new Error('patladı');
+        throw new Error('relation "invoices" does not exist');
       }),
     ]);
     const executor = new AiToolExecutor(registry);
     const res = await executor.execute({ name: 'boom', input: {} }, ctx);
     expect(res.content).toContain('gerçekleştirilemedi');
-    expect(res.content).toContain('patladı');
+    expect(res.content).not.toContain('invoices');
+    expect(res.content).toContain('Teknik bir sorun');
+  });
+
+  it('domain hatasının mesajı hastaya AKTARILIR (kullanıcı için yazılmıştır)', async () => {
+    const registry = buildRegistry([
+      tool('reject', async () => {
+        throw new QuoteOptionRejectedException('HOTEL', 'CLINIC_MISMATCH');
+      }),
+    ]);
+    const executor = new AiToolExecutor(registry);
+    const res = await executor.execute({ name: 'reject', input: {} }, ctx);
+    expect(res.content).toContain('tekrar arama');
   });
 });

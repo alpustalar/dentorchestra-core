@@ -6,7 +6,15 @@ import {
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
-import { ProductNotFoundException } from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
+import {
+  ProductNotFoundException,
+  ProductNotUsableInClinicException,
+} from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
+import { findProductUnusableReason } from '@modules/supply/inventory/domain/rules/catalog-usability.rules';
+import {
+  ITenantScopeResolver,
+  TENANT_SCOPE_RESOLVER,
+} from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
 import { INVENTORY_EVENTS } from '@src/domain/constants/events';
 import {
   IProductCommandRepository,
@@ -29,6 +37,8 @@ export class AdjustStockHandler implements ICommandHandler<
     private readonly productBatchRepo: IProductBatchCommandRepository,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
+    @Inject(TENANT_SCOPE_RESOLVER)
+    private readonly tenantScopeResolver: ITenantScopeResolver,
     private readonly txManager: TransactionManager
   ) {}
 
@@ -36,16 +46,42 @@ export class AdjustStockHandler implements ICommandHandler<
     const { clinicId, data, ctx } = command.payload;
     const { actor, source } = ctx;
 
-    const product = await this.productRepo.findById(data.productId);
-    if (!product) throw new ProductNotFoundException();
+    // Yetki, **yazmanın yapılacağı** klinik üzerinden değerlendirilir. Önceden
+    // kontrol `product.clinicId` ile yapılıyordu: aktör kendi kliniğinin ürünü
+    // üzerinde yetkili görünüp hareketi URL'den gelen `clinicId` ile
+    // damgalayabiliyordu (iki klinik ayrışıyordu). `clinicId` istekle geldiği
+    // için kiracı önce ondan çözülür.
+    const organizationId = await this.tenantScopeResolver.resolve({ clinicId });
 
     this.policyFactory
       .clinic(actor, source)
       .evaluator.check(
-        (p) => p.actorCanManageTargetClinic(product.clinicId.value),
+        (p) =>
+          p.actorCanManageClinicOrOwnsOrganization(clinicId, organizationId),
         'Bu klinikte işlem yapma yetkiniz yok.'
       )
       .orThrow(INVENTORY_EVENTS.ADJUST_STOCK);
+
+    const product = await this.productRepo.findById(data.productId);
+    if (!product) throw new ProductNotFoundException();
+
+    // Ürün bu klinikte kullanılabilir olmalı (başka kiracı / silinmiş / pasif):
+    // aynı kural mal kabulde ve sipariş kapısında da zorlanıyor.
+    const unusableReason = findProductUnusableReason(
+      {
+        id: product.id.value,
+        clinicId: product.clinicId.value,
+        isActive: product.isActive,
+        deletedAt: product.deletedAt,
+      },
+      clinicId
+    );
+    if (unusableReason) {
+      throw new ProductNotUsableInClinicException({
+        productId: data.productId,
+        reason: unusableReason,
+      });
+    }
 
     // Ürünü FOR UPDATE ile kilitle, sonra batch'leri kilit ALTINDA oku: aynı ürüne
     // eşzamanlı stok değişimlerini serialize eder. Aksi halde iki istek aynı batch
@@ -75,14 +111,7 @@ export class AdjustStockHandler implements ICommandHandler<
         notes: data.notes,
       });
 
-      if (updatedBatch) {
-        await this.productBatchRepo.update(updatedBatch);
-        return;
-      }
-
-      // Parti bulunmayan artışta olayı ürün fırlattı; olaylar yalnız kalıcılaştırma
-      // sırasında boşaltıldığı için ürün yazılır (satır zaten kilit altında).
-      await this.productRepo.update(lockedProduct);
+      await this.productBatchRepo.update(updatedBatch);
     });
   }
 }

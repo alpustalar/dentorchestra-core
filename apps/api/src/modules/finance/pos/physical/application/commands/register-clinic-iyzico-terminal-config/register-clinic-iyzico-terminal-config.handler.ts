@@ -14,9 +14,10 @@ import { TransactionManager } from '@src/infrastructure/persistence/prisma/trans
 import { CLINIC_EVENTS } from '@src/domain/constants/events';
 
 @CommandHandler(RegisterClinicIyzicoTerminalConfigCommand)
-export class RegisterClinicIyzicoTerminalConfigHandler
-  implements ICommandHandler<RegisterClinicIyzicoTerminalConfigCommand, string>
-{
+export class RegisterClinicIyzicoTerminalConfigHandler implements ICommandHandler<
+  RegisterClinicIyzicoTerminalConfigCommand,
+  string
+> {
   constructor(
     @Inject(CLINIC_IYZICO_TERMINAL_CONFIG_COMMAND_REPOSITORY)
     private readonly configCommandRepo: IClinicIyzicoTerminalConfigCommandRepository,

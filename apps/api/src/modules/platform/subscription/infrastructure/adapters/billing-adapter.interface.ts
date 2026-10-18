@@ -38,6 +38,23 @@ export interface PaymentResult {
   success: boolean;
   iyzicoPaymentId?: string;
   errorMessage?: string;
+  /**
+   * Sağlayıcının tahsil ettiğini bildirdiği tutar — **checkout yolunda** dolu
+   * (müşteri taksit seçebilir → bizim tutarımızdan büyük olabilir). Kayıtlı
+   * kartla yenilemede sağlayıcıya `installments: 1` ve `paidPrice = price`
+   * gönderildiği için karşılaştıracak bir fark yoktur; yenileme taksitlendirilmeye
+   * başlarsa bu alan orada da okunmalıdır.
+   */
+  paidAmount?: string;
+  /**
+   * Sağlayıcının **yankıladığı** korelasyon anahtarı (abonelikte `externalId`).
+   *
+   * Callback ucu `@Public` ve güncellenecek aboneliği **çağıranın gövdesindeki**
+   * `conversationId` belirliyor; sonuç ise `token` ile sağlayıcıdan okunuyor.
+   * İkisi bağlanmazsa başka bir ödemeye ait geçerli bir token, bekleyen bir
+   * aboneliği "ödendi" yapmaya yeter (bkz. `checkIyzicoCallbackBinding`).
+   */
+  conversationId?: string;
   /** Müşteri kartını sakladıysa dolu — recurring auto-charge için persist edilir. */
   savedCard?: CapturedSavedCard;
 }

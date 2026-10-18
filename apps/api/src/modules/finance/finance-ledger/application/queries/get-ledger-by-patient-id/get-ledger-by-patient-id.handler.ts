@@ -16,10 +16,10 @@ import {
 import { FINANCE_LEDGER_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetLedgerByPatientIdQuery)
-export class GetLedgerByPatientIdHandler
-  implements
-    IQueryHandler<GetLedgerByPatientIdQuery, GetLedgerByPatientIdQueryResponse>
-{
+export class GetLedgerByPatientIdHandler implements IQueryHandler<
+  GetLedgerByPatientIdQuery,
+  GetLedgerByPatientIdQueryResponse
+> {
   constructor(
     @Inject(FINANCE_LEDGER_QUERY_REPOSITORY)
     private readonly financeLedgerRepository: IFinanceLedgerQueryRepository,

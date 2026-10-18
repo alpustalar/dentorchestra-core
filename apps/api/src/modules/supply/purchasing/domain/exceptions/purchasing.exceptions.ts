@@ -39,6 +39,18 @@ export class PurchaseRequestNotApprovedException extends DomainException<{
   }
 }
 
+export class PurchaseRequestClinicMismatchException extends DomainException<{
+  requestClinicId: string;
+  orderClinicId: string;
+}> {
+  readonly errorCode = ERROR_CODES.PURCHASE_REQUEST.CLINIC_MISMATCH;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { requestClinicId: string; orderClinicId: string }) {
+    super('Talep ile sipariş farklı kliniklere ait.', meta);
+  }
+}
+
 export class PurchaseRequestEmptyItemsException extends DomainException {
   readonly errorCode = ERROR_CODES.PURCHASE_REQUEST.EMPTY_ITEMS;
 
@@ -180,5 +192,25 @@ export class PurchaseOrderOverReceiptException extends DomainException<{
     attempted: number;
   }) {
     super('Teslim alınan miktar sipariş edilen miktarı aşamaz.', meta);
+  }
+}
+
+export class PurchaseOrderCancelWithInvoicesException extends DomainException<{
+  orderId: string;
+  invoicedTotal: string;
+  billingStatus: string;
+}> {
+  readonly errorCode = ERROR_CODES.PURCHASE_ORDER.CANCEL_WITH_INVOICES;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: {
+    orderId: string;
+    invoicedTotal: string;
+    billingStatus: string;
+  }) {
+    super(
+      'Faturası eşleştirilmiş sipariş iptal edilemez; önce fatura eşleştirmesi kaldırılmalıdır.',
+      meta
+    );
   }
 }

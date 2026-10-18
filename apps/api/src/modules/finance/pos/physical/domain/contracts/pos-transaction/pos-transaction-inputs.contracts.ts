@@ -16,6 +16,17 @@ export interface CreatePosTransactionProps {
   /** Eğer varsa ilgili ödeme kaydı. */
   paymentId?: string | null;
 
+  /**
+   * İşlemi terminalde başlatan personel (Firebase UID — ham string, UUID değil).
+   *
+   * **Zorunlu, çünkü varsayılanı olamaz.** SALE'de kartı çeken, VOID/REFUND'da ters
+   * kaydı atan kişidir; ikisi de yüksek etkili para hareketidir (CLAUDE.md kural 7:
+   * kalıcı damga ister). Opsiyonel bırakılsaydı yeni bir POS akışı damgayı sessizce
+   * atlar ve kolon süse dönerdi (kural 10). DB kolonu eski satırlar için nullable'dır
+   * ama yeni kayıt daima damgalanır.
+   */
+  initiatedById: string;
+
   // Finansal veriler
   amount: number;
   currency: CurrencyType;

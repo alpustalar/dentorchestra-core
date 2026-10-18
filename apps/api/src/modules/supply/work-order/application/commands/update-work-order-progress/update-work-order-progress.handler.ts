@@ -19,9 +19,10 @@ import type { WorkOrderProgressStage } from '@shared/modules/work-order/schemas'
  * olduğunu entity doğrular; handler yalnız hedef adımı ilgili domain metoduna çevirir.
  */
 @CommandHandler(UpdateWorkOrderProgressCommand)
-export class UpdateWorkOrderProgressHandler
-  implements ICommandHandler<UpdateWorkOrderProgressCommand, void>
-{
+export class UpdateWorkOrderProgressHandler implements ICommandHandler<
+  UpdateWorkOrderProgressCommand,
+  void
+> {
   private readonly transitions: Record<
     WorkOrderProgressStage,
     (workOrder: ExternalWorkOrder) => void

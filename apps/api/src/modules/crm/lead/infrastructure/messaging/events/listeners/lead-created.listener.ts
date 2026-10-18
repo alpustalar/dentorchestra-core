@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { LeadCreatedEvent } from '@modules/crm/lead/domain/events';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { LogType } from '@src/domain/constants/log-action.constant';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class LeadCreatedListener {
@@ -10,7 +10,7 @@ export class LeadCreatedListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(LeadCreatedEvent.NAME, { async: true })
+  @OnDomainEvent(LeadCreatedEvent.NAME)
   async handle(event: LeadCreatedEvent): Promise<void> {
     const { log, metadata } = event;
     try {

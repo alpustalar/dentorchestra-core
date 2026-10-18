@@ -14,9 +14,10 @@ import {
 import { INVENTORY_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetStockMovementsQuery)
-export class GetStockMovementsHandler
-  implements IQueryHandler<GetStockMovementsQuery, GetStockMovementsResponse>
-{
+export class GetStockMovementsHandler implements IQueryHandler<
+  GetStockMovementsQuery,
+  GetStockMovementsResponse
+> {
   constructor(
     @Inject(STOCK_MOVEMENT_QUERY_REPOSITORY)
     private readonly stockMovementRepo: IStockMovementQueryRepository,

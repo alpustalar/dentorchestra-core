@@ -18,7 +18,11 @@ export interface ITransferCacheService {
   };
 
   readonly transferRateOption: {
-    get(token: string): Promise<TransferRateOptionToken | null>;
+    /** Anahtar kiracı kapsamlıdır: başka kliniğin optionId'si burada bulunmaz. */
+    get(
+      clinicId: string,
+      token: string
+    ): Promise<TransferRateOptionToken | null>;
     set(
       token: string,
       data: TransferRateOptionToken,

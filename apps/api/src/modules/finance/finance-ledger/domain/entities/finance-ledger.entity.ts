@@ -1,4 +1,7 @@
-import { FinanceLedger as IFinanceLedger, LedgerStatusSchema, } from '@shared/generated-zod';
+import {
+  FinanceLedger as IFinanceLedger,
+  LedgerStatusSchema,
+} from '@shared/generated-zod';
 import { LedgerCategoryType as LedgerCategory } from '@shared/generated-zod/inputTypeSchemas/LedgerCategorySchema';
 import { LedgerTypeType as LedgerType } from '@shared/generated-zod/inputTypeSchemas/LedgerTypeSchema';
 import { LedgerSourceType as LedgerSource } from '@shared/generated-zod/inputTypeSchemas/LedgerSourceSchema';
@@ -12,7 +15,12 @@ import { Currency } from '@src/domain/value-objects/currency.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';
+import { DefaultValidateOptions } from '@common/domain/constants/default-options.constant';
 import { FinanceLedgerRules } from '@modules/finance/finance-ledger/domain/rules/finance-ledger.rules';
+import {
+  LedgerInvalidPrecisionException,
+  LedgerInvalidStatusTransitionException,
+} from '@modules/finance/finance-ledger/domain/exceptions/finance-ledger.exceptions';
 
 export class FinanceLedgerEntity extends AggregateRoot {
   constructor(data: IFinanceLedger) {
@@ -23,7 +31,10 @@ export class FinanceLedgerEntity extends AggregateRoot {
     this._patientId = UUID.create(data.patientId).instance ?? null;
     this._paymentId = UUID.create(data.paymentId).instance ?? null;
     this._installmentId = UUID.create(data.installmentId).instance ?? null;
-    this._performedById = UUID.create(data.performedById).instance ?? null;
+    // Aktör kimliği ham string: `User.id` bir Firebase UID'dir (UUID değil).
+    // UUID VO'sundan geçirmek, aktör damgası taşıyan her cari kaydını okunamaz
+    // hale getirirdi.
+    this._performedById = data.performedById;
     this._type = data.type;
     this._source = data.source;
     this._category = data.category;
@@ -32,7 +43,9 @@ export class FinanceLedgerEntity extends AggregateRoot {
     const netMoney = Money.fromTrusted(data.amount, data.currency);
     const taxMoney = Money.fromTrusted(data.taxAmount, data.currency);
 
-    this._taxSpecification = TaxSpecification.create(
+    // Rehidrasyon: saklanmış kırılım doğrulanmadan kurulur. Okuma anında yeniden
+    // yargılanırsa bir kuruşluk sapma kaydı okunamaz hâle getirir.
+    this._taxSpecification = TaxSpecification.fromTrusted(
       netMoney,
       data.taxRate,
       taxMoney
@@ -79,8 +92,8 @@ export class FinanceLedgerEntity extends AggregateRoot {
     return this._installmentId;
   }
 
-  private _performedById: UUID | null;
-  get performedById(): UUID | null {
+  private _performedById: string | null;
+  get performedById(): string | null {
     return this._performedById;
   }
 
@@ -153,6 +166,8 @@ export class FinanceLedgerEntity extends AggregateRoot {
   }
 
   public static create(props: CreateFinanceLedgerProps): FinanceLedgerEntity {
+    FinanceLedgerEntity.assertKurusPrecision(props.money);
+
     const taxSpec = TaxSpecification.create(props.money, props.taxRate ?? 0);
 
     return new FinanceLedgerEntity({
@@ -172,14 +187,16 @@ export class FinanceLedgerEntity extends AggregateRoot {
         ? UUID.create(props.installmentId).orThrow().value
         : null,
 
-      performedById: props.performedById
-        ? UUID.create(props.performedById).orThrow().value
-        : null,
+      performedById: props.performedById ?? null,
 
       type: props.type,
       source: props.source,
       category: props.category,
-      status: LedgerStatusSchema.enum.COMPLETED,
+      // Durum dışarıdan gelebilir: tahsilat ile iade olayları **sırasız**
+      // teslim edilebiliyor (biri kuyrukta beklerken diğeri işlenir). Kaydı
+      // yazan taraf kaynağın o anki nihai durumunu okuyup buraya geçirir;
+      // sabit COMPLETED yazmak, önce gelen iadeyi sessizce yutuyordu.
+      status: props.status ?? LedgerStatusSchema.enum.COMPLETED,
 
       amount: taxSpec.netAmount.value,
       currency: taxSpec.netAmount.currency,
@@ -194,19 +211,42 @@ export class FinanceLedgerEntity extends AggregateRoot {
     });
   }
 
-  public rules(validateOptions: ValidateOptionsType) {
+  public rules(validateOptions: ValidateOptionsType = DefaultValidateOptions) {
     return new FinanceLedgerRules(this, validateOptions);
   }
 
+  /**
+   * Kaydı kaynağın (taksit) nihai durumuna hizalar. İdempotent: aynı durum
+   * tekrar verilirse hiçbir şey yapmaz ve `false` döner (gereksiz UPDATE yok).
+   *
+   * Geçiş matrisi tek yerde: COMPLETED → REFUNDED/CANCELLED serbest; iade ya
+   * da iptal edilmiş bir kaydı tekrar gelire çevirmek **yasak** — telafi turu
+   * (backfill) geç gelen bir tahsilat olayıyla iadeyi geri alamaz.
+   */
+  public syncStatus(target: LedgerStatus): boolean {
+    if (this._status === target) return false;
+
+    const isReversed =
+      this._status === LedgerStatusSchema.enum.REFUNDED ||
+      this._status === LedgerStatusSchema.enum.CANCELLED;
+
+    if (isReversed) {
+      throw new LedgerInvalidStatusTransitionException(this._status, target);
+    }
+
+    this._status = target;
+    this._updatedAt = DateTimeManager.create();
+    return true;
+  }
+
   public refund(): void {
-    this._status = LedgerStatusSchema.enum.REFUNDED;
+    this.syncStatus(LedgerStatusSchema.enum.REFUNDED);
   }
 
   public cancel(): void {
-    const isCancelled = this.isCancelled().value;
-    if (isCancelled) return;
+    if (this.isCancelled().value) return;
 
-    this._status = LedgerStatusSchema.enum.CANCELLED;
+    this.syncStatus(LedgerStatusSchema.enum.CANCELLED);
   }
 
   public toPersistence(): IFinanceLedger {
@@ -217,7 +257,7 @@ export class FinanceLedgerEntity extends AggregateRoot {
       patientId: this.patientId?.value ?? null,
       paymentId: this.paymentId?.value ?? null,
       installmentId: this.installmentId?.value ?? null,
-      performedById: this.performedById?.value ?? null,
+      performedById: this.performedById,
       type: this.type,
       source: this.source,
       category: this.category,
@@ -231,22 +271,63 @@ export class FinanceLedgerEntity extends AggregateRoot {
       documentNo: this.documentNo,
       entryDate: this.entryDate,
       createdAt: this.createdAt,
-      updatedAt: DateTimeManager.create(),
+      // `now()` değil: `toPersistence()` saf olmalı. Her çağrıda yeni bir
+      // damga üretmek, hiçbir şeyi değiştirmeyen bir UPDATE'i de "güncellendi"
+      // gösteriyordu.
+      updatedAt: this.updatedAt,
     };
+  }
+
+  /**
+   * Tutar kuruş hassasiyetini aşarsa kapıda durdurulur: DB kolonu
+   * `Decimal(10,2)`, üçüncü basamağı sessizce yuvarlar ve defter kaynağından
+   * (taksit) kayar.
+   */
+  private static assertKurusPrecision(money: Money): void {
+    if (money.value.decimalPlaces() > Money.PRECISION) {
+      throw new LedgerInvalidPrecisionException(money.value.toString());
+    }
   }
 
   private isCompleted(msg?: string): Guard<boolean> {
     const is = this._status === LedgerStatusSchema.enum.COMPLETED;
-    return Guard.monitor(is, is, () => new Error(msg ?? 'Tamamlanmamış'));
+    return Guard.monitor(
+      is,
+      is,
+      () =>
+        new LedgerInvalidStatusTransitionException(
+          this._status,
+          LedgerStatusSchema.enum.COMPLETED,
+          msg
+        )
+    );
   }
 
   private isRefunded(msg?: string): Guard<boolean> {
     const is = this._status === LedgerStatusSchema.enum.REFUNDED;
-    return Guard.monitor(is, is, () => new Error(msg ?? 'İade edilmemiş'));
+    return Guard.monitor(
+      is,
+      is,
+      () =>
+        new LedgerInvalidStatusTransitionException(
+          this._status,
+          LedgerStatusSchema.enum.REFUNDED,
+          msg
+        )
+    );
   }
 
   private isCancelled(msg?: string): Guard<boolean> {
     const is = this._status === LedgerStatusSchema.enum.CANCELLED;
-    return Guard.monitor(is, is, () => new Error(msg ?? 'İptal edilmemiş'));
+    return Guard.monitor(
+      is,
+      is,
+      () =>
+        new LedgerInvalidStatusTransitionException(
+          this._status,
+          LedgerStatusSchema.enum.CANCELLED,
+          msg
+        )
+    );
   }
 }

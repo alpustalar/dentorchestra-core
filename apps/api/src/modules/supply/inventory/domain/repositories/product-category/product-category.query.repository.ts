@@ -2,7 +2,6 @@ import { IBaseQueryRepository } from '@common/domain/repositories/base-query-rep
 import { ProductCategory } from '@shared';
 import { Paginated } from '@common/interfaces/paginated.type';
 
-export interface IProductCategoryQueryRepository
-  extends IBaseQueryRepository<ProductCategory> {
+export interface IProductCategoryQueryRepository extends IBaseQueryRepository<ProductCategory> {
   findAll(): Promise<Paginated<ProductCategory>>;
 }

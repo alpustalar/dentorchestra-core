@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentConfirmedEvent } from '@modules/clinical/appointment/domain/events/confirm-appointment.event';
 import { AppointmentCancelledEvent } from '@modules/clinical/appointment/domain/events/cancelled-appointment.event';
 import { AppointmentRescheduledEvent } from '@modules/clinical/appointment/domain/events/reschedule-appointment.event';
 import { NotificationDispatcherService } from '@modules/platform/notification/application/services/notification-dispatcher.service';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Randevu yaşam-döngüsü değişimlerinde (onay/iptal/erteleme) bildirim dağıtır:
@@ -19,7 +19,7 @@ export class AppointmentLifecycleNotificationListener {
 
   constructor(private readonly dispatcher: NotificationDispatcherService) {}
 
-  @OnEvent(APPOINTMENT_EVENTS.CONFIRMED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.CONFIRMED)
   async handleConfirmed(event: AppointmentConfirmedEvent): Promise<void> {
     try {
       await this.dispatcher.notifyAppointmentConfirmed({
@@ -38,7 +38,7 @@ export class AppointmentLifecycleNotificationListener {
     }
   }
 
-  @OnEvent(APPOINTMENT_EVENTS.CANCELLED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.CANCELLED)
   async handleCancelled(event: AppointmentCancelledEvent): Promise<void> {
     try {
       await this.dispatcher.notifyAppointmentCancelled({
@@ -59,7 +59,7 @@ export class AppointmentLifecycleNotificationListener {
     }
   }
 
-  @OnEvent(APPOINTMENT_EVENTS.RESCHEDULED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.RESCHEDULED)
   async handleRescheduled(event: AppointmentRescheduledEvent): Promise<void> {
     try {
       await this.dispatcher.notifyAppointmentRescheduled({

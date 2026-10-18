@@ -104,3 +104,61 @@ export class NoChargesForAppointmentException extends DomainException {
     super(`Randevunun ücretlendirilmiş işlem satırı yok: ${appointmentId}`);
   }
 }
+
+/**
+ * Adet pozitif ve en çok 3 ondalık basamaklı olmalı.
+ *
+ * Kapı (zod şeması) bunu zorluyordu ama **varlığın kendi kuralı** entity'de
+ * yoktu: sıfır adet bedelsiz bir satır, negatif adet ise negatif bir fatura
+ * satırı üretiyordu (CLAUDE.md finans kuralı 10 — değişmez kural varlığın
+ * çözümlendiği yerde zorlanır, tek bir çağrı yolunda değil).
+ */
+export class InvalidChargeQuantityException extends DomainException<{
+  quantity: string;
+}> {
+  public readonly errorCode = ERROR_CODES.TREATMENT_CHARGE.INVALID_QUANTITY;
+
+  constructor(quantity: string) {
+    super(
+      `İşlem adedi pozitif ve en fazla 3 ondalık basamaklı olmalı: ${quantity}`,
+      { quantity }
+    );
+  }
+}
+
+/**
+ * İndirim oranı 0–100 aralığında olmalı.
+ *
+ * Tavan kontrolü **politika**dır (yönetici aşabilir); bu ise **invariant**:
+ * negatif indirim sessizce zamma dönüşüyor (matrah liste tutarının üstüne
+ * çıkıyor), %100'ü aşan indirim ise `Money.subtract` üzerinden
+ * "yetersiz bakiye" diyen, sebebinden kopuk bir hata üretiyordu.
+ */
+export class InvalidDiscountRateException extends DomainException<{
+  discountRate: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.TREATMENT_CHARGE.INVALID_DISCOUNT_RATE;
+
+  constructor(discountRate: string) {
+    super(`İndirim oranı 0–100 arasında olmalı: ${discountRate}`, {
+      discountRate,
+    });
+  }
+}
+
+/**
+ * Liste fiyatı kuruş hassasiyetini aşıyor. DB kolonu `Decimal(10,2)`: üçüncü
+ * basamak sessizce yuvarlanır ve satırın dondurulmuş fiyatı kaynağından kayar.
+ */
+export class ChargeInvalidPrecisionException extends DomainException<{
+  amount: string;
+}> {
+  public readonly errorCode = ERROR_CODES.TREATMENT_CHARGE.INVALID_PRECISION;
+
+  constructor(amount: string) {
+    super(`Liste fiyatı en fazla iki ondalık basamak taşıyabilir: ${amount}`, {
+      amount,
+    });
+  }
+}

@@ -1,4 +1,4 @@
-import { JournalEntryStatus, Prisma } from '@prisma/client';
+import { JournalEntryKind, JournalEntryStatus, Prisma } from '@prisma/client';
 import { Pagination, JournalEntry as IJournalEntry } from '@shared';
 import { JournalEntry } from '../entities/journal-entry.entity';
 
@@ -16,9 +16,16 @@ export interface TrialBalanceFilter {
   clinicId: string;
   dateFrom?: Date;
   dateTo?: Date;
+  /**
+   * Hangi fiş nitelikleri sayılsın? Verilmezse **hepsi** — mizanın, bilançonun ve
+   * yıl sonu kapanışının kendisinin istediği budur. Tek daraltan tüketici gelir
+   * tablosudur (`INCOME_STATEMENT_ENTRY_KINDS`): kapanış fişi 6/7'yi sıfırladığı
+   * için sayılırsa kapanmış yılın cirosu sıfır görünür.
+   */
+  kinds?: readonly JournalEntryKind[];
 }
 
-/** Hesap bazında ham borç/alacak toplamı (yalnızca POSTED fiş satırları). */
+/** Hesap bazında ham borç/alacak toplamı (defterde etkili fiş satırları). */
 export interface TrialBalanceRow {
   accountId: string;
   totalDebit: Prisma.Decimal;
@@ -148,12 +155,19 @@ export interface JournalReportRow {
   lines: JournalReportLineRow[];
 }
 
+/** Kilitli kontrol hesabı bakiyesi okuması — tek şube, tek hesap. */
+export interface AccountBalanceLockParams {
+  clinicId: string;
+  accountId: string;
+}
+
 export interface IJournalCommandRepository {
   /** Fişi satırlarıyla birlikte yazar. */
   create(entry: JournalEntry): Promise<JournalEntry>;
 
-  /** Şube (defter) + dönem için bir sonraki boşluksuz fiş numarası. */
-  nextEntryNo(clinicId: string, periodId: string): Promise<bigint>;
+  // Yevmiye numarası buradan tahsis EDİLMEZ: numara dönem satırındaki sayaçtan,
+  // kilit altında alınır (`IJournalEntryNumberingService`). Eski `nextEntryNo`
+  // (MAX+1) kilitsiz olduğu için iki eşzamanlı fişe aynı numarayı veriyordu.
 
   /**
    * Storno linkajı: orijinal fişi REVERSED yapar + reversedById'yi ayarlar (hedefli
@@ -174,6 +188,23 @@ export interface IJournalCommandRepository {
    * Command Context'te okunur; nihai güvence `event_id` unique kısıtıdır.
    */
   findByEventId(eventId: string): Promise<JournalEntry | null>;
+
+  /**
+   * Bir kontrol hesabının (108 gibi) bakiyesini **kilit altında** okur:
+   * `Σborç − Σalacak` (defterde etkili fiş satırları).
+   *
+   * Kilit ile okuma **tek metotta** (CLAUDE.md `lockAndGet*` kuralı): ayrı
+   * metotlara bölünürse çağrı sırası derleyiciye görünmez olur ve bakiye kararı
+   * sessizce kilitsiz veriyle verilir. Kilit bir satıra değil **kavrama**
+   * tutulur (hesabın bakiyesi binlerce satırın toplamıdır) — bu yüzden danışma
+   * kilidi kullanılır ve fiş yazan diğer akışlar bloklanmaz.
+   *
+   * Yazma kararını beslediği için Command Context'tedir: kart hesap kapamasının
+   * (108 → 102 + 653) mevcut bakiyeyi aşmaması buradan doğrulanır.
+   */
+  lockAndGetAccountBalance(
+    params: AccountBalanceLockParams
+  ): Promise<Prisma.Decimal>;
 
   /**
    * Mizan — yıl sonu kapanış fişinin tutarlarını üretir. Rapor değil yazma kararı

@@ -3,8 +3,11 @@ import { Prisma } from '@prisma/client';
 import { BaseRepository } from '@src/infrastructure/persistence/prisma/base.repository';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { FinancialEvent } from '@modules/finance/accounting/financial-events/domain/entities/financial-event.entity';
-import { FinancialEventUniqueConstraintException } from '@modules/finance/accounting/financial-events/domain/exceptions/financial-event-unique-constraint.exception';
-import { IFinancialEventCommandRepository } from '@modules/finance/accounting/financial-events/domain/repositories/financial-event/financial-event.command.repository';
+import {
+  IFinancialEventCommandRepository,
+  UnpostedRangeParams,
+} from '@modules/finance/accounting/financial-events/domain/repositories/financial-event/financial-event.command.repository';
+import { unpostedFinancialEventWhere } from './financial-event-unposted.query';
 
 @Injectable()
 export class FinancialEventCommandRepository
@@ -22,22 +25,32 @@ export class FinancialEventCommandRepository
     return raw ? new FinancialEvent(raw) : null;
   }
 
-  async append(event: FinancialEvent): Promise<FinancialEvent> {
+  /**
+   * `createMany` + `skipDuplicates` bilinçli bir tercihtir: tekil `create`
+   * çakışmada P2002 fırlatıp **çağıranın transaction'ını abort** ederdi (bkz.
+   * interface notu). `skipDuplicates` PostgreSQL'de `ON CONFLICT DO NOTHING`'e
+   * çevrilir; transaction sağ kalır, `count === 0` çakışmayı bildirir.
+   *
+   * Event'ler yalnız satır **gerçekten yazıldığında** flush edilir — aksi hâlde
+   * yazılmamış bir kayıt için fiş üretimi tetiklenirdi.
+   */
+  async appendIfAbsent(event: FinancialEvent): Promise<FinancialEvent | null> {
     const data = event.toPersistence();
-    try {
-      const raw = await this.db.financialEvent.create({
-        data: { ...data, payload: data.payload as Prisma.InputJsonValue },
-      });
-      event.flushEvents();
-      return new FinancialEvent(raw);
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new FinancialEventUniqueConstraintException();
-      }
-      throw error;
-    }
+
+    const { count } = await this.db.financialEvent.createMany({
+      data: [{ ...data, payload: data.payload as Prisma.InputJsonValue }],
+      skipDuplicates: true,
+    });
+
+    if (count === 0) return null;
+
+    event.flushEvents();
+    return new FinancialEvent(data);
+  }
+
+  countUnpostedInRange(params: UnpostedRangeParams): Promise<number> {
+    return this.db.financialEvent.count({
+      where: unpostedFinancialEventWhere(params),
+    });
   }
 }

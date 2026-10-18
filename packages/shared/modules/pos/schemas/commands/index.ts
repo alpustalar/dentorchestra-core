@@ -8,3 +8,4 @@ export { IyzicoTerminalVoidSchema } from './iyzico-terminal-void.schema';
 export { IyzicoTerminalEodSchema } from './iyzico-terminal-eod.schema';
 export { RegisterClinicIyzicoTerminalConfigSchema } from './register-clinic-iyzico-terminal-config.schema';
 export { RegisterPosDeviceSchema } from './register-pos-device.schema';
+export { BackfillPosAccountingEventsSchema } from './backfill-pos-accounting-events.schema';

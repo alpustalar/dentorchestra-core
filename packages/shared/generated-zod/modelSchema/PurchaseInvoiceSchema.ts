@@ -26,6 +26,14 @@ export const PurchaseInvoiceSchema = z.object({
   netTotal: decimalSchema("Field 'netTotal' must be a Decimal. Location: ['Models', 'PurchaseInvoice']"),
   vatTotal: decimalSchema("Field 'vatTotal' must be a Decimal. Location: ['Models', 'PurchaseInvoice']"),
   grandTotal: decimalSchema("Field 'grandTotal' must be a Decimal. Location: ['Models', 'PurchaseInvoice']"),
+  /**
+   * İptal damgası (CLAUDE.md finans kuralı 7). `status = CANCELLED` kimin, ne zaman
+   * ve neden iptal ettiğini taşımıyordu; iptal storno fişi ürettiği için iz kalıcı
+   * olmak zorunda. `cancelledById` personel kimliğidir (Firebase UID — UUID değil).
+   */
+  cancelledAt: z.coerce.date().nullable(),
+  cancelledById: z.string().nullable(),
+  cancelReason: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })

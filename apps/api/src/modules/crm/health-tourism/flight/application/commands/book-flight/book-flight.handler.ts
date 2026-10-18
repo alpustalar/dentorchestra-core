@@ -1,5 +1,8 @@
 import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { Decimal } from 'decimal.js';
+import { Currency } from '@src/domain/value-objects/currency.vo';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { ITenantScopeResolver } from '@shared';
 import { DuffelFlightBookingModeSchema } from '@input-type-schemas/DuffelFlightBookingModeSchema';
 import { JsonValueType } from '@input-type-schemas/JsonValueSchema';
@@ -22,11 +25,12 @@ import {
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
+import { BookFlightResponse } from './book-flight.response';
 
 @CommandHandler(BookFlightCommand)
 export class BookFlightHandler implements ICommandHandler<
   BookFlightCommand,
-  string
+  BookFlightResponse
 > {
   constructor(
     @Inject(DUFFEL_API_SERVICE)
@@ -38,10 +42,11 @@ export class BookFlightHandler implements ICommandHandler<
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
     private readonly queryBus: TSQueryBus,
-    private readonly txManager: TransactionManager
+    private readonly txManager: TransactionManager,
+    private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
-  async execute(command: BookFlightCommand): Promise<string> {
+  async execute(command: BookFlightCommand): Promise<BookFlightResponse> {
     const { data, ctx } = command;
 
     this.policyFactory
@@ -50,7 +55,12 @@ export class BookFlightHandler implements ICommandHandler<
       .orThrow('health-tourism.flight');
 
     const { data: offer } = await this.queryBus.execute(
-      new GetFlightOfferQuery(data.optionId)
+      // Görüşme bağlamı yok (personel ucu): iddia klinik kapsamlı. `data.clinicId`
+      // bir satır yukarıda policy ile doğrulandı — teklif de o kliniğin olmalı.
+      new GetFlightOfferQuery(data.optionId, {
+        clinicId: data.clinicId,
+        conversationId: null,
+      })
     );
     if (!offer) throw new FlightOfferExpiredException();
 
@@ -63,28 +73,57 @@ export class BookFlightHandler implements ICommandHandler<
       contactPhone: data.contactPhone,
     });
 
-    const booking = DuffelFlightBooking.create({
-      duffelOrderId: order.orderId,
-      bookingReference: order.bookingReference,
-      offerId: offer.offerId,
-      mode: DuffelFlightBookingModeSchema.enum.INSTANT,
-      passengers: data.passengers as unknown as JsonValueType,
-      slices: offer.slices as unknown as JsonValueType,
-      totalAmount: offer.totalAmount,
-      currency: offer.currency,
-      holdExpiresAt: null,
-      organizationId,
-      clinicId: data.clinicId,
-      patientId: data.patientId,
-      leadId: data.leadId,
-      actorId: ctx.actor.userId,
-      logSource: ctx.actor.source,
-    });
+    // Buradan sonrası GERİ ALINAMAZ: instant siparişte bilet kesilmiş ve bakiyeden
+    // ödenmiştir. Yerel hata yalnız KAYDI düşürür; bilet havayolunda durur,
+    // tahsilat iade edilir ve kimse haberdar olmaz.
+    try {
+      const booking = DuffelFlightBooking.create({
+        duffelOrderId: order.orderId,
+        bookingReference: order.bookingReference,
+        offerId: offer.offerId,
+        mode: DuffelFlightBookingModeSchema.enum.INSTANT,
+        passengers: data.passengers as unknown as JsonValueType,
+        slices: offer.slices as unknown as JsonValueType,
+        // Teklifin değil SİPARİŞİN tutarı: `createInstantOrder` ödemeyi teklifi
+        // yeniden çekip gönderir, yani havayolu fiyatı değiştiyse ödenen tutar
+        // önbellekteki teklif tutarı DEĞİLDİR. Sipariş yanıtı doğru tutarı
+        // taşıyordu ama atılıyor, kayda bayat teklif yazılıyordu (kural 9).
+        totalAmount: new Decimal(order.totalAmount),
+        currency: Currency.create(order.currency).orThrow().value,
+        holdExpiresAt: null,
+        organizationId,
+        clinicId: data.clinicId,
+        patientId: data.patientId,
+        leadId: data.leadId,
+        actorId: ctx.actor.userId,
+        logSource: ctx.actor.source,
+      });
 
-    const saved = await this.txManager.run(async () =>
-      this.flightBookingRepo.create(booking)
-    );
+      const saved = await this.txManager.run(async () =>
+        this.flightBookingRepo.create(booking)
+      );
 
-    return saved.id.value;
+      return {
+        bookingId: saved.id.value,
+        supplierAmount: saved.totalAmount.toApiFormat(),
+        supplierCurrency: saved.totalAmount.currency,
+      };
+    } catch (err) {
+      this.criticalFailure.publish({
+        operation: 'health-tourism.flight.booking-record',
+        severity: 'CRITICAL',
+        summary:
+          'Uçuş siparişi açıldı/ödendi ama yerel kayıt yazılamadı — sipariş elle iptal edilmeli.',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        context: {
+          duffelOrderId: order.orderId,
+          bookingReference: order.bookingReference,
+          offerId: offer.offerId,
+        },
+        clinicId: data.clinicId,
+        dedupeKey: `flight-booking-record-failed:${order.orderId}`,
+      });
+      throw err;
+    }
   }
 }

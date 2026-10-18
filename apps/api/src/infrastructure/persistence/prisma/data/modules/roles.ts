@@ -89,6 +89,7 @@ const {
   BANKACCOUNT,
   BANKSTATEMENT,
   BANKSTATEMENTLINE,
+  PROVIDERSETTLEMENT,
   // Muhasebe
   ACCOUNT,
   ACCOUNTINGPERIOD,
@@ -122,6 +123,7 @@ const {
   AUDITLOG,
   STAFFNOTIFICATION,
   SUBSCRIPTION,
+  SUBSCRIPTIONCHARGE,
   PLAN,
   MODULE,
   // Sanal (kesitsel) alan
@@ -213,6 +215,9 @@ const TREASURY = [
   BANKACCOUNT,
   BANKSTATEMENT,
   BANKSTATEMENTLINE,
+  // Sağlayıcı hesap kapaması (108 → 102 + 653): kasa/banka mutabakatının
+  // parçası — kartla tahsil edilen paranın bankaya geçişini kaydeder.
+  PROVIDERSETTLEMENT,
 ];
 
 /** Çift taraflı muhasebe: hesap planı, dönem, yevmiye, finansal olay parkesi. */
@@ -347,7 +352,7 @@ export const rolesCreateManyInputs = [
       ...fullAccess(...HR),
       ...fullAccess(...PROJECT_MANAGEMENT),
       ...manage(ADMINREQUEST),
-      ...readOnly(AUDITLOG, SUBSCRIPTION, PLAN, MODULE),
+      ...readOnly(AUDITLOG, SUBSCRIPTION, SUBSCRIPTIONCHARGE, PLAN, MODULE),
       FINANCE.read,
       FINANCE.update,
     ]),

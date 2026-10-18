@@ -2,7 +2,9 @@ import { Inject, Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
 import { IGetContext } from '@common/decorators/get-context.decorator';
+import { CurrencyType } from '@input-type-schemas/CurrencySchema';
 import { PayHeldFlightCommand } from './pay-held-flight.command';
+import { PayHeldFlightResponse } from './pay-held-flight.response';
 import {
   DUFFEL_API_SERVICE,
   IDuffelApiService,
@@ -25,12 +27,17 @@ import {
  *   sorulur (para geçmiş olabilir).
  */
 type PaymentClaim =
-  | { kind: 'ALREADY_CONFIRMED' }
-  | { kind: 'FRESH' | 'RECLAIMED'; duffelOrderId: string; amount: string; currency: string };
+  | { kind: 'ALREADY_CONFIRMED'; amount: string; currency: CurrencyType }
+  | {
+      kind: 'FRESH' | 'RECLAIMED';
+      duffelOrderId: string;
+      amount: string;
+      currency: CurrencyType;
+    };
 
 @CommandHandler(PayHeldFlightCommand)
 export class PayHeldFlightHandler
-  implements ICommandHandler<PayHeldFlightCommand, string>
+  implements ICommandHandler<PayHeldFlightCommand, PayHeldFlightResponse>
 {
   private readonly logger = new Logger(PayHeldFlightHandler.name);
 
@@ -55,11 +62,22 @@ export class PayHeldFlightHandler
    * demek iki eşzamanlı isteğin ikisinin de commit sonrası HELD görüp Duffel'a
    * ödeme göndermesini engellemiyordu (aynı bilet iki kez ödenebiliyordu).
    */
-  async execute(command: PayHeldFlightCommand): Promise<string> {
+  async execute(
+    command: PayHeldFlightCommand
+  ): Promise<PayHeldFlightResponse> {
     const { bookingId, ctx } = command.payload;
 
+    // Sipariş tutarı her dalda dönülür: saga defteri tedarikçi borcu için bu
+    // tutardan yazar ve mükerrer çağrıda (ALREADY_CONFIRMED) de doğru tutarı
+    // görmek zorundadır — "zaten onaylı" dalında tutarı atlamak, ikinci
+    // bildirimde defteri teklif tutarına geri düşürürdü.
     const claim = await this.claim(bookingId);
-    if (claim.kind === 'ALREADY_CONFIRMED') return bookingId;
+    const settled: PayHeldFlightResponse = {
+      bookingId,
+      supplierAmount: claim.amount,
+      supplierCurrency: claim.currency,
+    };
+    if (claim.kind === 'ALREADY_CONFIRMED') return settled;
 
     // Devralınan (bayat) claim'de ödeme daha önce sağlayıcıya ulaşmış olabilir;
     // yerel durum makinesi tek başına idempotency sağlamaz, Duffel'a sorulur.
@@ -70,7 +88,7 @@ export class PayHeldFlightHandler
           `Yarıda kalmış ödeme sağlayıcıda tamamlanmış, tekrar ödenmiyor: ${bookingId}`
         );
         await this.markConfirmed(bookingId, ctx, state.bookingReference);
-        return bookingId;
+        return settled;
       }
     }
 
@@ -91,7 +109,7 @@ export class PayHeldFlightHandler
     }
 
     await this.markConfirmed(bookingId, ctx, null);
-    return bookingId;
+    return settled;
   }
 
   /** 1. adım — kilit altında sahiplenme. */
@@ -100,16 +118,20 @@ export class PayHeldFlightHandler
       const booking = await this.flightBookingRepo.findByIdForUpdate(bookingId);
       if (!booking) throw new FlightBookingNotFoundException(bookingId);
 
-      // Zaten onaylanmışsa bu mükerrer bir çağrıdır; Duffel'a ikinci ödeme gitmez.
-      if (booking.validate.status.isConfirmed.value) {
-        return { kind: 'ALREADY_CONFIRMED' as const };
-      }
-
       const claimed = {
         duffelOrderId: booking.duffelOrderId,
-        amount: booking.totalAmount.value.toFixed(2),
+        amount: booking.totalAmount.toApiFormat(),
         currency: booking.totalAmount.currency,
       };
+
+      // Zaten onaylanmışsa bu mükerrer bir çağrıdır; Duffel'a ikinci ödeme gitmez.
+      if (booking.validate.status.isConfirmed.value) {
+        return {
+          kind: 'ALREADY_CONFIRMED' as const,
+          amount: claimed.amount,
+          currency: claimed.currency,
+        };
+      }
 
       if (booking.validate.status.isPaymentInProgress.value) {
         // Canlı bir deneme sürüyorsa ikinci istek beklemeye alınmaz, reddedilir.

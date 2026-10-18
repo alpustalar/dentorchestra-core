@@ -19,7 +19,10 @@ import {
 } from '@modules/identity/user/domain/exceptions/user.exceptions';
 import { UserCapabilityRevokedEvent } from '@modules/identity/user/domain/events/user-capability-changed.event';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
-import { ContextService } from '@src/infrastructure/context/context.service';
+import {
+  CONTEXT_SERVICE,
+  IContextService,
+} from '@src/infrastructure/context/context.service.interface';
 import { USER_EVENTS } from '@src/domain/constants/events';
 
 /**
@@ -33,9 +36,10 @@ import { USER_EVENTS } from '@src/domain/constants/events';
  * Rolden gelen yetkiler buradan kaldırılamaz — kişisel kayıt yoksa 404 döner.
  */
 @CommandHandler(RevokeUserCapabilityCommand)
-export class RevokeUserCapabilityHandler
-  implements ICommandHandler<RevokeUserCapabilityCommand, void>
-{
+export class RevokeUserCapabilityHandler implements ICommandHandler<
+  RevokeUserCapabilityCommand,
+  void
+> {
   constructor(
     @Inject(USER_COMMAND_REPOSITORY)
     private readonly userRepo: IUserCommandRepository,
@@ -43,7 +47,8 @@ export class RevokeUserCapabilityHandler
     private readonly capabilityRepo: IUserCapabilityCommandRepository,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
-    private readonly contextService: ContextService,
+    @Inject(CONTEXT_SERVICE)
+    private readonly contextService: IContextService,
     private readonly txManager: TransactionManager
   ) {}
 

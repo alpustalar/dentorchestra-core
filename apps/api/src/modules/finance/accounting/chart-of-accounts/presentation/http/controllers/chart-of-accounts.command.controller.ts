@@ -17,19 +17,20 @@ const { ACCOUNT } = CAPABILITIES;
 export class ChartOfAccountsCommandController {
   constructor(private readonly commandBus: TSCommandBus) {}
 
+  /**
+   * `organizationId` uçtan alınmaz: kiracı kimliği istemciden gelmez,
+   * `TENANT_SCOPE_RESOLVER` her zaman `clinicId`'den çözer. Komut payload'ındaki
+   * alan yalnız **iç** çağrılar için duruyor (kayıt akışı, platform kiracısı) ve
+   * orada da doğrulamadan geçiyor.
+   */
   @HasCapability(ACCOUNT.create)
   @Post('initialize')
   initialize(
     @GetContext() ctx: IGetContext,
-    @Query('clinicId', ParseUUIDPipe) clinicId: string,
-    @Query('organizationId', ParseUUIDPipe) organizationId?: string | null
+    @Query('clinicId', ParseUUIDPipe) clinicId: string
   ) {
     return this.commandBus.execute(
-      new InitializeChartOfAccountsCommand({
-        clinicId,
-        organizationId,
-        ctx,
-      })
+      new InitializeChartOfAccountsCommand({ clinicId, ctx })
     );
   }
 }

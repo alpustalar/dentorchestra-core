@@ -39,4 +39,11 @@ export interface InvoiceView {
   currency: CurrencyType;
   issuedAt: Date | null;
   status: InvoiceStatusType;
+  /**
+   * İptal izi. `status = CANCELLED` "bu belge hükümsüz" der ama operatörün
+   * sorduğu soru "ne zaman ve neden" — iz yalnız audit log'da kalırsa ekranda
+   * görünmez. İptal edilmemiş faturada üçü de null.
+   */
+  cancelledAt: Date | null;
+  cancelReason: string | null;
 }

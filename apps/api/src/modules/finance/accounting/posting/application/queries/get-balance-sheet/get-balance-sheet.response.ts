@@ -14,8 +14,8 @@ export interface BalanceSheetReportSection {
 /** Bilanço — Aktif (1+2) = Pasif (3+4) + Öz Kaynaklar (5) + Dönem Sonucu. */
 export interface BalanceSheetReport {
   clinicId: string;
-  dateFrom: Date | null;
-  dateTo: Date | null;
+  /** Fotoğrafın çekildiği an (gün sonuna genişletilmiş). Verilmezse tüm defter. */
+  asOf: Date | null;
 
   currentAssets: BalanceSheetReportSection; // dönen varlıklar (1)
   nonCurrentAssets: BalanceSheetReportSection; // duran varlıklar (2)

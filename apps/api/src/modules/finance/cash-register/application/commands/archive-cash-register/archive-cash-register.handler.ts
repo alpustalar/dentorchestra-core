@@ -14,9 +14,10 @@ import {
 } from '@modules/finance/cash-register/domain/repositories/cash-register/cash-register.command.repository';
 
 @CommandHandler(ArchiveCashRegisterCommand)
-export class ArchiveCashRegisterHandler
-  implements ICommandHandler<ArchiveCashRegisterCommand, void>
-{
+export class ArchiveCashRegisterHandler implements ICommandHandler<
+  ArchiveCashRegisterCommand,
+  void
+> {
   constructor(
     @Inject(CASH_REGISTER_COMMAND_REPOSITORY)
     private readonly cashRegisterRepo: ICashRegisterCommandRepository,

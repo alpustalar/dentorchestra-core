@@ -83,7 +83,12 @@ describe('SearchFlightsTool', () => {
 
     expect(result.content).not.toContain('off_SECRET_DUFFEL_ID');
     const parsed = JSON.parse(result.content);
-    expect(parsed.options[0].optionId).toMatch(/^fl_[0-9a-f]{8}$/);
+    // Tam UUID: 8 hex'e kısaltılmış bir optionId aynı pencerede yaşayan başka bir
+    // teklifle çarpışıp onun ÜZERİNE yazılabiliyordu (hasta gördüğü uçuşu öder,
+    // sistem başka teklifi kullanır).
+    expect(parsed.options[0].optionId).toMatch(
+      /^fl_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+    );
     expect(parsed.options[0]).not.toHaveProperty('offerId');
   });
 
@@ -310,8 +315,16 @@ describe('CancelFlightBookingTool — sahiplik', () => {
     expect(commandBus.execute).not.toHaveBeenCalled();
   });
 
-  it('kendi rezervasyonu iptal edilir ve iade tetiklenir', async () => {
-    const commandBus = { execute: jest.fn() } as unknown as TSCommandBus;
+  it('kendi rezervasyonu iptal edilir ve iptal ekonomisi iadeye TAŞINIR', async () => {
+    // İptal komutunun döndürdüğü `retained` (havayolunun alıkoyduğu tutar)
+    // iade komutuna geçmek zorunda: geçmezse platform defteri cezasız ters
+    // kayıt yazar ve zarar hiç tanınmaz (§67).
+    const commandBus = {
+      execute: jest.fn().mockResolvedValue({
+        orderId: 'ord_1',
+        retained: { amount: '30.00', currency: 'EUR' },
+      }),
+    } as unknown as TSCommandBus;
     const support = buildSupport();
     (support.loadOwnedFlightBookings as jest.Mock).mockResolvedValue([
       { id: 'bk-1' },
@@ -325,6 +338,9 @@ describe('CancelFlightBookingTool — sahiplik', () => {
       .find((c) => c instanceof CancelFlightBookingCommand);
 
     expect(cancelCmd).toBeDefined();
-    expect(support.refundForCancelledBooking).toHaveBeenCalledWith('bk-1');
+    expect(support.refundForCancelledBooking).toHaveBeenCalledWith({
+      bookingId: 'bk-1',
+      retained: { amount: '30.00', currency: 'EUR' },
+    });
   });
 });

@@ -130,7 +130,10 @@ export class PosDevice extends AggregateRoot {
    */
   public assertBelongsToClinic(clinicId: string): void {
     if (this._clinicId.value !== clinicId) {
-      throw new PosDeviceClinicMismatchException(this._clinicId.value, clinicId);
+      throw new PosDeviceClinicMismatchException(
+        this._clinicId.value,
+        clinicId
+      );
     }
   }
 

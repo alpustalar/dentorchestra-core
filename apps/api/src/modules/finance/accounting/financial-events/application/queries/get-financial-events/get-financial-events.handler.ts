@@ -15,11 +15,13 @@ import {
   ITenantScopeResolver,
   TENANT_SCOPE_RESOLVER,
 } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
+import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetFinancialEventsQuery)
-export class GetFinancialEventsHandler
-  implements IQueryHandler<GetFinancialEventsQuery, GetFinancialEventsResponse>
-{
+export class GetFinancialEventsHandler implements IQueryHandler<
+  GetFinancialEventsQuery,
+  GetFinancialEventsResponse
+> {
   constructor(
     @Inject(FINANCIAL_EVENT_QUERY_REPOSITORY)
     private readonly financialEventRepo: IFinancialEventQueryRepository,
@@ -34,24 +36,26 @@ export class GetFinancialEventsHandler
   ): Promise<GetFinancialEventsResponse> {
     const { pagination, type, sourceModule, sourceRefId, clinicId, ctx } =
       query.payload;
-    // `clinicId` sorgu dizesinden geliyor — aktörün kendi kliniği DEĞİL. Kontrol
-    // yokken bu yetkiye sahip herhangi bir personel başka bir organizasyonun
-    // finansal olaylarını okuyabiliyordu; `getOrganizationSerializationOptions`
-    // yalnız ALAN maskeler, SATIR erişimini kısıtlamaz.
+
+    // `clinicId` sorgu dizesinden geliyor — aktörün kendi kliniği DEĞİL.
     const { evaluator, policy } = this.policyFactory.finance(
       ctx.actor,
       ctx.source
     );
     evaluator
       .check((p) => p.canAccessClinicFinances(clinicId))
-      .orThrow('accounting.financial-events.list');
+      .orThrow(ACCOUNTING_EVENTS.FINANCIAL_EVENTS);
 
     const organizationId = await this.tenantScopeResolver.resolve(
       query.payload
     );
 
+    // Yetki klinik seviyesinde verildi → satırlar da klinik seviyesinde gelir.
+    // Yalnız `organizationId` ile filtrelemek, tek şubeye erişimi olan personele
+    // organizasyondaki tüm şubelerin finansal olay defterini açıyordu;
+    // serileştirme yalnız ALAN maskeler, SATIR erişimini kısıtlamaz.
     const { items, total } = await this.financialEventRepo.findMany(
-      { organizationId, type, sourceModule, sourceRefId },
+      { clinicId, organizationId, type, sourceModule, sourceRefId },
       pagination
     );
 
@@ -59,9 +63,7 @@ export class GetFinancialEventsHandler
       data: items,
       meta: {
         pagination: buildPaginationMeta(pagination, total),
-        serializationOptions: policy.getOrganizationSerializationOptions({
-          organizationId,
-        }),
+        serializationOptions: policy.getSerializationOptions({ clinicId }),
       },
     };
   }

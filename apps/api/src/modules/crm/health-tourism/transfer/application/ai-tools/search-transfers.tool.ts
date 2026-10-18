@@ -16,6 +16,7 @@ import { SearchTransferAvailabilityQuery } from '@modules/crm/health-tourism/tra
 import { SearchTransferAvailabilityDto } from '@shared/modules/health-tourism/dto/queries';
 import { CacheTransferRateOptionCommand } from '@modules/crm/health-tourism/transfer/application/commands/cache-transfer-rate-option/cache-transfer-rate-option.command';
 import { TransferRateOptionToken } from '@modules/crm/health-tourism/transfer/domain/contracts/hotelbeds-transfer-booking';
+import { QuoteOptionOwner } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.contracts';
 
 const SearchTransfersInputSchema = z.object({
   direction: z.enum(['ARRIVAL', 'DEPARTURE']).optional(),
@@ -138,6 +139,13 @@ export class SearchTransfersTool implements IAiSubToolHandler {
       return { content: 'Verilen tarih/saat için uygun transfer bulunamadı.' };
     }
 
+    // Teklifin sahibi: bu kiracı + bu görüşme. Okuma anında doğrulanır
+    // (`QuoteOptionOwnershipService`) — önbellek anahtarı yetki değildir.
+    const owner: QuoteOptionOwner = {
+      clinicId: context.clinicId,
+      conversationId: context.conversationId,
+    };
+
     const options: Array<{
       optionId: string;
       vehicle: string;
@@ -146,8 +154,10 @@ export class SearchTransfersTool implements IAiSubToolHandler {
       currency: string;
     }> = [];
     for (const item of top) {
-      const optionId = `tr_${randomUUID().slice(0, 8)}`;
+      // Kısaltma YOK — gerekçe `search_hotels` ile aynı (çarpışma üzerine yazar).
+      const optionId = `tr_${randomUUID()}`;
       const token: TransferRateOptionToken = {
+        owner,
         rateKey: item.rateKey,
         direction,
         vehicleName: item.vehicle.name,

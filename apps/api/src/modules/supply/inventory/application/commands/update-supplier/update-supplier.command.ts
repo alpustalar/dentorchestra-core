@@ -7,6 +7,6 @@ export class UpdateSupplierCommand implements ICommand {
   constructor(
     public readonly supplierId: string,
     public readonly dto: UpdateSupplierDto,
-    public readonly ctx: IGetContext,
+    public readonly ctx: IGetContext
   ) {}
 }

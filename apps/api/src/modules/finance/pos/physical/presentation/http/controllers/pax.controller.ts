@@ -19,7 +19,7 @@ import { HasCapability } from '@common/decorators';
 import { CAPABILITIES } from '@src/infrastructure/persistence/prisma/data/modules';
 
 const { POSDEVICE, POSTRANSACTION } = CAPABILITIES;
-@Controller('pos/pax')
+@Controller('pax')
 @UseGuards(AuthGuard, CapabilityGuard)
 export class PaxController {
   constructor(private readonly commandBus: TSCommandBus) {}

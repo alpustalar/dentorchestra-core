@@ -2,13 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { FinancialEvent, FinancialEventTypeSchema } from '@shared';
 import { ACCOUNTING_RULES } from '@modules/finance/shared/domain/constants/accounting-rules.constant';
-import {
-  DraftJournalEntry,
-  PostingContext,
-  PostingRule,
-} from '../posting-rule.interface';
+import { DraftJournalEntry, PostingRule } from '../posting-rule.interface';
 import { PlatformBookingSettledEventPayload } from '../event-payloads';
-import { PlatformBookingAmountsMismatchException } from '../../exceptions/posting.exceptions';
+import {
+  PlatformBookingAmountsMismatchException,
+  PlatformBookingBelowCostException,
+} from '../../exceptions/posting.exceptions';
 
 /** Komisyon geliri — Yurtdışı Satışlar (Sağlık Turizmi). */
 const COMMISSION_REVENUE_601 = '601';
@@ -39,7 +38,7 @@ const SUPPLIERS_320 = '320';
 export class PlatformBookingSettledRule implements PostingRule {
   readonly eventType = FinancialEventTypeSchema.enum.PLATFORM_BOOKING_SETTLED;
 
-  build(event: FinancialEvent, _ctx: PostingContext): DraftJournalEntry {
+  build(event: FinancialEvent): DraftJournalEntry {
     const payload =
       event.payload as unknown as PlatformBookingSettledEventPayload;
 
@@ -52,6 +51,19 @@ export class PlatformBookingSettledRule implements PostingRule {
     // olayı postlanmamış bırakıp sesli hata vermek yeğdir.
     if (!commission.plus(supplier).equals(sale)) {
       throw new PlatformBookingAmountsMismatchException({
+        saleAmount: payload.saleAmount,
+        supplierAmount: payload.supplierAmount,
+        commission: payload.commission,
+      });
+    }
+
+    // Negatif komisyon denklemi BOZMAZ (sale − supplier her zaman denk gelir),
+    // bu yüzden üstteki kontrol onu yakalamaz: 601'e negatif alacak yazılır ve
+    // hasılat ters işaretle görünür. Maliyetin altında satış istisnai bir
+    // olaydır ve zararın hangi hesapta tanınacağı muhasebe kararıdır → fiş
+    // yazılmaz, olay postlanmamış kalır.
+    if (commission.isNegative()) {
+      throw new PlatformBookingBelowCostException({
         saleAmount: payload.saleAmount,
         supplierAmount: payload.supplierAmount,
         commission: payload.commission,
@@ -77,9 +89,24 @@ export class PlatformBookingSettledRule implements PostingRule {
           desc: 'Platform komisyon geliri',
         },
         {
+          // 320 `requiresParty` taşır: cari olmadan fiş reddedilir ve tahsilat
+          // defteri HİÇ yazılmaz (satır kuralı posting handler'da zorlanıyor,
+          // bu yüzden kuralın birim testi yeşil kalıyordu).
           accountCode: SUPPLIERS_320,
+          partyId: payload.supplierPartyId,
           credit: supplier.toFixed(2),
           desc: 'Tedarikçiye borç (rezervasyon)',
+          // Para TRY girdi (iyzico) ama borç sağlayıcıya **kendi cinsinden**
+          // doğdu: orijinal tutar + kilitli kur satıra iliştirilir, yoksa
+          // tedarikçi mutabakatı EUR cinsinden yapılamaz. Gövde temeli
+          // eksiksiz gelir ya hiç gelmez (yazma-anı şeması zorluyor).
+          ...(payload.originalCurrency
+            ? {
+                originalCredit: payload.supplierOriginalAmount,
+                originalCurrency: payload.originalCurrency,
+                fxRate: payload.fxRate,
+              }
+            : {}),
         },
       ],
     };

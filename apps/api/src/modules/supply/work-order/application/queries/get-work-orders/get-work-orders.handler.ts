@@ -13,9 +13,10 @@ import {
 } from '@modules/supply/work-order/domain/repositories/external-work/external-work.query.repository';
 
 @QueryHandler(GetWorkOrdersQuery)
-export class GetWorkOrdersHandler
-  implements IQueryHandler<GetWorkOrdersQuery, GetWorkOrdersResponse>
-{
+export class GetWorkOrdersHandler implements IQueryHandler<
+  GetWorkOrdersQuery,
+  GetWorkOrdersResponse
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_QUERY_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderQueryRepository,
@@ -50,7 +51,9 @@ export class GetWorkOrdersHandler
       data: result.items,
       meta: {
         pagination: buildPaginationMeta(pagination, result.total),
-        serializationOptions: policy.getSerializationOptions({ clinicId: clinicId }),
+        serializationOptions: policy.getSerializationOptions({
+          clinicId: clinicId,
+        }),
       },
     };
   }

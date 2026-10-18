@@ -102,33 +102,4 @@ export class PaymentCommandRepository
     entity.flushEvents();
     return entity;
   }
-
-  async updateMany(entities: Payment[]): Promise<void> {
-    const allOps = entities.flatMap((entity) => {
-      const data = entity.toPersistence();
-      const paymentOp = this.db.payment.upsert({
-        where: { id: data.id },
-        create: data,
-        update: data,
-      });
-      const installmentOps = [...entity.dirtyInstallmentIds].map(
-        (installmentId) => {
-          const inst = entity.installments.find((i) => i.id === installmentId)!;
-          return this.db.paymentInstallment.update({
-            where: { id: installmentId },
-            data: { status: inst.status, paidAt: inst.paidAt },
-          });
-        }
-      );
-      return [paymentOp, ...installmentOps];
-    });
-
-    if (txStorage.getStore()?.tx) {
-      await Promise.all(allOps);
-    } else {
-      await this.prisma.$transaction(allOps);
-    }
-
-    entities.forEach((e) => e.flushEvents());
-  }
 }

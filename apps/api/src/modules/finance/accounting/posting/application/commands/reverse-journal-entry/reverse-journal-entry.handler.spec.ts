@@ -8,6 +8,7 @@ import { IJournalCommandRepository } from '@modules/finance/accounting/posting/d
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { AccountingPeriodStatusSchema } from '@shared';
+import { IJournalEntryNumberingService } from '@modules/finance/accounting/periods/domain/services/entry-numbering/journal-entry-numbering.service.interface';
 
 describe('ReverseJournalEntryHandler (storno, doc 04/08)', () => {
   // createDraft yalnız `id`'yi UUID doğrular (clinicId/organizationId/periodId/accountId ham kalır).
@@ -52,11 +53,16 @@ describe('ReverseJournalEntryHandler (storno, doc 04/08)', () => {
     const journalCommandRepo = {
       // Storno okuması kilitli: handler orijinali Command Repo'dan çeker.
       findByIdForUpdate: jest.fn().mockResolvedValue(params.original),
-      nextEntryNo: jest.fn().mockResolvedValue(107n),
       create: jest.fn(async (entry: JournalEntry) => entry),
       update: jest.fn(async (entry: JournalEntry) => entry),
       applyReversal: jest.fn().mockResolvedValue(undefined),
     } as unknown as IJournalCommandRepository;
+
+    // Numara artık dönem satırındaki sayaçtan, kilit altında tahsis edilir.
+    const entryNumbering = {
+      lockAndAllocateEntryNo: jest.fn().mockResolvedValue(107n),
+      lockAndAllocateClosingEntryNo: jest.fn(),
+    } as unknown as IJournalEntryNumberingService;
 
     const queryBus = {
       execute: jest.fn().mockResolvedValue({ data: period }),
@@ -76,11 +82,13 @@ describe('ReverseJournalEntryHandler (storno, doc 04/08)', () => {
     return {
       handler: new ReverseJournalEntryHandler(
         journalCommandRepo,
+        entryNumbering,
         queryBus,
         txManager,
         policyFactory
       ),
       journalCommandRepo,
+      entryNumbering,
     };
   };
 
@@ -123,6 +131,17 @@ describe('ReverseJournalEntryHandler (storno, doc 04/08)', () => {
 
     await expect(run(handler)).rejects.toBeInstanceOf(PeriodNotOpenForPostingException);
     expect(journalCommandRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('yevmiye numarası dönem sayacından tahsis edilir (MAX+1 değil)', async () => {
+    const original = buildPostedOriginal();
+    const { handler, entryNumbering } = build({ original });
+
+    await run(handler);
+
+    expect(entryNumbering.lockAndAllocateEntryNo).toHaveBeenCalledWith(
+      'period-2026'
+    );
   });
 
   it('POSTED olmayan fiş storno edilemez', async () => {

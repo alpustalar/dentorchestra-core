@@ -59,6 +59,24 @@ export abstract class BaseRepository {
   }
 
   /**
+   * Satırı olmayan bir **kavram** üzerinde kilit tutar (Postgres danışma kilidi).
+   *
+   * Bazı değişmezler tek bir satıra bağlı değildir: "108 Diğer Hazır Değerler'in
+   * bakiyesi" on binlerce fiş satırının toplamıdır — `FOR UPDATE` ile kilitlenecek
+   * bir satırı yoktur (hepsini kilitlemek fiş yazan her akışı bloklardı). Danışma
+   * kilidi bu durumda doğru primitiftir: anahtar bir **isimdir**, kilit transaction
+   * sonunda kendiliğinden bırakılır (`pg_advisory_xact_lock`) ve hiçbir satırı
+   * bloklamaz — yalnız aynı anahtarı isteyen diğer akışı serileştirir.
+   *
+   * Anahtar çağıranın sabitidir (kullanıcı girdisi değil). `hashtext` çakışması
+   * yalnız gereksiz serileştirme üretir, yanlış sonuç üretmez.
+   */
+  protected async lockConcept(key: string): Promise<void> {
+    this.assertInTransaction(`lockConcept("${key}")`);
+    await this.db.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+  }
+
+  /**
    * Çapa (anchor) kilitleri için katı varyant: kilitlenen satır **okunmadığı** için
    * yokluğu başka hiçbir yerde fark edilmez; burada patlamazsa işlem eşzamanlılık
    * koruması olmadan devam eder.

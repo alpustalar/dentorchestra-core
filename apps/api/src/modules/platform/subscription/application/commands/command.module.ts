@@ -16,6 +16,9 @@ import { BILLING_ADAPTER } from '@modules/platform/subscription/infrastructure/a
 import { IyzicoBillingAdapter } from '@modules/platform/subscription/infrastructure/adapters/iyzico-billing.adapter';
 import { PrismaModule } from '@src/infrastructure/persistence/prisma/prisma.module';
 import { PosModule } from '@modules/finance/pos/pos.module';
+// IyzicoBillingAdapter IYZICO_PROVIDER token'ını istiyor; PosModule bu token'ı
+// dışa açmıyor, sağlayan modül doğrudan import edilir.
+import { IyzicoModule } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/iyzico.module';
 import { SubscriptionInfrastructureModule } from '@modules/platform/subscription/infrastructure/infrastructure.module';
 
 const CommandHandlers = [
@@ -35,7 +38,12 @@ const CommandHandlers = [
 ];
 
 @Module({
-  imports: [PosModule, SubscriptionInfrastructureModule, PrismaModule],
+  imports: [
+    PosModule,
+    IyzicoModule,
+    SubscriptionInfrastructureModule,
+    PrismaModule,
+  ],
   providers: [
     ...CommandHandlers,
     { provide: BILLING_ADAPTER, useClass: IyzicoBillingAdapter },

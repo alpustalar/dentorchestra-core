@@ -22,9 +22,10 @@ import { TREATMENT_CHARGE_EVENTS } from '@src/domain/constants/events';
  * "bu işlem neden faturaya girmedi" sorusunun cevabı kaybolmasın diye.
  */
 @CommandHandler(VoidTreatmentChargeCommand)
-export class VoidTreatmentChargeHandler
-  implements ICommandHandler<VoidTreatmentChargeCommand, void>
-{
+export class VoidTreatmentChargeHandler implements ICommandHandler<
+  VoidTreatmentChargeCommand,
+  void
+> {
   constructor(
     @Inject(TREATMENT_CHARGE_COMMAND_REPOSITORY)
     private readonly chargeRepo: ITreatmentChargeCommandRepository,
@@ -58,7 +59,11 @@ export class VoidTreatmentChargeHandler
         charge.appointmentId.value
       );
 
-      charge.void({ reason: data.reason });
+      charge.void({
+        reason: data.reason,
+        actorId: ctx.actor.userId,
+        logSource: ctx.actor.source,
+      });
 
       await this.chargeRepo.update(charge);
     });

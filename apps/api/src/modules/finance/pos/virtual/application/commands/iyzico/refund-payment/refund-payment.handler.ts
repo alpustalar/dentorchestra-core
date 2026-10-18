@@ -28,12 +28,17 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
+import { EnsurePartyForPatientCommand } from '@modules/finance/party/application/commands/ensure-party-for-patient/ensure-party-for-patient.command';
+import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
+import { FinancialEventTypeSchema, PartyRoleSchema } from '@shared';
+import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
+import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 
 @CommandHandler(RefundPaymentCommand)
-export class RefundPaymentHandler
-  implements
-    ICommandHandler<RefundPaymentCommand, RefundPaymentCommandResponse>
-{
+export class RefundPaymentHandler implements ICommandHandler<
+  RefundPaymentCommand,
+  RefundPaymentCommandResponse
+> {
   constructor(
     @Inject(IYZICO_PROVIDER)
     private readonly iyzicoProvider: IIyzicoProvider,
@@ -128,8 +133,75 @@ export class RefundPaymentHandler
 
       // PaymentRefundedEvent burada YAYINLANMAZ: yukarıdaki
       // MarkInstallmentAsRefundedCommand → Payment.refundInstallment() zaten
-      // raise ediyor. İkinci kez yayınlamak muhasebe ters kaydını
+      // raise ediyor. İkinci kez yayınlamak CARİ defter ters kaydını
       // (RefundLedgerEntriesCommand) iki kez tetikliyordu.
+      //
+      // Çift taraflı defter ayrı bir yoldur: yukarıdaki olay cari defteri
+      // (finance-ledger) düzeltir, yevmiye için ekonomik olay YAZILMALIDIR.
+      // Bu satır eklenene kadar iade yevmiyeye hiç ulaşmıyordu: 108'de hiç
+      // gelmeyecek para, 120'de kapanmış görünen bir borç kalıyordu.
+      await this.recordPaymentRefunded({
+        patientId: payment.patientId,
+        clinicId: payment.clinicId,
+        installmentId: completedInstallment.id,
+        paymentId,
+        amount: completedInstallment.amount.toString(),
+      });
     });
   }
+
+  /**
+   * İadeyi çift taraflı deftere köprüler: hastanın carisini garanti eder ve
+   * `PAYMENT_REFUNDED` ekonomik olayını yazar (120 / 108).
+   *
+   * Hata YUTULMAZ — tahsilat köprüsüyle (bkz. `handle-payment-callback`) aynı
+   * tercih: aynı `outboxRun` içindeyiz, köprü patlarsa iade işaretlemesi de geri
+   * sarılır ve yerel durum ile defter **birlikte** eski hâlinde kalır. Yarısını
+   * yazıp diğerini alarmla bırakmak, iade edilmiş bir taksitin defterde hâlâ
+   * tahsilat görünmesi demekti — bu turun kapattığı hatanın aynısı.
+   */
+  private async recordPaymentRefunded(
+    input: RecordPaymentRefundedInput
+  ): Promise<void> {
+    const ctx = ExecutionContextFactory.createInternal();
+
+    const { partyId } = await this.commandBus.execute(
+      new EnsurePartyForPatientCommand(
+        input.patientId,
+        input.clinicId,
+        PartyRoleSchema.enum.CUSTOMER,
+        ctx
+      )
+    );
+
+    await this.commandBus.execute(
+      new RecordFinancialEventCommand(
+        {
+          clinicId: input.clinicId,
+          type: FinancialEventTypeSchema.enum.PAYMENT_REFUNDED,
+          payload: {
+            // Sanal POS iadesi her zaman karttan geri gider → 108.
+            method: 'POS_CARD',
+            amount: input.amount,
+            partyId,
+            reference: input.installmentId,
+          },
+          sourceModule: FINANCIAL_EVENT_SOURCE_MODULES.PAYMENT,
+          sourceRefId: input.paymentId,
+          dedupeKey: FinancialEventDedupeKeys.payment_refunded(
+            input.installmentId
+          ),
+        },
+        ctx
+      )
+    );
+  }
+}
+
+interface RecordPaymentRefundedInput {
+  patientId: string;
+  clinicId: string;
+  installmentId: string;
+  paymentId: string;
+  amount: string;
 }

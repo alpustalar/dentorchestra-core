@@ -35,13 +35,10 @@ import { AutoMatchStatementLinesResponse } from './auto-match-statement-lines.re
  * (102 zaten payment/kasa köprüsünden besleniyor; postlamak mükerrer olurdu).
  */
 @CommandHandler(AutoMatchStatementLinesCommand)
-export class AutoMatchStatementLinesHandler
-  implements
-    ICommandHandler<
-      AutoMatchStatementLinesCommand,
-      AutoMatchStatementLinesResponse
-    >
-{
+export class AutoMatchStatementLinesHandler implements ICommandHandler<
+  AutoMatchStatementLinesCommand,
+  AutoMatchStatementLinesResponse
+> {
   private readonly logger = new Logger(AutoMatchStatementLinesHandler.name);
 
   constructor(

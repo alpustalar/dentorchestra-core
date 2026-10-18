@@ -14,9 +14,10 @@ import {
 import { WORK_ORDER_EVENTS } from '@src/domain/constants/events';
 
 @CommandHandler(CancelWorkOrderCommand)
-export class CancelWorkOrderHandler
-  implements ICommandHandler<CancelWorkOrderCommand, void>
-{
+export class CancelWorkOrderHandler implements ICommandHandler<
+  CancelWorkOrderCommand,
+  void
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_COMMAND_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderCommandRepository,

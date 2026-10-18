@@ -7,7 +7,6 @@ import {
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
-import { randomUUID } from 'crypto';
 import { CreatePurchaseRequestProps } from '@modules/supply/purchasing/domain/contracts';
 import {
   PurchaseRequestEmptyItemsException,
@@ -120,7 +119,7 @@ export class PurchaseRequest extends AggregateRoot {
     const requestId = UUID.createOrGenerate(props.id).value;
 
     const lines: PurchaseRequestLine[] = props.items.map((item) => ({
-      id: randomUUID(),
+      id: UUID.generate().value,
       productId: item.productId ?? null,
       description: item.description,
       quantity: new Decimal(item.quantity),
@@ -137,7 +136,12 @@ export class PurchaseRequest extends AggregateRoot {
         id: requestId,
         clinicId: UUID.create(props.clinicId).orThrow().value,
         organizationId: UUID.create(props.organizationId).orThrow().value,
-        requestedById: UUID.create(props.requestedById).orThrow().value,
+        // Talep sahibi **ham string**: `ctx.actor.userId` bir Firebase UID'dir
+        // (`User.id = firebaseUid`), UUID değil. UUID VO'sundan geçirildiği
+        // sürece gerçek personelin açtığı her talep `InvalidUuidException` ile
+        // reddediliyordu — talep akışı hiç çalışmıyordu. Kardeş alan
+        // `reviewedById` zaten ham string tutuluyor.
+        requestedById: props.requestedById,
         status: PurchaseRequestStatusSchema.enum.SUBMITTED,
         neededBy: props.neededBy ?? null,
         note: props.note ?? null,

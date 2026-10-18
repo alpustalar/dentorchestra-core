@@ -14,11 +14,13 @@ import { META_ADS_EVENTS } from '@src/domain/constants/events';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetAdAttributedLeadsQuery } from '@modules/crm/lead/application/queries/get-ad-attributed-leads/get-ad-attributed-leads.query';
 import { GetRevenueByPatientsQuery } from '@modules/finance/finance-ledger/application/queries/get-revenue-by-patients/get-revenue-by-patients.query';
+import { GetClinicCurrencyQuery } from '@modules/organization/clinic/application/queries/get-clinic-currency/get-clinic-currency.query';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import {
   RoiCampaignBreakdown,
   RoiPeriodTotals,
 } from '@shared/modules/meta-ads/interfaces';
+import type { CurrencyType } from '@input-type-schemas/CurrencySchema';
 
 interface CampaignAgg {
   campaignName: string;
@@ -33,10 +35,20 @@ interface PeriodResult {
   campaigns: RoiCampaignBreakdown[];
 }
 
+interface ComputePeriodInput {
+  clinicId: string;
+  from: Date;
+  to: Date;
+  campaignId?: string;
+  /** ROAS'ın hesaplandığı para birimi (kliniğin fonksiyonel parası). */
+  referenceCurrency: CurrencyType;
+}
+
 @QueryHandler(GetAgencyRoiReportQuery)
-export class GetAgencyRoiReportHandler
-  implements IQueryHandler<GetAgencyRoiReportQuery, GetAgencyRoiReportResponse>
-{
+export class GetAgencyRoiReportHandler implements IQueryHandler<
+  GetAgencyRoiReportQuery,
+  GetAgencyRoiReportResponse
+> {
   constructor(
     @Inject(META_CAMPAIGN_METRIC_QUERY_REPOSITORY)
     private readonly metaCampaignMetricRepo: IMetaCampaignMetricQueryRepository,
@@ -67,9 +79,28 @@ export class GetAgencyRoiReportHandler
     const prevTo = from;
     const prevFrom = DateTimeManager.addMinutes(from, -spanMinutes);
 
+    // Gelir para birimi başına geliyor; ROAS tek para biriminde anlamlı.
+    // Referans, kliniğin fonksiyonel para birimidir (Model A, doc 07) — diğer
+    // para birimleri rapora kur UYDURULARAK karıştırılmaz, ayrıca bildirilir.
+    const { data: referenceCurrency } = await this.queryBus.execute(
+      new GetClinicCurrencyQuery(clinicId)
+    );
+
     const [current, previous] = await Promise.all([
-      this.computePeriod(clinicId, from, to, campaignId),
-      this.computePeriod(clinicId, prevFrom, prevTo, campaignId),
+      this.computePeriod({
+        clinicId,
+        from,
+        to,
+        campaignId,
+        referenceCurrency,
+      }),
+      this.computePeriod({
+        clinicId,
+        from: prevFrom,
+        to: prevTo,
+        campaignId,
+        referenceCurrency,
+      }),
     ]);
 
     return {
@@ -93,12 +124,13 @@ export class GetAgencyRoiReportHandler
     };
   }
 
-  private async computePeriod(
-    clinicId: string,
-    from: Date,
-    to: Date,
-    campaignId?: string
-  ): Promise<PeriodResult> {
+  private async computePeriod({
+    clinicId,
+    from,
+    to,
+    campaignId,
+    referenceCurrency,
+  }: ComputePeriodInput): Promise<PeriodResult> {
     const map = new Map<string, CampaignAgg>();
 
     // 1) Harcama (kampanya-başı).
@@ -126,9 +158,26 @@ export class GetAgencyRoiReportHandler
     const { data: revenues } = await this.queryBus.execute(
       new GetRevenueByPatientsQuery(patientIds, from, to)
     );
-    const revByPatient = new Map(
-      revenues.map((r) => [r.patientId, parseFloat(r.revenue)])
-    );
+
+    // Referans dışı para birimleri ROAS'a KATILMAZ ama sessizce düşmez:
+    // raporda hangi para birimlerinin dışarıda kaldığı bildirilir (aksi halde
+    // 1.000 EUR tahsilat TRY harcamanın yanına toplanıp ROAS'ı uyduruyordu).
+    const excludedRevenueCurrencies = [
+      ...new Set(
+        revenues
+          .filter((r) => r.currency !== referenceCurrency)
+          .map((r) => r.currency)
+      ),
+    ];
+
+    const revByPatient = new Map<string, number>();
+    for (const row of revenues) {
+      if (row.currency !== referenceCurrency) continue;
+      revByPatient.set(
+        row.patientId,
+        (revByPatient.get(row.patientId) ?? 0) + parseFloat(row.revenue)
+      );
+    }
 
     // 4) Lead'leri kampanyalara dağıt.
     for (const l of leads) {
@@ -183,6 +232,8 @@ export class GetAgencyRoiReportHandler
           : 0,
       attributedLeads: leads.length,
       convertedPatients: distinctPatients.size,
+      revenueCurrency: referenceCurrency,
+      excludedRevenueCurrencies,
     };
 
     return { totals, campaigns };

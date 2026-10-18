@@ -27,6 +27,12 @@ model TaxParameter {
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
+  // Aynı (clinicId, key) için **en fazla bir açık sürüm** olabilir. Kısmî unique
+  // index (`WHERE valid_to IS NULL`) Prisma şemasında tanımlanamıyor; migration
+  // 20260928090000 içinde ham SQL ile kurulur:
+  //   tax_parameters_open_version_key ON (clinic_id, key) WHERE valid_to IS NULL
+  // Uygulama tarafında kilit ilk sürüm yokken serileştirecek bir satır bulamadığı
+  // için (kilitlenecek satır henüz yok) tek gerçek koruma bu kısıttır.
   @@index([clinicId, key, validFrom])
   @@index([organizationId])
   @@map("tax_parameters")

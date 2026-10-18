@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { PAYMENT_EVENTS } from '@src/domain/constants/events';
 import { PaymentPaidEvent } from '@modules/finance/payment/domain/events/payment-paid.event';
 import { IssueInvoiceCommand } from '@modules/finance/invoice/application/commands/issue-invoice/issue-invoice.command';
@@ -11,9 +10,9 @@ import {
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetPaymentWithInstallmentsQuery } from '@modules/finance/payment/application/queries/get-payment-with-installments/get-payment-with-installments.query';
-import { InvoiceTriggers } from '@modules/finance/invoice/domain/constants/invoice-triggers';
 import { Money } from '@src/domain/value-objects/money.vo';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class PaymentPaidInvoiceListener {
@@ -25,7 +24,7 @@ export class PaymentPaidInvoiceListener {
     private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
-  @OnEvent(PAYMENT_EVENTS.PAID, { async: true })
+  @OnDomainEvent(PAYMENT_EVENTS.PAID)
   async handle(event: PaymentPaidEvent): Promise<void> {
     try {
       // Cari + tutar payment modülünden çözülür (bounded context — QueryBus).
@@ -39,24 +38,25 @@ export class PaymentPaidInvoiceListener {
         return;
       }
 
-      // Tahsil edilen taksitin tutarı faturalanır; bulunamazsa ödeme toplamı.
-      const installment = payment.installments.find(
-        (i) => i.id === event.installmentId
-      );
-      const amount = installment
-        ? installment.amount.toNumber()
-        : payment.totalAmount.toNumber();
-
-      const currency = installment ? installment.currency : payment.currency;
-
+      // Faturalanan tutar **ödemenin tamamı**, tahsil edilen taksit DEĞİL.
+      //
+      // Fatura `payment_id` üzerinde tekil: ilk taksitte açılır, sonraki taksitlerde
+      // komut idempotent davranıp mevcut faturayı döner. Tutar taksitten alınsaydı
+      // 6 taksitli bir tedavide hasılat yalnız 1/6 oranında kaydedilir, kalan beş
+      // taksit hiç faturalanmazdı; 120 Alıcılar ise her tahsilatta kapanmaya devam
+      // edip ters bakiyeye düşerdi (hasılat + KDV matrahı eksik beyan).
+      //
+      // Fatura tahakkuku tahsilattan bağımsızdır (doc 03): hizmet bedeli bir kez
+      // faturalanır, taksitler yalnız 120'yi kapatır (PAYMENT_RECEIVED). Bu yüzden
+      // randevu dinleyicisi de aynı tutarı (ödeme toplamı) kullanır — iki tetikleyici
+      // artık olay sırasından bağımsız olarak aynı faturayı üretir.
       await this.commandBus.execute(
         new IssueInvoiceCommand({
           clinicId: event.clinicId,
           patientId: payment.patientId,
           appointmentId: event.appointmentId,
           paymentId: event.paymentId,
-          totalAmount: Money.create(amount, currency).orThrow(),
-          trigger: InvoiceTriggers.PAYMENT,
+          totalAmount: Money.fromTrusted(payment.totalAmount, payment.currency),
           action: LogAction.INVOICE_ISSUED,
           type: LogType.INFO,
           source: LogSource.SYSTEM,

@@ -13,9 +13,10 @@ import {
 } from '@modules/supply/work-order/domain/repositories/external-work/external-work.query.repository';
 
 @QueryHandler(GetWorkOrderByIdQuery)
-export class GetWorkOrderByIdHandler
-  implements IQueryHandler<GetWorkOrderByIdQuery, GetWorkOrderByIdResponse>
-{
+export class GetWorkOrderByIdHandler implements IQueryHandler<
+  GetWorkOrderByIdQuery,
+  GetWorkOrderByIdResponse
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_QUERY_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderQueryRepository,

@@ -1,10 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { CriticalFailureEvent } from '@common/observability/critical-failure.event';
 import {
   OPS_ALERT_PORT,
   OpsAlertPort,
 } from '@common/observability/ops-alert.port';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Kritik hatayı operasyonel uyarı kanalına iletir (Slack bağlanacak).
@@ -20,7 +20,7 @@ export class CriticalFailureListener {
     @Inject(OPS_ALERT_PORT) private readonly opsAlert: OpsAlertPort
   ) {}
 
-  @OnEvent(CriticalFailureEvent.NAME, { async: true })
+  @OnDomainEvent(CriticalFailureEvent.NAME)
   async handle(event: CriticalFailureEvent): Promise<void> {
     try {
       await this.opsAlert.alert(event.toAlertInput());

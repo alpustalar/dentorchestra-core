@@ -23,6 +23,8 @@ import type {
   InvoiceView,
 } from '@modules/finance/invoice/domain/contracts/invoice';
 import { CAPABILITIES } from '@src/infrastructure/persistence/prisma/data/modules';
+import { FindUninvoicedPaymentsQuery } from '@modules/finance/invoice/application/queries/find-uninvoiced-payments/find-uninvoiced-payments.query';
+import { GetUninvoicedPaymentsFilterDto } from '@shared/modules/invoice/dto/queries';
 
 /**
  * Fatura okuma yüzeyi. Faturalar event-driven üretildiği için manuel kesim endpoint'i
@@ -47,6 +49,24 @@ export class InvoiceQueryController {
   ) {
     return this.queryBus.execute(
       new FindInvoicesQuery({ pagination, ctx, clinicId, organizationId })
+    );
+  }
+
+  /**
+   * Tahsilatı alınmış ama faturası kesilmemiş ödemeler (mutabakat).
+   *
+   * Fatura kesimi olay güdümlü ve tetikleyici dinleyiciler hatayı yutuyor; fatura
+   * HİÇ oluşmamışsa ekonomik olay da yazılmadığı için fişleme mutabakatı
+   * (`sweep-unposted-financial-events`) bunu göremez. Bu uç o boşluğun raporu,
+   * `POST /invoices/backfill` ise telafisidir.
+   */
+  @Get('uninvoiced-payments')
+  uninvoicedPayments(
+    @Query() filter: GetUninvoicedPaymentsFilterDto,
+    @GetContext() ctx: IGetContext
+  ) {
+    return this.queryBus.execute(
+      new FindUninvoicedPaymentsQuery({ filter, ctx })
     );
   }
 

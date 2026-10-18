@@ -38,6 +38,13 @@ export interface EDocumentTotals {
 export interface EDocumentRequest {
   type: EDocumentTypeType;
   invoiceId: string; // İç sistem faturası
+  /**
+   * Sağlayıcı tarafında tekilleştirme anahtarı (= `invoiceId`). Çekirdek tarafındaki
+   * asıl kapı gönderim hakkının sahiplenilmesidir (`claimForEDocumentDispatch`);
+   * bu alan gerçek entegratör adapter'larının kendi idempotency başlığını
+   * doldurabilmesi için sözleşmede durur.
+   */
+  idempotencyKey: string;
   issueDate: Date;
   seller: PartyTaxInfo;
   buyer: PartyTaxInfo;

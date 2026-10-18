@@ -33,7 +33,8 @@ export class UnmatchPurchaseInvoiceHandler implements ICommandHandler<
 
     await this.txManager.run(async () => {
       // Kilitli okuma: eşleştirme kararı siparişin kümülatif sayacını besliyor.
-      const invoice = await this.purchaseInvoiceCommandRepo.findByIdForUpdate(invoiceId);
+      const invoice =
+        await this.purchaseInvoiceCommandRepo.findByIdForUpdate(invoiceId);
       if (!invoice) throw new PurchaseInvoiceNotFoundException(invoiceId);
 
       this.policyFactory
@@ -53,7 +54,7 @@ export class UnmatchPurchaseInvoiceHandler implements ICommandHandler<
         new RevertInvoiceFromPurchaseOrderCommand({
           orderId: previousOrderId,
           invoiceId: invoice.id.value,
-          grandTotal: invoice.grandTotal.value.toNumber(),
+          grandTotal: invoice.grandTotal.value.toFixed(2),
           ctx,
         })
       );

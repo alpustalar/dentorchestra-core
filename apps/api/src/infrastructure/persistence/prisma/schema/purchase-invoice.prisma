@@ -33,9 +33,22 @@ model PurchaseInvoice {
   currency        Currency              @default(TRY)
   status          PurchaseInvoiceStatus @default(RECORDED)
 
+  /// İptal damgası (CLAUDE.md finans kuralı 7). `status = CANCELLED` kimin, ne zaman
+  /// ve neden iptal ettiğini taşımıyordu; iptal storno fişi ürettiği için iz kalıcı
+  /// olmak zorunda. `cancelledById` personel kimliğidir (Firebase UID — UUID değil).
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelledById String?   @map("cancelled_by_id")
+  cancelReason  String?   @map("cancel_reason")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  /// Doğal anahtar: aynı tedarikçinin aynı belge numarası bir klinikte bir kez
+  /// kayıtlanabilir. Mükerrer alış faturası gideri (770/150), 320 borcunu ve KDV
+  /// indirimini (191) iki kez yazardı; uygulama kontrolü yarışı kapatmaz, bu kısıt
+  /// kapatır. `invoice_number` null olan satırlar (belge no'su girilmemiş fatura)
+  /// Postgres'te NULL'lar birbirinden farklı sayıldığı için kısıt dışında kalır.
+  @@unique([clinicId, supplierId, invoiceNumber])
   @@index([clinicId])
   @@index([organizationId])
   @@index([supplierId])

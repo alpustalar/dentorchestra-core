@@ -11,6 +11,9 @@ import type { FinancialEvent } from '@shared';
 import { PaginationDto } from '@shared';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetFinancialEventsQuery } from '@modules/finance/accounting/financial-events/application/queries/get-financial-events/get-financial-events.query';
+import { GetUnpostedFinancialEventsQuery } from '@modules/finance/accounting/financial-events/application/queries/get-unposted-financial-events/get-unposted-financial-events.query';
+import { GetUnpostedFinancialEventsFilterDto } from '@shared/modules/financial-event/dto/queries';
+import { POSTABLE_FINANCIAL_EVENT_TYPES } from '@modules/finance/accounting/posting/domain/posting/postable-event-types.constant';
 import { FinancialEventTypeType as FinancialEventType } from '@input-type-schemas/FinancialEventTypeSchema';
 import { Serialize } from '@common/decorators/serialize.decorator';
 import { FinancialEventResponseDto } from '@modules/finance/accounting/financial-events/presentation/http/dto/financial-event-response.dto';
@@ -42,6 +45,29 @@ export class FinancialEventQueryController {
         type,
         sourceModule,
         sourceRefId,
+      })
+    );
+  }
+
+  /**
+   * Mutabakat: aralıkta fişlenmemiş (mizana girmemiş) ekonomik olaylar.
+   * Dönem kapanışı bu liste boşalmadan geçmez; liste boş değilse
+   * `POST /financial-events/post-unposted` ile yeniden fişleme denenir.
+   */
+  @Get('unposted')
+  @Serialize<FinancialEvent, FinancialEventResponseDto>(
+    FinancialEventResponseDto
+  )
+  getUnposted(
+    @GetContext() ctx: IGetContext,
+    @Query() pagination: PaginationDto,
+    @Query() filter: GetUnpostedFinancialEventsFilterDto
+  ) {
+    return this.queryBus.execute(
+      new GetUnpostedFinancialEventsQuery({
+        filter: { ...filter, types: POSTABLE_FINANCIAL_EVENT_TYPES },
+        pagination,
+        ctx,
       })
     );
   }

@@ -13,6 +13,7 @@ import {
 import { PaxService } from '@src/infrastructure/payment/pos/physical/providers/pax/pax.service';
 import { PaxConnectionError } from '@src/infrastructure/payment/pos/physical/providers/pax/pax.errors';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
+import { PosAccountingBridgeService } from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
 import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
@@ -36,6 +37,7 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
       clinicId: CLINIC_ID,
       amount: 123.45,
       currency: CurrencySchema.enum.TRY,
+      initiatedById: 'firebase-staff-uid-1',
     });
     sale.markSuccess('HOSTREF-ORIGINAL');
     return sale;
@@ -123,6 +125,13 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
       markRefunded: jest.fn(() => Promise.resolve()),
     } as unknown as PosPaymentSyncService;
 
+    // Muhasebe köprüsü: ters kayıt artık PAYMENT_REFUNDED olayını da yazar
+    // (120 / 108). Çağrıldığı testlerde girdisi doğrulanıyor.
+    const bridgeRecord = jest.fn(() => Promise.resolve());
+    const accountingBridge = {
+      recordBestEffort: bridgeRecord,
+    } as unknown as PosAccountingBridgeService;
+
     // Kiracı kapsamı kontrolü: aktör bu kliniğe erişebiliyor kabul edilir.
     // Reddedilme yolu ayrı testte doğrulanıyor.
     const policyFactory = {
@@ -144,6 +153,7 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
         paxService,
         txManager,
         posPaymentSync,
+        accountingBridge,
         policyFactory
       ),
       posTransactionRepo,
@@ -152,6 +162,7 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
       create,
       created,
       voidCall,
+      bridgeRecord,
       depthAtCall,
     };
   };
@@ -275,6 +286,7 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
       clinicId: '99999999-9999-4999-8999-999999999999',
       amount: 123.45,
       currency: CurrencySchema.enum.TRY,
+      initiatedById: 'firebase-staff-uid-1',
     });
     foreignSale.markSuccess('HOSTREF-FOREIGN');
 
@@ -287,5 +299,18 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
         expect(create).not.toHaveBeenCalled();
       });
   });
+  it('iptal kaydı satışı çekeni değil, iptali yapan aktörü damgalar', async () => {
+    // Handler `ctx.actor`'ü bugüne kadar yalnız yetki kontrolünde okuyup atıyordu:
+    // bir kart satışını kimin iptal ettiği ne kolonda ne audit log'da duruyordu.
+    // Damga ters kaydın KENDİ satırına basılır — orijinalin damgası devralınsaydı
+    // iptali yapan kişi izde hiç görünmezdi.
+    const sale = makeSuccessfulSale();
+    const { handler, created } = build(sale);
 
+    await handler.execute(commandFor(sale));
+
+    expect(created).toHaveLength(1);
+    expect(created[0].initiatedById).toBe(ctx.actor.userId);
+    expect(created[0].initiatedById).not.toBe(sale.initiatedById);
+  });
 });

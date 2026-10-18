@@ -29,7 +29,7 @@ export class PartyQueryRepository
     pagination: Pagination
   ): Promise<{ items: IParty[]; total: number }> {
     const where: Prisma.PartyWhereInput = {
-      organizationId: filter.organizationId,
+      clinicId: filter.clinicId,
       ...(filter.role ? { roles: { has: filter.role } } : {}),
       ...(filter.isActive !== undefined ? { isActive: filter.isActive } : {}),
     };

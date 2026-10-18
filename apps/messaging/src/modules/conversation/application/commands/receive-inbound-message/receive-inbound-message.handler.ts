@@ -178,18 +178,27 @@ export class ReceiveInboundMessageHandler implements ICommandHandler<
         await this.conversationRepo.update(conversation);
       }
 
+      // Bağlam penceresini tazele — AI turu bu mesajı DB'ye gitmeden görsün. Cache
+      // otoritatif değil; `append` pencere soğuksa no-op'tur ve okuma DB'den ısıtır.
+      //
+      // **Neden transaction'ın İÇİNDE (en sonda):** event bu bloğun commit'inde
+      // mühürlenir ve relay hemen dürtülür; append commit'ten sonra yapılırsa AI turu
+      // pencereyi **bu mesaj olmadan** okur ve geç gelen append önceki kullanıcı
+      // turunu tekrarlar (ölçüldü: ikinci turun penceresi `[user A, assistant, user A]`
+      // oluyordu). Eskiden sıra tesadüfen tutuyordu: dinleyiciler `emitAsync` ile
+      // beklenmediği için handler her zaman önde bitiyordu. Teslim gerçek olunca
+      // tesadüf bozuldu — doğruluk zamanlamaya bırakılamaz. Rollback penceresi
+      // yalnız commit hatasıdır; pencere TTL'li ve otoritatif değil.
+      const body = input.body?.trim();
+      if (body) {
+        await this.aiMemoryCache.append({
+          conversationId: conversation.id,
+          message: { role: 'user', content: body },
+        });
+      }
+
       return { messageId: savedMessage.id, conversationId: conversation.id };
     });
-
-    // Bağlam penceresini tazele — AI turu bu mesajı DB'ye gitmeden görsün. Cache
-    // otoritatif değil; `append` pencere soğuksa no-op'tur ve okuma DB'den ısıtır.
-    const body = input.body?.trim();
-    if (body) {
-      await this.aiMemoryCache.append({
-        conversationId: saved.conversationId,
-        message: { role: 'user', content: body },
-      });
-    }
 
     return saved.messageId;
   }

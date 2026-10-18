@@ -6,8 +6,10 @@ import { FlightOfferToken } from '@modules/crm/health-tourism/flight/domain/cont
 import { IFlightCacheService } from '@modules/crm/health-tourism/flight/domain/interfaces/flight-cache.service.interface';
 
 const KEYS = {
-  // AI asistanı için kısa optionId → Duffel offer id + bağlam.
-  OFFER: (token: string) => `flight:offer:${token}`,
+  // AI asistanı için optionId → Duffel offer id + bağlam. Anahtar **kiracı
+  // kapsamlı** (bkz. `HotelCacheService`): başka kliniğin teklifi burada yok.
+  OFFER: (clinicId: string, token: string) =>
+    `flight:offer:${clinicId}:${token}`,
 };
 
 /** Teklif hiç bayatlamayacakmış gibi görünse bile üst sınır. */
@@ -28,14 +30,18 @@ export class FlightCacheService implements IFlightCacheService {
       ): Promise<void> => {
         const ttl = ttlSeconds ?? deriveTtlFromOffer(data.expiresAt);
         await this.redis.set(
-          KEYS.OFFER(token),
+          // Anahtarın kiracısı kaydın sahibinden gelir: ikisi **ayrışamaz**.
+          KEYS.OFFER(data.owner.clinicId, token),
           JSON.stringify(data),
           'EX',
           ttl
         );
       },
-      get: async (token: string): Promise<FlightOfferToken | null> => {
-        const raw = await this.redis.get(KEYS.OFFER(token));
+      get: async (
+        clinicId: string,
+        token: string
+      ): Promise<FlightOfferToken | null> => {
+        const raw = await this.redis.get(KEYS.OFFER(clinicId, token));
         if (!raw) return null;
         try {
           return JSON.parse(raw) as FlightOfferToken;

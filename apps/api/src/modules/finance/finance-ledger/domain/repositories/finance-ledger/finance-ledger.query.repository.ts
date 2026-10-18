@@ -1,6 +1,7 @@
 import { FinanceLedger as IFinanceLedger, Pagination } from '@shared';
 import {
   GetSummaryFilter,
+  LedgerEntryStatusRow,
   LedgerSummary,
   PatientFinanceSummary,
   PatientLedgerItem,
@@ -26,8 +27,19 @@ export interface IFinanceLedgerQueryRepository {
     clinicId: string,
     filter: GetSummaryFilter
   ): Promise<LedgerSummary>;
-  /** Verilen hastaların dönem içi INCOME (COMPLETED) gelirini hasta-başı toplar. */
+  /**
+   * Verilen hastaların dönem içi INCOME (COMPLETED) gelirini hasta **ve para
+   * birimi** başına toplar.
+   */
   sumIncomeByPatientIds(
     filter: SumIncomeByPatientsFilter
   ): Promise<PatientRevenue[]>;
+
+  /**
+   * Verilen taksitlerin defterdeki durumu (mutabakat eşleştirmesi). Dönmeyen
+   * `installmentId` "kayıt hiç yazılmamış" demektir.
+   */
+  findEntryStatusesByInstallmentIds(
+    installmentIds: string[]
+  ): Promise<LedgerEntryStatusRow[]>;
 }

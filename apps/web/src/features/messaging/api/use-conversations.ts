@@ -2,8 +2,8 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  messagingEndpoints,
   type GetConversations,
+  messagingEndpoints,
   type PaginationInput,
 } from '@core-crm/shared/client';
 

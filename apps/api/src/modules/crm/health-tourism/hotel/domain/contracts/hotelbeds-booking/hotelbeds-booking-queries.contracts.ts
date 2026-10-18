@@ -1,3 +1,6 @@
+// Barrel'dan DEĞİL: barrel yaprak NestJS modülünü ve uyarı yayıncısına bağlı
+// servisi de dışa açıyor; sözleşme dosyası yalnız TİPE bağımlı kalmalı.
+import { QuoteOptionOwner } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.contracts';
 // ==========================================
 // FİLTRELER
 // ==========================================
@@ -61,6 +64,13 @@ export interface HotelAvailabilityItem {
  * bağlamı. AI kısa bir optionId sunar; gerçek rateKey + fiyat/tarih burada saklanır.
  */
 export interface HotelRateOptionToken {
+  /**
+   * Teklifi üreten kiracı + görüşme. Okuma anında **doğrulanır**: önbellek
+   * anahtarını bilmek teklifi kullanma yetkisi vermez
+   * (`QuoteOptionOwnershipService`).
+   */
+  owner: QuoteOptionOwner;
+
   hotelCode: string;
   hotelName: string;
   roomName: string;

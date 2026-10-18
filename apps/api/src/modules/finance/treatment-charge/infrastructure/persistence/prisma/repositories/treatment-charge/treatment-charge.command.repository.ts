@@ -55,4 +55,23 @@ export class TreatmentChargeCommandRepository
     });
     return rows.map((raw) => new TreatmentCharge(raw));
   }
+
+  /**
+   * Kilit ve okuma **tek metotta**: `FOR UPDATE` yalnız çevreleyen transaction
+   * boyunca tutulur, bölünürse sıra bozulur ve kilit sessizce etkisiz kalır.
+   * Tablo adı sabit (kullanıcı girdisi değil) — enjeksiyon riski yok.
+   */
+  async findActiveByAppointmentIdForUpdate(
+    appointmentId: string
+  ): Promise<TreatmentCharge[]> {
+    this.assertInTransaction('findActiveByAppointmentIdForUpdate');
+
+    await this.db.$queryRaw`
+      SELECT id FROM "treatment_charges"
+      WHERE appointment_id = ${appointmentId} AND voided_at IS NULL
+      FOR UPDATE
+    `;
+
+    return this.findActiveByAppointmentId(appointmentId);
+  }
 }

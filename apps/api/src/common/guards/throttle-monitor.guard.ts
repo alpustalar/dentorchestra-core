@@ -4,6 +4,7 @@ import { ThrottlerGuard, ThrottlerLimitDetail } from '@nestjs/throttler';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { THROTTLE_EVENTS } from '@src/domain/constants/events';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { emitDetached } from '@common/utils';
 
 export interface RateLimitExceededPayload {
   ip: string;
@@ -38,7 +39,13 @@ export class ThrottleMonitorGuard extends ThrottlerGuard {
       timestamp: DateTimeManager.create(),
     };
 
-    this.eventEmitter.emit(THROTTLE_EVENTS.RATE_LIMIT_EXCEEDED, payload);
+    // Bekletmeden yayınlanır (istek zaten 429 ile kapanıyor); dinleyicinin
+    // hatası burada yutulur — bkz. `emitDetached`.
+    emitDetached(
+      this.eventEmitter,
+      THROTTLE_EVENTS.RATE_LIMIT_EXCEEDED,
+      payload
+    );
 
     await super.throwThrottlingException(context, throttlerLimitDetail);
   }

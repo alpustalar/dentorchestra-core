@@ -37,7 +37,12 @@ export class StockMovement extends AggregateRoot {
       Money.create(data.totalAmount, currency.value).instance ?? null;
 
     this._financeLedgerId = UUID.create(data.financeLedgerId).instance ?? null;
-    this._performedById = UUID.create(data.performedById).instance ?? null;
+    // Personel kimliği **ham string**: `ctx.actor.userId` bir Firebase UID'dir
+    // (`User.id = firebaseUid`), UUID değil. Burada UUID VO'suna sokulduğunda
+    // kayıttan okunan gerçek personel kimliği sessizce `null`'a düşüyordu
+    // (`instance ?? null`) ve `toPersistence()` o null'ı geri yazıyordu —
+    // yani hareketi kimin yaptığı bir güncellemede siliniyordu.
+    this._performedById = data.performedById;
     this._notes = data.notes;
     this._createdAt = data.createdAt;
   }
@@ -120,9 +125,9 @@ export class StockMovement extends AggregateRoot {
     return this._financeLedgerId;
   }
 
-  private _performedById: UUID | null;
+  private _performedById: string | null;
 
-  get performedById(): UUID | null {
+  get performedById(): string | null {
     return this._performedById;
   }
 
@@ -160,9 +165,11 @@ export class StockMovement extends AggregateRoot {
       ? UUID.create(props.financeLedgerId).orThrow()
       : null;
 
-    const performedById = props.performedById
-      ? UUID.create(props.performedById).orThrow()
-      : null;
+    // `UUID.create(...).orThrow()` buradaydı: gerçek personel kimliği 28 karakterli
+    // bir Firebase UID olduğu için HER stok hareketi (mal kabul, sayım düzeltmesi,
+    // ürün kullanımı) `InvalidUuidException` ile patlıyordu — satın almanın mal
+    // kabulü de bu yüzden hiç tamamlanamıyordu.
+    const performedById = props.performedById ?? null;
 
     return new StockMovement({
       id: UUID.createOrGenerate(props.id).value,
@@ -179,7 +186,7 @@ export class StockMovement extends AggregateRoot {
       totalAmount: totalAmount?.value ?? null,
 
       financeLedgerId: financeLedgerId?.value ?? null,
-      performedById: performedById?.value ?? null,
+      performedById,
       notes: props.notes ?? null,
       createdAt: DateTimeManager.create(),
     });
@@ -200,7 +207,7 @@ export class StockMovement extends AggregateRoot {
       vatAmount: this.vatAmount?.value ?? null,
       totalAmount: this.totalAmount?.value ?? null,
       financeLedgerId: this.financeLedgerId?.value ?? null,
-      performedById: this.performedById?.value ?? null,
+      performedById: this.performedById,
       notes: this.notes,
       createdAt: this.createdAt,
     };

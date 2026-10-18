@@ -4,6 +4,7 @@ import { ProductBatchRepositoryModule } from '@modules/supply/inventory/infrastr
 import { ProductCategoryRepositoryModule } from '@modules/supply/inventory/infrastructure/persistence/prisma/repositories/product-category/product-category.repository.module';
 import { StockMovementRepositoryModule } from '@modules/supply/inventory/infrastructure/persistence/prisma/repositories/stock-movement/stock-movement.repository.module';
 import { SupplierRepositoryModule } from '@modules/supply/inventory/infrastructure/persistence/prisma/repositories/supplier/supplier.repository.module';
+import { ProductUsageRepositoryModule } from '@modules/supply/inventory/infrastructure/persistence/prisma/repositories/product-usage/product-usage.repository.module';
 
 const InventoryRepositoriesModules = [
   ProductRepositoryModule,
@@ -11,6 +12,7 @@ const InventoryRepositoriesModules = [
   ProductCategoryRepositoryModule,
   StockMovementRepositoryModule,
   SupplierRepositoryModule,
+  ProductUsageRepositoryModule,
 ];
 
 @Module({

@@ -62,8 +62,6 @@ export class WorkOrderQueryController {
     @Param('id', ParseUUIDPipe) workOrderId: string,
     @GetContext() ctx: IGetContext
   ) {
-    return this.queryBus.execute(
-      new GetWorkOrderByIdQuery(workOrderId, ctx)
-    );
+    return this.queryBus.execute(new GetWorkOrderByIdQuery(workOrderId, ctx));
   }
 }

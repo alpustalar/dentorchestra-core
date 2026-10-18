@@ -13,9 +13,10 @@ import {
 import { INVENTORY_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetLowStockAlertsQuery)
-export class GetLowStockAlertsHandler
-  implements IQueryHandler<GetLowStockAlertsQuery, GetLowStockAlertsResponse>
-{
+export class GetLowStockAlertsHandler implements IQueryHandler<
+  GetLowStockAlertsQuery,
+  GetLowStockAlertsResponse
+> {
   constructor(
     @Inject(PRODUCT_QUERY_REPOSITORY)
     private readonly productRepo: IProductQueryRepository,

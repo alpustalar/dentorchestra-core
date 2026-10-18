@@ -2,9 +2,7 @@ import { CreateModuleHandler } from './create-module.handler';
 import { CreateModuleCommand } from './create-module.command';
 import { Module } from '@modules/platform/subscription/domain/entities/module.entity';
 import { SubscriptionModuleAlreadyExistsException } from '@modules/platform/subscription/domain/exceptions/subscription.exceptions';
-import {
-  IModuleCommandRepository,
-} from '@modules/platform/subscription/domain/repositories/module/module.command.repository';
+import { IModuleCommandRepository } from '@modules/platform/subscription/domain/repositories/module/module.command.repository';
 
 describe('CreateModuleHandler', () => {
   const build = (existing: Module | null) => {

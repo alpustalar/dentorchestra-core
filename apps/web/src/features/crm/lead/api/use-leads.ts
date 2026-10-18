@@ -2,8 +2,8 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
-  leadEndpoints,
   type GetLeads,
+  leadEndpoints,
   type PaginationInput,
 } from '@core-crm/shared/client';
 

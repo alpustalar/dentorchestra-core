@@ -14,9 +14,10 @@ import {
 } from '@modules/finance/invoice/domain/repositories/invoice/invoice.query.repository';
 
 @QueryHandler(GetInvoiceByIdQuery)
-export class GetInvoiceByIdHandler
-  implements IQueryHandler<GetInvoiceByIdQuery, GetInvoiceByIdResponse>
-{
+export class GetInvoiceByIdHandler implements IQueryHandler<
+  GetInvoiceByIdQuery,
+  GetInvoiceByIdResponse
+> {
   constructor(
     @Inject(INVOICE_QUERY_REPOSITORY)
     private readonly invoiceRepo: IInvoiceQueryRepository,
@@ -65,6 +66,8 @@ export class GetInvoiceByIdHandler
         currency: invoice.currency,
         issuedAt: invoice.issuedAt,
         status: invoice.status,
+        cancelledAt: invoice.cancelledAt,
+        cancelReason: invoice.cancelReason,
       },
       meta: {
         serializationOptions: policy.getSerializationOptions({

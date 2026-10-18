@@ -15,10 +15,10 @@ import {
 import { POS_EVENTS } from '@src/domain/constants/events';
 
 @CommandHandler(RegisterPosDeviceCommand)
-export class RegisterPosDeviceHandler
-  implements
-    ICommandHandler<RegisterPosDeviceCommand, RegisterPosDeviceResponse>
-{
+export class RegisterPosDeviceHandler implements ICommandHandler<
+  RegisterPosDeviceCommand,
+  RegisterPosDeviceResponse
+> {
   constructor(
     @Inject(POS_DEVICE_COMMAND_REPOSITORY)
     private readonly posDeviceRepo: IPosDeviceCommandRepository,

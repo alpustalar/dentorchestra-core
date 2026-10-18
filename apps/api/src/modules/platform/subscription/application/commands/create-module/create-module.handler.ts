@@ -9,9 +9,10 @@ import {
 } from '@modules/platform/subscription/domain/repositories/module/module.command.repository';
 
 @CommandHandler(CreateModuleCommand)
-export class CreateModuleHandler
-  implements ICommandHandler<CreateModuleCommand, string>
-{
+export class CreateModuleHandler implements ICommandHandler<
+  CreateModuleCommand,
+  string
+> {
   constructor(
     @Inject(MODULE_COMMAND_REPOSITORY)
     private readonly moduleRepo: IModuleCommandRepository

@@ -178,7 +178,7 @@ const nextConfig: NextConfig = {
 | Tablo               | **TanStack Table**                     | CRM = tablo; sunucu-taraflı sayfalama/sıralama API ile birebir        |
 | Tarih               | **dayjs**                              | Backend `DateTimeManager` dayjs kullanıyor — aynı semantik            |
 | Auth                | **Firebase Web SDK** + httpOnly cookie | Backend Firebase ID token doğruluyor                                  |
-| Grafik              | **Recharts**                           | Rapor ekranları (ROI, finans özeti)                                   |
+
 
 > **Not:** kök `package.json`'da `date-fns` + `date-fns-tz` var ama API tarafı `dayjs` kullanıyor.
 > Frontend'de **dayjs**'te birleş — iki tarih kütüphanesi taşımanın anlamı yok.

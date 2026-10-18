@@ -212,9 +212,7 @@ export class ExternalWorkOrder extends AggregateRoot {
     return this._lines;
   }
 
-  public static create(
-    props: CreateExternalWorkOrderProps
-  ): ExternalWorkOrder {
+  public static create(props: CreateExternalWorkOrderProps): ExternalWorkOrder {
     if (!props.items || props.items.length === 0) {
       throw new WorkOrderEmptyItemsException();
     }
@@ -274,7 +272,12 @@ export class ExternalWorkOrder extends AggregateRoot {
    */
   public static openRemake(
     source: ExternalWorkOrder,
-    props: { id?: string; reason: string; dueDate?: Date | null; createdById?: string | null }
+    props: {
+      id?: string;
+      reason: string;
+      dueDate?: Date | null;
+      createdById?: string | null;
+    }
   ): ExternalWorkOrder {
     const remake = ExternalWorkOrder.create({
       id: props.id,

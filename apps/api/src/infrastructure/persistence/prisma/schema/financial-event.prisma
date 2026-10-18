@@ -7,6 +7,10 @@ enum FinancialEventType {
   SALES_INVOICE_CANCELLED
   PURCHASE_INVOICE_RECEIVED
   PAYMENT_RECEIVED
+  /// Tahsil edilmiş paranın müşteriye GERİ verilmesi (kart iadesi/iptali, nakit iade).
+  /// Kendi tarihi olan ayrı bir ekonomik olaydır — tahsilat fişinin storno'su DEĞİL:
+  /// para o gün gerçekten alınmıştı ve iade başka bir (hatta kapanmış) döneme düşebilir.
+  PAYMENT_REFUNDED
   PAYMENT_MADE
   INSTRUMENT_RECEIVED
   INSTRUMENT_GIVEN
@@ -21,9 +25,19 @@ enum FinancialEventType {
   OPENING_BALANCE
   PERIOD_CLOSING
   CASH_SESSION_CLOSED
+  /// Sağlayıcı hesap kapaması: kartla tahsil edilen paranın (108 Diğer Hazır
+  /// Değerler) komisyon kesilerek bankaya geçmesi. Olmadığı sürece 108 **hiç
+  /// kapanmaz**: her kart tahsilatı orada kalır (bilanço şişik), para 102'ye hiç
+  /// girmez ve sağlayıcı komisyonu gider yazılmaz (kâr fazla görünür).
+  PROVIDER_SETTLEMENT_RECEIVED
   /// Sağlık turizmi rezervasyonunun tahsilatı — platform defterine yazılır.
   /// Klinik defterine YAZILMAZ: klinik bu işleme finansal olarak taraf değildir.
   PLATFORM_BOOKING_SETTLED
+  /// Rezervasyon iptali sonrası iade — PLATFORM_BOOKING_SETTLED fişinin ters
+  /// yönü, ama **storno'su değil**: paranın geri gittiği günün kendi olayıdır
+  /// (tahsilat fişi yerinde kalır, bkz. PAYMENT_REFUNDED). Üstlenilen iptal
+  /// cezası bu fişte zarar olarak tanınır.
+  PLATFORM_BOOKING_REFUNDED
 }
 
 model FinancialEvent {

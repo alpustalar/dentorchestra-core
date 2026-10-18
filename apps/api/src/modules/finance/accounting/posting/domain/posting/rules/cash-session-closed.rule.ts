@@ -4,7 +4,6 @@ import { FinancialEvent, FinancialEventTypeSchema } from '@shared';
 import {
   DraftJournalEntry,
   DraftJournalLine,
-  PostingContext,
   PostingRule,
 } from '../posting-rule.interface';
 import { CashSessionClosedEventPayload } from '../event-payloads';
@@ -24,7 +23,7 @@ import { CashSessionClosedEventPayload } from '../event-payloads';
 export class CashSessionClosedRule implements PostingRule {
   readonly eventType = FinancialEventTypeSchema.enum.CASH_SESSION_CLOSED;
 
-  build(event: FinancialEvent, _ctx: PostingContext): DraftJournalEntry {
+  build(event: FinancialEvent): DraftJournalEntry {
     const payload = event.payload as unknown as CashSessionClosedEventPayload;
 
     const bankDeposit = new Decimal(payload.bankDepositTotal);

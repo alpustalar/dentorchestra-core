@@ -5,7 +5,7 @@ import { BloodTypeType as BloodType } from '@input-type-schemas/BloodTypeSchema'
 import { PatientStatusType as PatientStatus } from '@input-type-schemas/PatientStatusSchema';
 import { PatientTypeType as PatientType } from '@input-type-schemas/PatientTypeSchema';
 
-const { INTERNAL, MANAGEMENT, DATA_OWNER, FINANCIAL, ADMIN } = ResponseGroups;
+const { INTERNAL, MANAGEMENT, DATA_OWNER, ADMIN } = ResponseGroups;
 
 export class PatientResponseDto {
   @Expose() id: string;

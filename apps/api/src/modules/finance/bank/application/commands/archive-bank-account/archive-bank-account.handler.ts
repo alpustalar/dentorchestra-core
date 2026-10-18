@@ -13,9 +13,10 @@ import {
 } from '@modules/finance/bank/domain/repositories/bank-account/bank-account.command.repository';
 
 @CommandHandler(ArchiveBankAccountCommand)
-export class ArchiveBankAccountHandler
-  implements ICommandHandler<ArchiveBankAccountCommand, void>
-{
+export class ArchiveBankAccountHandler implements ICommandHandler<
+  ArchiveBankAccountCommand,
+  void
+> {
   constructor(
     @Inject(BANK_ACCOUNT_COMMAND_REPOSITORY)
     private readonly bankAccountRepo: IBankAccountCommandRepository,

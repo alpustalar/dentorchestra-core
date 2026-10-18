@@ -33,6 +33,29 @@ export class AccountingPeriodResponseDto {
   @Expose({ groups: [MANAGEMENT, ADMIN] })
   organizationId: string;
 
+  // Denetim damgaları: mali yılı kim/ne zaman kapattı, kilidi kim açtı.
+  // Yönetime açıktır; klinik personeli için anlamlı değil.
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  lockedAt: Date | null;
+
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  lockedById: string | null;
+
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  reopenedAt: Date | null;
+
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  reopenedById: string | null;
+
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  closedAt: Date | null;
+
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  closedById: string | null;
+
   @Expose({ groups: [MANAGEMENT, ADMIN] })
   @Type(() => Date)
   createdAt: Date;

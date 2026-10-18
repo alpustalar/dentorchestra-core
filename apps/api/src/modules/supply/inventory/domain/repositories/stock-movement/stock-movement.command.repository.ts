@@ -4,5 +4,10 @@ import { StockMovement } from '@modules/supply/inventory/domain/entities/stock-m
 export const STOCK_MOVEMENT_COMMAND_REPOSITORY = Symbol(
   'IStockMovementCommandRepository'
 );
-export interface IStockMovementCommandRepository
-  extends IBaseCommandRepository<StockMovement> {}
+/**
+ * Hareket kaydı **değişmez**: düzeltme ters hareketle yapılır, satır
+ * güncellenmez. `IBaseCommandRepository`'nin `create`/`findById`/`update`
+ * sözleşmesi yeterli (ekstra metot yok).
+ */
+export type IStockMovementCommandRepository =
+  IBaseCommandRepository<StockMovement>;

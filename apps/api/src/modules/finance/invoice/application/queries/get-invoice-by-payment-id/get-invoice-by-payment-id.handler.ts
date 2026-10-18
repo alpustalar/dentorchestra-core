@@ -14,10 +14,10 @@ import {
 } from '@modules/finance/invoice/domain/repositories/invoice/invoice.query.repository';
 
 @QueryHandler(GetInvoiceByPaymentIdQuery)
-export class GetInvoiceByPaymentIdHandler
-  implements
-    IQueryHandler<GetInvoiceByPaymentIdQuery, GetInvoiceByPaymentIdResponse>
-{
+export class GetInvoiceByPaymentIdHandler implements IQueryHandler<
+  GetInvoiceByPaymentIdQuery,
+  GetInvoiceByPaymentIdResponse
+> {
   constructor(
     @Inject(INVOICE_QUERY_REPOSITORY)
     private readonly invoiceRepo: IInvoiceQueryRepository,
@@ -68,6 +68,8 @@ export class GetInvoiceByPaymentIdHandler
         currency: invoice.currency,
         issuedAt: invoice.issuedAt,
         status: invoice.status,
+        cancelledAt: invoice.cancelledAt,
+        cancelReason: invoice.cancelReason,
       },
       meta: {
         serializationOptions: policy.getSerializationOptions({

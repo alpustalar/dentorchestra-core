@@ -10,13 +10,10 @@ import {
 } from '@modules/finance/payment/domain/repositories/payment/payment.query.repository';
 
 @QueryHandler(GetPaymentWithInstallmentsQuery)
-export class GetPaymentWithInstallmentsHandler
-  implements
-    IQueryHandler<
-      GetPaymentWithInstallmentsQuery,
-      GetPaymentWithInstallmentsResponse
-    >
-{
+export class GetPaymentWithInstallmentsHandler implements IQueryHandler<
+  GetPaymentWithInstallmentsQuery,
+  GetPaymentWithInstallmentsResponse
+> {
   constructor(
     @Inject(PAYMENT_QUERY_REPOSITORY)
     private readonly paymentRepo: IPaymentQueryRepository

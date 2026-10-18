@@ -1,7 +1,10 @@
 import { CancelFlightBookingHandler } from './cancel-flight-booking.handler';
 import { CancelFlightBookingCommand } from './cancel-flight-booking.command';
 import { DuffelFlightBooking } from '@modules/crm/health-tourism/flight/domain/entities/duffel-flight-booking.entity';
-import { IDuffelApiService } from '@modules/crm/health-tourism/flight/domain/interfaces/duffel-api.interface';
+import {
+  FlightCancellationResult,
+  IDuffelApiService,
+} from '@modules/crm/health-tourism/flight/domain/interfaces/duffel-api.interface';
 import { IDuffelFlightBookingCommandRepository } from '@modules/crm/health-tourism/flight/domain/repositories/duffel-flight-booking/duffel-flight-booking.command.repository';
 import {
   FlightBookingNotFoundException,
@@ -44,7 +47,10 @@ const makeBooking = () =>
     logSource: LogSource.SYSTEM,
   });
 
-const build = (booking: DuffelFlightBooking | null) => {
+const build = (
+  booking: DuffelFlightBooking | null,
+  cancellation: Partial<FlightCancellationResult> = {}
+) => {
   let txDepth = 0;
   const depthAtCall: Record<string, number> = {};
 
@@ -55,6 +61,7 @@ const build = (booking: DuffelFlightBooking | null) => {
         cancellationId: 'can_1',
         refundAmount: null,
         refundCurrency: null,
+        ...cancellation,
       };
     }),
   } as unknown as IDuffelApiService;
@@ -136,6 +143,77 @@ describe('CancelFlightBookingHandler', () => {
     );
 
     expect(depthAtCall.cancelOrder).toBe(0);
+  });
+
+  describe('iptal ekonomisi (havayolunun alıkoyduğu tutar)', () => {
+    const cancel = (cancellation: Partial<FlightCancellationResult>) => {
+      const booking = makeBooking(); // sipariş tutarı 100 EUR
+      const { handler } = build(booking, cancellation);
+      return handler.execute(
+        new CancelFlightBookingCommand(dto(booking.id.value), ctx)
+      );
+    };
+
+    it('alıkoyulan = sipariş tutarı − iade edilecek tutar', async () => {
+      // Duffel İADE EDİLECEĞİ tutarı bildirir, alıkoyduğunu değil. Yanıtı
+      // atmak, platform defterinde cezanın hiç görünmemesi demekti.
+      const result = await cancel({
+        refundAmount: '70.00',
+        refundCurrency: 'EUR',
+      });
+
+      expect(result.retained).toEqual({ amount: '30.00', currency: 'EUR' });
+    });
+
+    it('tam iade → alıkoyulan sıfır (bilinmiyor DEĞİL)', async () => {
+      const result = await cancel({
+        refundAmount: '100.00',
+        refundCurrency: 'EUR',
+      });
+
+      expect(result.retained).toEqual({ amount: '0.00', currency: 'EUR' });
+    });
+
+    it('iade tutarı bildirilmediyse "bilinmiyor" taşınır (0 varsayılmaz)', async () => {
+      // 0 kabul etmek "havayolu hiçbir şey iade etmiyor, tamamı ceza" demek
+      // olurdu ve maliyetin tamamını zarara yazardı.
+      const result = await cancel({ refundAmount: null });
+
+      expect(result.retained).toBeNull();
+    });
+
+    it('iade farklı para biriminde → çıkarılamaz, bilinmiyor', async () => {
+      const result = await cancel({
+        refundAmount: '3000.00',
+        refundCurrency: 'TRY',
+      });
+
+      expect(result.retained).toBeNull();
+    });
+
+    it('iade sipariş tutarını aşıyorsa tutarsız → bilinmiyor', async () => {
+      const result = await cancel({
+        refundAmount: '150.00',
+        refundCurrency: 'EUR',
+      });
+
+      expect(result.retained).toBeNull();
+    });
+
+    it('zaten iptalliyse sağlayıcıya gidilmez → ekonomi bilinmiyor', async () => {
+      const booking = makeBooking();
+      booking.cancel({
+        actorId: ctx.actor.userId,
+        logSource: LogSource.SYSTEM,
+      });
+      const { handler } = build(booking);
+
+      const result = await handler.execute(
+        new CancelFlightBookingCommand(dto(booking.id.value), ctx)
+      );
+
+      expect(result).toEqual({ orderId: null, retained: null });
+    });
   });
 
   it('kayıt yoksa FlightBookingNotFoundException', async () => {

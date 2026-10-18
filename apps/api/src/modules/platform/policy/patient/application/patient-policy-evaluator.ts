@@ -3,6 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { PatientBasePolicy } from '@modules/platform/policy/patient/application/patient-base.policy';
 import { PatientPolicyAccessDeniedEvent } from '@modules/platform/policy/patient/domain/events/patient-policy-access-denied.event';
+import { emitDetached } from '@common/utils';
 
 export class PatientPolicyEvaluator<T extends PatientBasePolicy> {
   private isValid: boolean = true;
@@ -44,15 +45,20 @@ export class PatientPolicyEvaluator<T extends PatientBasePolicy> {
 
       const actor = this.policy.getActorContext();
 
-      void this.eventEmitter?.emitAsync(
-        PatientPolicyAccessDeniedEvent.NAME,
-        new PatientPolicyAccessDeniedEvent({
-          patientId: actor.patientId,
-          organizationId: actor.organizationId,
-          reason: finalMessage,
-          operation,
-        })
-      );
+      if (this.eventEmitter) {
+        // Yetki reddi denetim kaydı akışı bekletmez; dinleyicinin hatası
+        // burada yutulur (çağıran zaten 403 fırlatıyor).
+        emitDetached(
+          this.eventEmitter,
+          PatientPolicyAccessDeniedEvent.NAME,
+          new PatientPolicyAccessDeniedEvent({
+            patientId: actor.patientId,
+            organizationId: actor.organizationId,
+            reason: finalMessage,
+            operation,
+          })
+        );
+      }
 
       throw new ForbiddenException(finalMessage);
     }

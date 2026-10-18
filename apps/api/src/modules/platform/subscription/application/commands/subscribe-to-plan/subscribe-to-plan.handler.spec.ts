@@ -7,15 +7,9 @@ import {
   SubscriptionAlreadyExistsException,
   SubscriptionClinicRequiredException,
 } from '@modules/platform/subscription/domain/exceptions/subscription.exceptions';
-import {
-  ISubscriptionCommandRepository,
-} from '@modules/platform/subscription/domain/repositories/subscription/subscription.command.repository';
-import {
-  ISubscriptionItemCommandRepository,
-} from '@modules/platform/subscription/domain/repositories/subscription-item/subscription-item.command.repository';
-import {
-  IPlanCommandRepository,
-} from '@modules/platform/subscription/domain/repositories/plan/plan.command.repository';
+import { ISubscriptionCommandRepository } from '@modules/platform/subscription/domain/repositories/subscription/subscription.command.repository';
+import { ISubscriptionItemCommandRepository } from '@modules/platform/subscription/domain/repositories/subscription-item/subscription-item.command.repository';
+import { IPlanCommandRepository } from '@modules/platform/subscription/domain/repositories/plan/plan.command.repository';
 import { IBillingAdapter } from '@modules/platform/subscription/infrastructure/adapters/billing-adapter.interface';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';

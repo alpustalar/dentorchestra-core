@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { AuthCacheService } from '@modules/identity/auth/auth/infrastructure/cache/auth-cache.service';
 import { USER_EVENTS } from '@src/domain/constants/events';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class CleanAuthCacheOnUserUpdatedListener {
@@ -11,7 +11,7 @@ export class CleanAuthCacheOnUserUpdatedListener {
 
   constructor(private readonly cacheService: AuthCacheService) {}
 
-  @OnEvent([
+  @OnDomainEvent([
     USER_EVENTS.UPDATE,
     USER_EVENTS.SOFT_DELETED,
     USER_EVENTS.BULK_SOFT_DELETED,

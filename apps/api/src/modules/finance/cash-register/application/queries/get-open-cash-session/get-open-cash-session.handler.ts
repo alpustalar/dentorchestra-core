@@ -12,9 +12,10 @@ import {
 } from '@modules/finance/cash-register/domain/repositories/cash-session/cash-session.query.repository';
 
 @QueryHandler(GetOpenCashSessionQuery)
-export class GetOpenCashSessionHandler
-  implements IQueryHandler<GetOpenCashSessionQuery, GetOpenCashSessionResponse>
-{
+export class GetOpenCashSessionHandler implements IQueryHandler<
+  GetOpenCashSessionQuery,
+  GetOpenCashSessionResponse
+> {
   constructor(
     @Inject(CASH_SESSION_QUERY_REPOSITORY)
     private readonly cashSessionRepo: ICashSessionQueryRepository,

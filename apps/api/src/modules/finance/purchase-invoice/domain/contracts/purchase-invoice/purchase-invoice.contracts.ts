@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { CurrencyType } from '@input-type-schemas/CurrencySchema';
+import { LogSource } from '@src/domain/constants/log-action.constant';
 
 /**
  * PurchaseInvoice domain kontratları. Entity static `create()` girişi (Props).
@@ -29,4 +30,16 @@ export interface CreatePurchaseInvoiceProps {
   grandTotal: string | number | Decimal;
 
   currency: CurrencyType;
+
+  /** Audit damgası — olay entity içinde raise edilir (bkz. AggregateRoot kuralı). */
+  actorId?: string;
+  source?: LogSource;
+}
+
+/** Alış faturası iptali — gerekçe ve iptal eden personel kalıcı damgadır. */
+export interface CancelPurchaseInvoiceProps {
+  reason: string;
+  /** Personel kimliği — Firebase UID (UUID değil). */
+  cancelledById: string;
+  source?: LogSource;
 }

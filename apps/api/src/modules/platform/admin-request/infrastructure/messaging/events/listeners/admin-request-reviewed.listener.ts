@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { CommandBus } from '@nestjs/cqrs';
 import { AdminRequestReviewedEvent } from '@modules/platform/admin-request/domain/events/admin-request-reviewed.event';
 import { ADMIN_REQUEST_EVENTS } from '@src/domain/constants/events/admin-request.constant';
@@ -8,6 +7,7 @@ import { SoftDeleteClinicCommand } from '@modules/organization/clinic/applicatio
 import { SoftDeleteOrganizationCommand } from '@modules/organization/organization/application/commands/soft-delete-organization/soft-delete-organization.command';
 import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
 import { AdminRequestStatusSchema, AdminRequestTypeSchema } from '@shared';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class AdminRequestReviewedListener {
@@ -16,7 +16,7 @@ export class AdminRequestReviewedListener {
 
   constructor(private readonly commandBus: CommandBus) {}
 
-  @OnEvent(ADMIN_REQUEST_EVENTS.REVIEWED, { async: true })
+  @OnDomainEvent(ADMIN_REQUEST_EVENTS.REVIEWED)
   async handle(event: AdminRequestReviewedEvent) {
     if (event.status !== AdminRequestStatusSchema.enum.APPROVED) return;
 

@@ -3,6 +3,7 @@ import {
   AutoMatchStatementLinesSchema,
   CreateBankAccountSchema,
   ImportBankStatementSchema,
+  RecordProviderSettlementSchema,
   ReconcileStatementLineSchema,
 } from '../../schemas/commands';
 
@@ -13,4 +14,7 @@ export type ReconcileStatementLine = z.infer<
 >;
 export type AutoMatchStatementLines = z.infer<
   typeof AutoMatchStatementLinesSchema
+>;
+export type RecordProviderSettlement = z.infer<
+  typeof RecordProviderSettlementSchema
 >;

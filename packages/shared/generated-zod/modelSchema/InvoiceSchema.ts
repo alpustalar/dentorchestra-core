@@ -19,6 +19,15 @@ export const InvoiceSchema = z.object({
   organizationId: z.string(),
   clinicId: z.string(),
   patientId: z.string(),
+  /**
+   * `@unique` DEĞİL: tekillik **iptal edilmemiş** faturalar arasında geçerlidir.
+   * Prisma kısmî (partial) unique index'i ifade edemediği için kısıt migration'da
+   * elle kurulur: `invoices_appointment_id_active_key` / `invoices_payment_id_active_key`
+   * (`WHERE status <> 'CANCELLED'`). Tam unique olduğunda hatalı kesilmiş bir fatura
+   * iptal edildikten sonra aynı randevu/tahsilat için DOĞRU fatura bir daha
+   * kesilemiyordu — iptal akışı yarım kalıyordu.
+   * Kabul kümesinin kod tarafındaki tek kaynağı: `ACTIVE_INVOICE_STATUSES`.
+   */
   appointmentId: z.string().nullable(),
   paymentId: z.string().nullable(),
   amount: decimalSchema("Field 'amount' must be a Decimal. Location: ['Models', 'Invoice']"),
@@ -30,6 +39,9 @@ export const InvoiceSchema = z.object({
   einvoiceUuid: z.string().nullable(),
   providerRef: z.string().nullable(),
   rawResponse: JsonValueSchema.nullable(),
+  cancelledAt: z.coerce.date().nullable(),
+  cancelledById: z.string().nullable(),
+  cancelReason: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
   isDeleted: z.boolean(),

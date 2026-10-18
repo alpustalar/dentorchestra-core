@@ -12,13 +12,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @QueryHandler(GetReconciliationSummaryQuery)
-export class GetReconciliationSummaryHandler
-  implements
-    IQueryHandler<
-      GetReconciliationSummaryQuery,
-      GetReconciliationSummaryResponse
-    >
-{
+export class GetReconciliationSummaryHandler implements IQueryHandler<
+  GetReconciliationSummaryQuery,
+  GetReconciliationSummaryResponse
+> {
   constructor(
     @Inject(BANK_STATEMENT_QUERY_REPOSITORY)
     private readonly statementQueryRepo: IBankStatementQueryRepository,

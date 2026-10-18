@@ -17,9 +17,10 @@ import {
 } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
 
 @CommandHandler(CreateBankAccountCommand)
-export class CreateBankAccountHandler
-  implements ICommandHandler<CreateBankAccountCommand, string>
-{
+export class CreateBankAccountHandler implements ICommandHandler<
+  CreateBankAccountCommand,
+  string
+> {
   constructor(
     @Inject(BANK_ACCOUNT_COMMAND_REPOSITORY)
     private readonly bankAccountRepo: IBankAccountCommandRepository,

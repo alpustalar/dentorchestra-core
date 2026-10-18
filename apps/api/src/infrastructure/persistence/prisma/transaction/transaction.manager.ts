@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { DomainEvent } from '@common/interfaces';
+import { emitDetached } from '@common/utils';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import {
   TransactionContext,
@@ -53,7 +54,7 @@ export class TransactionManager {
       return value;
     });
 
-    await this.emitAfterCommit(events);
+    this.emitAfterCommit(events);
 
     return result;
   }
@@ -106,28 +107,31 @@ export class TransactionManager {
 
     const result = await txStorage.run(context, work);
 
-    await this.emitAfterCommit(context.events);
+    this.emitAfterCommit(context.events);
 
     return result;
   }
 
   /**
-   * Toplanan event'leri yayınlar. Bir listener'ın hatası ne diğer listener'ları ne de
-   * zaten kalıcılaşmış iş yazmasını etkiler; yalnız loglanır (kritik yan etkiler
-   * outbox'tan gider). Sıra korunur: event'ler eklendikleri sırayla yayınlanır.
+   * Toplanan event'leri yayınlar — **beklemeden**. Bir listener'ın hatası ne diğer
+   * listener'ları ne de zaten kalıcılaşmış iş yazmasını etkiler; loglanır ve WARNING
+   * uyarısı çıkar. Sıra korunur: event'ler eklendikleri sırayla yayınlanır.
+   *
+   * Niye `emitDetached` (await değil): bu kanal **kritik olmayan** yan etkiler için
+   * (bildirim, denetim kaydı, e-posta) ve commit sonrası isteğin içinde çalışır.
+   * Beklemek, HTTP yanıtını bir SMTP/WhatsApp çağrısının arkasına koyardı. Kritik
+   * yan etki outbox'tan gider; orada beklemek **doğru** yerdir (kuyruk işçisi),
+   * çünkü teslim garantisi bekleyen tarafın hatayı görmesine bağlıdır.
+   *
+   * Not: dinleyiciler `@OnDomainEvent` ile kaydedilene kadar bu `try/catch` ölü
+   * koddu — framework hatayı yutuyordu (bkz. `OnDomainEvent`).
    */
-  private async emitAfterCommit(events: DomainEvent[]): Promise<void> {
+  private emitAfterCommit(events: DomainEvent[]): void {
     for (const event of events) {
-      try {
-        await this.eventEmitter.emitAsync(event.name, event.payload);
-      } catch (error) {
-        this.logger.error(
-          `Event listener'ı hata verdi (event=${event.name}): ${error}`
-        );
-        // Bu kanal kritik OLMAYAN yan etkiler için (kritik olanlar outbox'tan
-        // gider); yine de sessizce düşen bir listener fark edilmeli — bildirim
-        // gitmemiş ya da denetim kaydı yazılmamış olabilir. WARNING seviyesi,
-        // dedupe event adına göre: aynı listener sürekli patlıyorsa tek satır.
+      emitDetached(this.eventEmitter, event.name, event.payload, (error) => {
+        // Sessizce düşen bir listener fark edilmeli — bildirim gitmemiş ya da
+        // denetim kaydı yazılmamış olabilir. WARNING seviyesi, dedupe event adına
+        // göre: aynı listener sürekli patlıyorsa tek satır.
         this.criticalFailure.publish({
           operation: 'events.in-memory-dispatch',
           severity: 'WARNING',
@@ -137,7 +141,7 @@ export class TransactionManager {
           clinicId: null,
           dedupeKey: `listener-failed:${event.name}`,
         });
-      }
+      });
     }
   }
 }

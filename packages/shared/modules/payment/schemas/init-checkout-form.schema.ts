@@ -12,7 +12,11 @@ export const InitCheckoutFormSchema = z.object({
   /** TRY cinsinden tutar, örn: 500.00 */
   amount: z
     .number({ message: 'Tutar sayısal bir değer olmalıdır' })
-    .positive({ message: 'Tutar sıfırdan büyük olmalıdır' }),
+    .positive({ message: 'Tutar sıfırdan büyük olmalıdır' })
+    // Sanal POS'a giden tutar ile kayda geçen tutarın ayrışmaması için kuruş sınırı.
+    .multipleOf(0.01, {
+      message: 'Tutar en fazla 2 ondalık basamak taşıyabilir',
+    }),
 
   patientName: z
     .string()

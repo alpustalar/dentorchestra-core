@@ -1,4 +1,4 @@
-import { PurchaseOrder, Pagination } from '@shared';
+import { PurchaseOrder, PurchaseOrderItem, Pagination } from '@shared';
 
 /** Filter for finding purchase orders. */
 export interface FindPurchaseOrdersFilter {
@@ -9,8 +9,15 @@ export interface FindPurchaseOrdersFilter {
   pagination: Pagination;
 }
 
-/** Purchase order with items. */
-export type PurchaseOrderWithItems = any; // Infer from @shared if available
+/**
+ * Sipariş + kalemleri (okuma modeli). `any` idi: üçlü eşleştirme hesabı
+ * (sipariş ↔ teslim ↔ fatura) bu tipin para alanlarından besleniyor ve `any`
+ * altında `quantityReceived`/`unitPrice` adının yanlış yazılması derleme hatası
+ * vermiyordu — sessizce `undefined` ile çarpım yapılırdı.
+ */
+export type PurchaseOrderWithItems = PurchaseOrder & {
+  items: PurchaseOrderItem[];
+};
 
 /** Paginated purchase order results. */
 export interface PurchaseOrderPage {

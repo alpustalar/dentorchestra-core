@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { SetupApp } from '@common/setup-app';
@@ -7,6 +8,10 @@ import { WinstonModule } from 'nest-winston';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { ENV } from '@common/constants/env.constant';
 import { winstonConfig } from '@src/infrastructure/logging/winston.config';
+import {
+  CriticalFailurePublisher,
+  installProcessFailureAlarms,
+} from '@common/observability';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -15,6 +20,11 @@ async function bootstrap() {
   });
 
   SetupApp(app);
+
+  // Sürecin ölümü de bir uyarıdır: yakalanmayan bir promise reddi uçuşta olan
+  // istekleri yarıda bırakır ve finans tarafında bu "para alındı, defter
+  // yazılmadı" demektir. Yeniden başlatma sessiz kalmasın.
+  installProcessFailureAlarms({ publisher: app.get(CriticalFailurePublisher) });
 
   const configService = app.get(ConfigService);
 
@@ -36,4 +46,16 @@ async function bootstrap() {
   await app.listen(port);
 }
 
-bootstrap();
+// Açılış hatası da bir ölümdür ve en sessiz olanıdır: `installProcessFailureAlarms`
+// henüz bağlanmamıştır (konteyner yok), uyarı kanalı da yoktur. Elde kalan tek şey
+// log'dur — o yüzden en azından hatanın kendisi ve sıfırdan farklı çıkış kodu
+// garanti edilir; yakalanmayan bir promise olarak bırakılırsa Node'un genel
+// mesajına karışır ve yeniden başlatma döngüsünde sebebi kaybolur.
+bootstrap().catch((error: unknown) => {
+  const logger = new Logger('Bootstrap');
+  logger.error(
+    'Uygulama ayağa kalkamadı.',
+    error instanceof Error ? error.stack : String(error)
+  );
+  process.exit(1);
+});

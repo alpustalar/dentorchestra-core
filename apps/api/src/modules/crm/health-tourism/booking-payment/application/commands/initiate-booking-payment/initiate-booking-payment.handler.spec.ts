@@ -10,6 +10,7 @@ import { IBookingPaymentCommandRepository } from '@modules/crm/health-tourism/bo
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
 import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment.entity';
 import { HotelBookingIntent } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
+import { BookingPaymentInvalidNetAmountException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 
 describe('InitiateBookingPaymentHandler — iki link + FX', () => {
   const hotelIntent: HotelBookingIntent = {
@@ -159,6 +160,41 @@ describe('InitiateBookingPaymentHandler — iki link + FX', () => {
     expect(res.iyzico?.currency).toBe('TRY');
     expect(stripeLink.createLink).not.toHaveBeenCalled();
   });
+
+  it('satış fiyatı kuruşta yukarı yuvarlanır (ikili kayan nokta aşağı kaydırıyordu)', async () => {
+    // Regresyon: `Math.round(17.9 * 1.05 * 100) / 100` → 18.79 çünkü çarpım
+    // ikili tabanda 18.794999999999998 düşüyor. `Money` (Decimal + HALF_UP)
+    // 18.795 → 18.80 verir. Fark bir kuruş ve HER ZAMAN platform aleyhine.
+    const { handler, saved } = build({ fxRate: 35, serviceFeePercent: 5 });
+    const res = await handler.execute(
+      new InitiateBookingPaymentCommand({ ...baseInput, netAmount: 17.9 })
+    );
+
+    expect(res.saleAmount).toBe(18.8);
+    expect(saved[0].saleAmount.toApiFormat()).toBe('18.80');
+    // TRY tutarı da aynı kapıdan geçer: 18.80 × 35 = 658.00
+    expect(saved[0].tryAmount.toApiFormat()).toBe('658.00');
+  });
+
+  it.each([0, -1, Number.NaN])(
+    'fiyatı %p olan seçenek için link ÜRETİLMEZ (bedava/geçersiz satış)',
+    async (netAmount) => {
+      // Sağlayıcı yanıtında fiyat alanı eksik olduğunda eskiden `?? 0` ile sıfır
+      // fiyat taşınıyordu; satış fiyatı ondan türetildiği için hastaya bedava
+      // link gidiyordu. Kapı satışın türetildiği tek noktada.
+      const { handler, iyzicoLink, stripeLink, repo } = build({ fxRate: 35 });
+
+      await expect(
+        handler.execute(
+          new InitiateBookingPaymentCommand({ ...baseInput, netAmount })
+        )
+      ).rejects.toBeInstanceOf(BookingPaymentInvalidNetAmountException);
+
+      expect(iyzicoLink.createLink).not.toHaveBeenCalled();
+      expect(stripeLink.createLink).not.toHaveBeenCalled();
+      expect(repo.create).not.toHaveBeenCalled();
+    }
+  );
 
   it('iki sağlayıcı da başarısızsa hata fırlatır', async () => {
     const { handler } = build({ iyzicoThrows: true, stripeThrows: true });

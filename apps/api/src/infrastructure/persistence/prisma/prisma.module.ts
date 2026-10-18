@@ -6,6 +6,9 @@ import { OutboxRepository } from '@src/infrastructure/persistence/prisma/outbox/
 @Global()
 @Module({
   providers: [PrismaService, TransactionManager, OutboxRepository],
-  exports: [PrismaService, TransactionManager],
+  // `OutboxRepository` de dışa açılır: teslim işçisi (`OutboxProcessor`) artık
+  // ham `PrismaService` ile değil, sahiplenme/işaretleme sözleşmesini tek yerde
+  // tutan bu repo ile çalışıyor.
+  exports: [PrismaService, TransactionManager, OutboxRepository],
 })
 export class PrismaModule {}

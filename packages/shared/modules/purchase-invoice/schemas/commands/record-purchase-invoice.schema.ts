@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { STATUTORY_VAT_RATES } from '@shared/common/constants';
 
 /** Para birimi — @prisma/client'a bağlanmadan (frontend güvenliği) lokal enum. */
 export const PurchaseInvoiceCurrencyEnum = z.enum(['TRY', 'USD', 'EUR', 'GBP']);
@@ -27,9 +28,27 @@ export const RecordPurchaseInvoiceSchema = z.object({
 
   /** Karşı borç/gider hesabı: 150 (stok) | 770/760/740 (gider). */
   lineAccountCode: z.string().min(1).default('770'),
-  vatRate: z.number().int().min(0).max(100),
-  netTotal: z.number().nonnegative(),
-  vatTotal: z.number().nonnegative(),
+  /**
+   * Kabul kümesi **kullanım yeriyle aynı** sabitten gelir: entity oranı
+   * `VatRate` VO'suna sokuyor ve yasal olmayan oranı reddediyor. Kapı 0–100
+   * kaldığı sürece kullanıcı %8 gönderip "Yasal olmayan KDV oranı" hatasını
+   * oranın yanında değil, kaydın ortasında görüyordu (CLAUDE.md finans kuralı 12).
+   */
+  vatRate: z
+    .number()
+    .int()
+    .refine((rate) => STATUTORY_VAT_RATES.includes(rate), {
+      message: `KDV oranı yasal kümede olmalı: ${STATUTORY_VAT_RATES.join(' / ')}`,
+    }),
+
+  /**
+   * Tutarlar kuruş hassasiyetindedir (en fazla 2 ondalık): kolonlar
+   * `Decimal(12,2)` ve kuruş altı girdi DB'de sessizce yuvarlanıp "net + KDV =
+   * genel toplam" dengesini satırda bozuyor (fiş dengesiz kalır, muhasebeleşemez).
+   * Aynı kural entity'de de zorlanır — bu kapı ondan geniş olamaz.
+   */
+  netTotal: z.number().nonnegative().multipleOf(0.01),
+  vatTotal: z.number().nonnegative().multipleOf(0.01),
   currency: PurchaseInvoiceCurrencyEnum.default('TRY'),
 
   // organizationId ALINMAZ — clinicId'den türetilir (bkz. create-supplier).

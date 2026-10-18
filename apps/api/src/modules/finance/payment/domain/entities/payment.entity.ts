@@ -8,20 +8,26 @@ import PaymentMethodSchema from '@input-type-schemas/PaymentMethodSchema';
 import InstallmentStatusSchema from '@input-type-schemas/InstallmentStatusSchema';
 import { Money } from '@src/domain/value-objects/money.vo';
 import {
+  InstallmentNotCancellableException,
+  InstallmentNotCollectibleException,
+  InstallmentNotFailableException,
+  InstallmentNotFoundException,
+  InstallmentNotRefundableException,
   InstallmentTotalMismatchException,
   InvalidInstallmentPlanException,
+  PaymentInvalidPrecisionException,
 } from '@modules/finance/payment/domain/exceptions/payment.exceptions';
 import {
+  CompleteInstallmentProps,
   CreatePaymentProps,
+  FailInstallmentProps,
   RefundInstallmentProps,
 } from '@modules/finance/payment/domain/contracts/payment';
 import { PaymentRefundedEvent } from '@modules/finance/payment/domain/events/payment-refunded.event';
-import {
-  LogAction,
-  LogType,
-} from '@src/domain/constants/log-action.constant';
+import { PaymentPaidEvent } from '@modules/finance/payment/domain/events/payment-paid.event';
+import { PaymentFailedEvent } from '@modules/finance/payment/domain/events/payment-failed.event';
+import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { FirebaseUid } from '@src/domain/value-objects/firebase-uid.vo';
 import { Guard } from '@common/domain/guards';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import { PaymentRules } from '@modules/finance/payment/domain/rules/payment.rules';
@@ -36,7 +42,7 @@ export class Payment extends AggregateRoot {
     super();
     this._id = UUID.create(data.id).orThrow();
     this._clinicId = UUID.create(data.clinicId).orThrow();
-    this._patientId = FirebaseUid.create(data.patientId).orThrow();
+    this._patientId = UUID.create(data.patientId).orThrow();
     this._appointmentId = UUID.create(data.appointmentId).instance ?? null;
     this._providerId = UUID.create(data.providerId).instance ?? null;
     this._totalAmount = Money.create(data.totalAmount, data.currency).orThrow();
@@ -58,9 +64,9 @@ export class Payment extends AggregateRoot {
     return this._clinicId;
   }
 
-  private _patientId: FirebaseUid;
+  private _patientId: UUID;
 
-  get patientId(): FirebaseUid {
+  get patientId(): UUID {
     return this._patientId;
   }
 
@@ -112,6 +118,14 @@ export class Payment extends AggregateRoot {
     return this._dirtyInstallmentIds;
   }
 
+  /**
+   * Durum yüklemleri **düz boolean** döner.
+   *
+   * Önceden `Guard<boolean>` dönüyorlardı; `PaymentRules` içinde `!guard`
+   * yazıldığı için koşul **her zaman** false'a düşüyor, iade/iptal kuralı
+   * sessizce "asla geçerli değil" oluyordu (tipler uyduğu için derleyici
+   * görmüyordu). Boolean dönmek bu hata sınıfını kapatır.
+   */
   public get validate() {
     return {
       andFind: {
@@ -119,11 +133,11 @@ export class Payment extends AggregateRoot {
           this.validateAndFindInstallment(installmentId),
       },
       status: {
-        isRefunded: this.isRefunded(),
-        isCompleted: this.isCompleted(),
-        isCancelled: this.isCancelled(),
-        isPending: this.isPending(),
-        isPartial: this.isPartial(),
+        isRefunded: this._status === PaymentStatusSchema.enum.REFUNDED,
+        isCompleted: this._status === PaymentStatusSchema.enum.COMPLETED,
+        isCancelled: this._status === PaymentStatusSchema.enum.CANCELLED,
+        isPending: this._status === PaymentStatusSchema.enum.PENDING,
+        isPartial: this._status === PaymentStatusSchema.enum.PARTIAL,
       },
     };
   }
@@ -134,6 +148,13 @@ export class Payment extends AggregateRoot {
     if (!props.installments || props.installments.length === 0) {
       throw new InvalidInstallmentPlanException();
     }
+
+    // Kuruştan ince tutar DB'de (`Decimal(10,2)`) sessizce yuvarlanır ve
+    // "taksitler toplamı = ana tutar" invariant'ı diskte bozulur.
+    Payment.assertKurusPrecision(props.totalAmount);
+    props.installments.forEach((inst) =>
+      Payment.assertKurusPrecision(inst.money)
+    );
 
     const totalInstallmentMoney = props.installments
       .map((inst) => inst.money)
@@ -156,8 +177,11 @@ export class Payment extends AggregateRoot {
     return new Payment({
       id: paymentId,
       clinicId: UUID.create(props.clinicId).orThrow().value,
-      patientId: FirebaseUid.create(props.patientId).orThrow().value,
-      appointmentId: UUID.create(props.clinicId).instance?.value ?? null,
+      patientId: UUID.create(props.patientId).orThrow().value,
+      // `props.clinicId` yazılıyordu: randevu kimliği kliniğin kimliğiyle
+      // doldurulduğu için kayıt yanlış randevuya bağlanıyor, `appointment_id`
+      // tekil + FK olduğu için ilk kayıttan sonrası hiç yazılamıyordu.
+      appointmentId: UUID.create(props.appointmentId).instance?.value ?? null,
       providerId: UUID.create(props.providerId).instance?.value ?? null,
       totalAmount: props.totalAmount.value,
       currency: props.totalAmount.currency,
@@ -187,109 +211,160 @@ export class Payment extends AggregateRoot {
     return new PaymentRules(this, validateOptions);
   }
 
-  getCompletedInstallments(): Guard<PaymentInstallment[] | undefined> {
-    const installment = this._installments.filter(
-      (i) => i.status === InstallmentStatusSchema.enum.COMPLETED
-    );
+  /**
+   * Taksiti tahsil edilmiş olarak işaretler ve **yalnız gerçek geçişte**
+   * `PaymentPaidEvent` fırlatır.
+   *
+   * Event'i önceden handler koşulsuz yayınlıyordu: aynı POS callback'i iki kez
+   * geldiğinde taksit zaten COMPLETED olduğu için durum değişmiyor ama event
+   * tekrar çıkıyor, cari kayıt kuyruğuna ikinci iş + ikinci faturalama denemesi
+   * düşüyordu. Olayın tek kaynağı artık bu metot.
+   */
+  completeInstallment(props: CompleteInstallmentProps): void {
+    const installment = this.getInstallmentOrThrow(props.installmentId);
 
-    const has = !!installment;
-
-    return Guard.monitor(
-      installment,
-      has,
-      () => new Error('Ödemesi tamamlanmış taksit bulunamadı')
-    );
-  }
-
-  completeInstallment(installmentId: string): void {
-    const installment =
-      this.validateAndFindInstallment(installmentId).orThrow();
+    // Tekrarlanan tahsilat bildirimi: sessiz ve event'siz no-op (idempotent).
     if (installment.status === InstallmentStatusSchema.enum.COMPLETED) return;
 
-    this.mutateInstallment(installmentId, {
+    if (
+      installment.status === InstallmentStatusSchema.enum.CANCELLED ||
+      installment.status === InstallmentStatusSchema.enum.REFUNDED
+    ) {
+      throw new InstallmentNotCollectibleException({
+        installmentId: props.installmentId,
+        status: installment.status,
+      });
+    }
+
+    this.mutateInstallment(props.installmentId, {
       status: InstallmentStatusSchema.enum.COMPLETED,
       paidAt: DateTimeManager.create(),
     });
+    this.recalculateStatusAfterInstallmentChange();
 
-    const pendingCount = this._installments.filter(
-      (i) =>
-        i.status !== InstallmentStatusSchema.enum.COMPLETED &&
-        i.status !== InstallmentStatusSchema.enum.CANCELLED
-    ).length;
-
-    this._status =
-      pendingCount === 0
-        ? PaymentStatusSchema.enum.COMPLETED
-        : PaymentStatusSchema.enum.PARTIAL;
+    this.addDomainEvent(
+      new PaymentPaidEvent({
+        installmentId: props.installmentId,
+        paymentId: this._id.value,
+        appointmentId: this._appointmentId?.value ?? null,
+        clinicId: this._clinicId.value,
+        actorId: props.actorId,
+        source: props.logSource,
+        action: LogAction.PAYMENT_SUCCESS,
+        type: LogType.INFO,
+        details: props.details ?? 'Ödeme tahsil edildi',
+      })
+    );
   }
 
+  /** Taksiti iptal eder (tahsil edilmemiş taksit için; tahsil edilmişte iade yolu). */
   cancelInstallment(installmentId: string): void {
-    this.validateAndFindInstallment(installmentId).orThrow();
+    const installment = this.getInstallmentOrThrow(installmentId);
+
+    if (installment.status === InstallmentStatusSchema.enum.CANCELLED) return;
+
+    if (
+      installment.status === InstallmentStatusSchema.enum.COMPLETED ||
+      installment.status === InstallmentStatusSchema.enum.REFUNDED
+    ) {
+      throw new InstallmentNotCancellableException({
+        installmentId,
+        status: installment.status,
+      });
+    }
+
     this.mutateInstallment(installmentId, {
       status: InstallmentStatusSchema.enum.CANCELLED,
     });
-
-    const nonCancelledCount = this._installments.filter(
-      (i) => i.status !== InstallmentStatusSchema.enum.CANCELLED
-    ).length;
-
-    if (nonCancelledCount === 0) {
-      this._status = PaymentStatusSchema.enum.CANCELLED;
-    }
+    this.recalculateStatusAfterInstallmentChange();
   }
 
-  refundInstallment({
-    installmentId,
-    actorId,
-    logSource,
-    details,
-  }: RefundInstallmentProps): void {
-    this.validateAndFindInstallment(installmentId).orThrow();
-    this.mutateInstallment(installmentId, {
+  refundInstallment(props: RefundInstallmentProps): void {
+    const installment = this.getInstallmentOrThrow(props.installmentId);
+
+    // Tekrarlanan iade bildirimi (webhook/retry): para çoktan geri gitti,
+    // ikinci kez ters kayıt atılmaması için event'siz no-op.
+    if (installment.status === InstallmentStatusSchema.enum.REFUNDED) return;
+
+    // Tahsil edilmemiş taksit iade EDİLEMEZ: alınmamış parayı geri vermek
+    // defterde karşılığı olmayan bir ters kayıt üretir. Bu bir invariant'tır,
+    // politika değil — `systemOverride` ile atlanamaz.
+    if (installment.status !== InstallmentStatusSchema.enum.COMPLETED) {
+      throw new InstallmentNotRefundableException({
+        installmentId: props.installmentId,
+        status: installment.status,
+      });
+    }
+
+    this.mutateInstallment(props.installmentId, {
       status: InstallmentStatusSchema.enum.REFUNDED,
     });
 
-    // Ödeme durumu TÜM taksitlerden türetilir — kardeş metodlarla (markAsPaid,
-    // cancelInstallment) aynı mantık. Önceden tek taksitin iadesi ödemenin
-    // tamamını REFUNDED yapıyordu: 3 taksitli planda 1 taksit iade edilince
-    // diğer ikisi hâlâ tahsil edilmiş olduğu halde ödeme "tamamen iade" görünüyor,
-    // buna bağlı cari/rapor sorguları geliri sıfırlıyordu.
-    const activeInstallments = this._installments.filter(
-      (i) => i.status !== InstallmentStatusSchema.enum.CANCELLED
-    );
-    const allRefunded =
-      activeInstallments.length > 0 &&
-      activeInstallments.every(
-        (i) => i.status === InstallmentStatusSchema.enum.REFUNDED
-      );
-
-    this._status = allRefunded
-      ? PaymentStatusSchema.enum.REFUNDED
-      : PaymentStatusSchema.enum.PARTIAL;
+    // Ödeme durumu TÜM taksitlerden türetilir — kardeş geçişlerle aynı mantık.
+    // Önceden tek taksitin iadesi ödemenin tamamını REFUNDED yapıyordu:
+    // 3 taksitli planda 1 taksit iade edilince diğer ikisi hâlâ tahsil edilmiş
+    // olduğu halde ödeme "tamamen iade" görünüyor, buna bağlı cari/rapor
+    // sorguları geliri sıfırlıyordu.
+    this.recalculateStatusAfterInstallmentChange();
 
     // Event burada raise edilir; muhasebe ters kaydını (RefundLedgerEntries)
     // tetikleyen tek kaynak budur. Handler'ların ayrıca publish etmesi ters
     // kaydın iki kez çalışmasına yol açıyordu.
     this.addDomainEvent(
       new PaymentRefundedEvent({
-        installmentId,
+        installmentId: props.installmentId,
         paymentId: this._id.value,
         appointmentId: this._appointmentId?.value ?? null,
         clinicId: this._clinicId.value,
-        actorId,
-        source: logSource,
+        actorId: props.actorId,
+        source: props.logSource,
         action: LogAction.PAYMENT_REFUNDED,
         type: LogType.INFO,
-        details: details ?? 'Ödeme iade edildi',
+        details: props.details ?? 'Ödeme iade edildi',
       })
     );
   }
 
-  failInstallment(installmentId: string): void {
-    this.validateAndFindInstallment(installmentId).orThrow();
-    this.mutateInstallment(installmentId, {
+  /**
+   * Tahsilat denemesi başarısız: taksit yeniden denenebilir olsun diye PENDING'e
+   * döner ve `paidAt` **temizlenir**.
+   *
+   * Tahsil edilmiş taksit bu yoldan geçemez: durum PENDING'e çekilirken
+   * tahsilatın cari/defter kaydı yerinde kalacağı için rapor ile defter kalıcı
+   * olarak çelişirdi (taksit "açık alacak", defterde tahsilat var).
+   */
+  failInstallment(props: FailInstallmentProps): void {
+    const installment = this.getInstallmentOrThrow(props.installmentId);
+
+    if (
+      installment.status === InstallmentStatusSchema.enum.COMPLETED ||
+      installment.status === InstallmentStatusSchema.enum.REFUNDED
+    ) {
+      throw new InstallmentNotFailableException({
+        installmentId: props.installmentId,
+        status: installment.status,
+      });
+    }
+
+    this.mutateInstallment(props.installmentId, {
       status: InstallmentStatusSchema.enum.PENDING,
+      paidAt: null,
     });
+    this.recalculateStatusAfterInstallmentChange();
+
+    this.addDomainEvent(
+      new PaymentFailedEvent({
+        installmentId: props.installmentId,
+        paymentId: this._id.value,
+        appointmentId: this._appointmentId?.value ?? null,
+        clinicId: this._clinicId.value,
+        actorId: props.actorId,
+        source: props.logSource,
+        action: LogAction.PAYMENT_FAILED,
+        type: LogType.ERROR,
+        details: props.details ?? 'Ödeme başarısız',
+      })
+    );
   }
 
   toPersistence(): IPayment {
@@ -309,51 +384,6 @@ export class Payment extends AggregateRoot {
     };
   }
 
-  private isCompleted(): Guard<boolean> {
-    const isCompleted = this._status === PaymentStatusSchema.enum.COMPLETED;
-    return Guard.monitor(
-      isCompleted,
-      isCompleted,
-      () => new Error('Ödeme durumu "tamamlanmış" değil')
-    );
-  }
-
-  private isCancelled(): Guard<boolean> {
-    const isCancelled = this._status === PaymentStatusSchema.enum.CANCELLED;
-    return Guard.monitor(
-      isCancelled,
-      isCancelled,
-      () => new Error('Ödeme durumu "iptal edilmiş" değil')
-    );
-  }
-
-  private isRefunded(): Guard<boolean> {
-    const isRefunded = this._status === PaymentStatusSchema.enum.REFUNDED;
-    return Guard.monitor(
-      isRefunded,
-      isRefunded,
-      () => new Error('Ödeme durumu "iade edilmiş" değil')
-    );
-  }
-
-  private isPending(): Guard<boolean> {
-    const isPending = this._status === PaymentStatusSchema.enum.PENDING;
-    return Guard.monitor(
-      isPending,
-      isPending,
-      () => new Error('Ödeme durumu "beklemede" değil')
-    );
-  }
-
-  private isPartial(): Guard<boolean> {
-    const isPartial = this._status === PaymentStatusSchema.enum.PARTIAL;
-    return Guard.monitor(
-      isPartial,
-      isPartial,
-      () => new Error('Ödeme durumu "kısmi" değil')
-    );
-  }
-
   private mutateInstallment(
     installmentId: string,
     patch: Partial<PaymentInstallment>
@@ -366,36 +396,51 @@ export class Payment extends AggregateRoot {
     this._updatedAt = now; // Ana aggregate'in de güncellenme tarihini tetikle
   }
 
+  /**
+   * Ödeme durumunu taksitlerin tamamından türetir — **tek kaynak**. Her geçiş
+   * (tahsil/iptal/iade/başarısız) bu metodu çağırır; metod başına kopyalanmış
+   * sayaç mantıkları birbirinden sapıyordu (ör. iade ödemeyi koşulsuz REFUNDED
+   * yapıyordu).
+   *
+   * İptal edilmiş taksitler karar dışıdır: iptal, planın o satırının hiç
+   * olmadığı anlamına gelir.
+   */
   private recalculateStatusAfterInstallmentChange(): void {
-    const totalCount = this._installments.length;
-    const completedCount = this._installments.filter(
-      (i) => i.status === InstallmentStatusSchema.enum.COMPLETED
-    ).length;
-    const cancelledCount = this._installments.filter(
-      (i) => i.status === InstallmentStatusSchema.enum.CANCELLED
-    ).length;
-    const refundedCount = this._installments.filter(
-      (i) => i.status === InstallmentStatusSchema.enum.REFUNDED
-    ).length;
+    const active = this._installments.filter(
+      (i) => i.status !== InstallmentStatusSchema.enum.CANCELLED
+    );
 
-    // Eğer tüm taksitler iptal edildiyse veya iade edildiyse
-    if (cancelledCount === totalCount) {
+    if (active.length === 0) {
       this._status = PaymentStatusSchema.enum.CANCELLED;
       return;
     }
-    if (refundedCount === totalCount) {
+
+    const isRefunded = (i: PaymentInstallment) =>
+      i.status === InstallmentStatusSchema.enum.REFUNDED;
+    const isCompleted = (i: PaymentInstallment) =>
+      i.status === InstallmentStatusSchema.enum.COMPLETED;
+
+    if (active.every(isRefunded)) {
       this._status = PaymentStatusSchema.enum.REFUNDED;
       return;
     }
-
-    // Aktif (iptal/iade edilmemiş) tüm taksitler ödendiyse COMPLETED
-    if (completedCount + cancelledCount + refundedCount === totalCount) {
+    if (active.every(isCompleted)) {
       this._status = PaymentStatusSchema.enum.COMPLETED;
-    } else if (completedCount > 0 || refundedCount > 0) {
-      // En az bir başarı ödeme veya kısmi iade varsa PARTIAL
-      this._status = PaymentStatusSchema.enum.PARTIAL;
-    } else {
-      this._status = PaymentStatusSchema.enum.PENDING;
+      return;
+    }
+    this._status = active.some((i) => isCompleted(i) || isRefunded(i))
+      ? PaymentStatusSchema.enum.PARTIAL
+      : PaymentStatusSchema.enum.PENDING;
+  }
+
+  /** Taksit yoksa tipli domain hatası — ham `Error` 500'e dönüşüyordu. */
+  private getInstallmentOrThrow(installmentId: string): PaymentInstallment {
+    return this.validateAndFindInstallment(installmentId).orThrow();
+  }
+
+  private static assertKurusPrecision(money: Money): void {
+    if (money.value.decimalPlaces() > Money.PRECISION) {
+      throw new PaymentInvalidPrecisionException(money.value.toString());
     }
   }
 
@@ -404,10 +449,10 @@ export class Payment extends AggregateRoot {
   ): Guard<PaymentInstallment | undefined> {
     const installment = this._installments.find((i) => i.id === installmentId);
 
-    const hasInstallment = !!installment;
-
-    return Guard.monitor(installment, hasInstallment, () =>
-      Error(`Taksit bulunamadı: installmentId=${installmentId}`)
+    return Guard.monitor(
+      installment,
+      !!installment,
+      () => new InstallmentNotFoundException(installmentId)
     );
   }
 }

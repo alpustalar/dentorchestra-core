@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Decimal } from 'decimal.js';
 import { BaseCommandRepository } from '@src/infrastructure/persistence/prisma/base-command.repository';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { IProductBatchCommandRepository } from '@modules/supply/inventory/domain/repositories/product-batch/product-batch.command.repository';
@@ -37,6 +38,14 @@ export class ProductBatchCommandRepository
       orderBy: { expiresAt: 'asc' },
     });
     return rows.map((raw) => new ProductBatch(raw));
+  }
+
+  async sumOnHandByProduct(productId: string): Promise<Decimal> {
+    const result = await this.db.productBatch.aggregate({
+      where: { productId },
+      _sum: { quantity: true },
+    });
+    return new Decimal((result._sum.quantity ?? 0).toString());
   }
 
   async create(batch: ProductBatch): Promise<ProductBatch> {

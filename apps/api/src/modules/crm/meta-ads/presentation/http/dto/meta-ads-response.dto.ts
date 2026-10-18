@@ -21,8 +21,10 @@ export class MetaAdAccountResponseDto {
   isActive: boolean;
 
   // --- Token Güvenliği & Finansal Senkronizasyon (Yönetim ve Admin) ---
-  @Expose({ groups: [MANAGEMENT, ADMIN] })
-  accessToken: string;
+  // `accessToken` BİLİNÇLİ olarak yok: reklam hesabının tam yetkili erişim
+  // anahtarıdır; bir yanıt gövdesinde grup kısıtıyla "korunması" onu hâlâ
+  // tarayıcıya, ara belleklere ve log'lara taşır. Geçerliliği `tokenExpiresAt`
+  // ile görünür, değeri gerekmez.
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })
   @Type(() => Date)

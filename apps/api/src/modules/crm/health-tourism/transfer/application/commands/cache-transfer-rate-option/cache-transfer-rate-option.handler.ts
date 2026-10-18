@@ -7,9 +7,10 @@ import {
 } from '@modules/crm/health-tourism/transfer/domain/interfaces/transfer-cache.service.interface';
 
 @CommandHandler(CacheTransferRateOptionCommand)
-export class CacheTransferRateOptionHandler
-  implements ICommandHandler<CacheTransferRateOptionCommand, void>
-{
+export class CacheTransferRateOptionHandler implements ICommandHandler<
+  CacheTransferRateOptionCommand,
+  void
+> {
   constructor(
     @Inject(TRANSFER_CACHE_SERVICE)
     private readonly cacheService: ITransferCacheService

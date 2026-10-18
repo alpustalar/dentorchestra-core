@@ -29,10 +29,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @CommandHandler(InitCheckoutFormCommand)
-export class InitCheckoutFormHandler
-  implements
-    ICommandHandler<InitCheckoutFormCommand, InitCheckoutFormCommandResponse>
-{
+export class InitCheckoutFormHandler implements ICommandHandler<
+  InitCheckoutFormCommand,
+  InitCheckoutFormCommandResponse
+> {
   constructor(
     private readonly commandBus: TSCommandBus,
     @Inject(IYZICO_PROVIDER)

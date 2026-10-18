@@ -4,3 +4,4 @@ export type { SearchTransferAvailability } from './search-transfer-availability.
 export type { GetTransferBookings } from './get-transfer-bookings.type';
 export type { SearchFlights } from './search-flights.type';
 export type { GetFlightBookings } from './get-flight-bookings.type';
+export type { GetUnbridgedBookingLedgerEntries } from './get-unbridged-booking-ledger-entries.type';

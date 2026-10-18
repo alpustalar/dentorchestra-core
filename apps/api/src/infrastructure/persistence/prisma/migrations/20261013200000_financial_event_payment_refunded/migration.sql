@@ -1,0 +1,15 @@
+-- İade ekonomik olayı.
+--
+-- İade bugüne kadar hiçbir yoldan çift taraflı deftere ulaşmıyordu: kart iadesi
+-- taksiti REFUNDED yapıyor, cari defteri düzeltiyor, POS satırını damgalıyor —
+-- ama yevmiyede tahsilat olduğu gibi duruyordu (108 tahsilatta kalıyor, 120
+-- kapanmış görünüyordu). Mizan/bilanço iade edilen parayı hâlâ bizde sayıyordu.
+--
+-- Yeni bir tip (tahsilat fişinin storno'su değil): para o gün gerçekten
+-- alınmıştı; iadenin kendi tarihi vardır ve orijinal dönem kapanmış olabilir.
+-- Storno, kaydın hiç olmaması gerektiği durumlar (belge iptali) içindir.
+-- `IF NOT EXISTS`: enum değeri eklemek geri alınamaz; migration yeniden
+-- oynatılırsa (shadow DB, kısmi uygulama) ikinci çalıştırma patlamasın.
+-- Değer bu migration içinde KULLANILMIYOR — Postgres aynı transaction'da
+-- yeni enum değerini kabul etmez.
+ALTER TYPE "FinancialEventType" ADD VALUE IF NOT EXISTS 'PAYMENT_REFUNDED';

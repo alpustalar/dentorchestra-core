@@ -6,7 +6,11 @@ import { HotelRateOptionToken } from '@modules/crm/health-tourism/hotel/domain/c
 import { IHotelCacheService } from '@modules/crm/health-tourism/hotel/domain/interfaces/hotel-cache.service.interface';
 
 const KEYS = {
-  RATE_OPTION: (token: string) => `hotel:rate-option:${token}`,
+  // Anahtar **kiracı kapsamlı**: başka bir kliniğin optionId'si burada hiç bulunmaz
+  // (çarpışma da kiracı içinde kalır). Sahiplik kontrolü kaydın içinde ayrıca yapılır —
+  // anahtar bir adres, yetki değil.
+  RATE_OPTION: (clinicId: string, token: string) =>
+    `hotel:rate-option:${clinicId}:${token}`,
 };
 
 @Injectable()
@@ -19,8 +23,11 @@ export class HotelCacheService implements IHotelCacheService {
 
   get hotelRateOption() {
     return {
-      get: async (token: string): Promise<HotelRateOptionToken | null> => {
-        const raw = await this.redis.get(KEYS.RATE_OPTION(token));
+      get: async (
+        clinicId: string,
+        token: string
+      ): Promise<HotelRateOptionToken | null> => {
+        const raw = await this.redis.get(KEYS.RATE_OPTION(clinicId, token));
         if (!raw) return null;
 
         try {
@@ -39,7 +46,8 @@ export class HotelCacheService implements IHotelCacheService {
         ttlSeconds = this.rateOptionTtl
       ): Promise<void> => {
         await this.redis.set(
-          KEYS.RATE_OPTION(token),
+          // Anahtarın kiracısı kaydın sahibinden gelir: ikisi **ayrışamaz**.
+          KEYS.RATE_OPTION(data.owner.clinicId, token),
           JSON.stringify(data),
           'EX',
           ttlSeconds

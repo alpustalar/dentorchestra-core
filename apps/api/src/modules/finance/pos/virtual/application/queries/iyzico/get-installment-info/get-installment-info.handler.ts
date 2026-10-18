@@ -14,10 +14,10 @@ import { UUID } from '@src/domain/value-objects';
 import { IyzicoResultGuard } from '@src/domain/value-objects/iyzico-result-guard.vo';
 
 @QueryHandler(GetInstallmentInfoQuery)
-export class GetInstallmentInfoHandler
-  implements
-    IQueryHandler<GetInstallmentInfoQuery, GetInstallmentInfoQueryResponse>
-{
+export class GetInstallmentInfoHandler implements IQueryHandler<
+  GetInstallmentInfoQuery,
+  GetInstallmentInfoQueryResponse
+> {
   constructor(
     @Inject(IYZICO_PROVIDER)
     private readonly iyzicoProvider: IIyzicoProvider

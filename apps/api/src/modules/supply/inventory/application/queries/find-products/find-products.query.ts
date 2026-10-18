@@ -9,7 +9,6 @@ export class FindProductsQuery implements IQuery {
     public readonly payload: {
       readonly pagination: PaginationDto;
       readonly clinicId: string;
-      readonly organizationId?: string | null;
       readonly ctx: IGetContext;
     }
   ) {}

@@ -13,9 +13,10 @@ import {
 import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetTaxParametersQuery)
-export class GetTaxParametersHandler
-  implements IQueryHandler<GetTaxParametersQuery, GetTaxParametersResponse>
-{
+export class GetTaxParametersHandler implements IQueryHandler<
+  GetTaxParametersQuery,
+  GetTaxParametersResponse
+> {
   constructor(
     @Inject(TAX_PARAMETER_QUERY_REPOSITORY)
     private readonly taxParameterRepo: ITaxParameterQueryRepository,

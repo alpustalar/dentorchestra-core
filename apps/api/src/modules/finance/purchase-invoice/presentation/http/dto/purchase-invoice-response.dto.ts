@@ -49,6 +49,22 @@ export class PurchaseInvoiceResponseDto {
   @Type(() => Number)
   grandTotal: number;
 
+  // --- İptal İzi ---
+  /**
+   * `status = CANCELLED` belgenin hükümsüz olduğunu söyler; "ne zaman, neden"
+   * sorusunun cevabı burada. İptal edilmemiş faturada ikisi de null.
+   */
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  cancelledAt: Date | null;
+
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  cancelReason: string | null;
+
+  /** İptali yapan personel (Firebase UID) — yönetim/denetim tier'ı. */
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  cancelledById: string | null;
+
   // --- Audit Zaman Damgaları ---
   @Expose({ groups: [MANAGEMENT, ADMIN] })
   @Type(() => Date)

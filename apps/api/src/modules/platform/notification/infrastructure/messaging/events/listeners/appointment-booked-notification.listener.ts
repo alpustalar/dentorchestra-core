@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentBookedEvent } from '@modules/clinical/appointment/domain/events/book-appointment.event';
 import { NotificationDispatcherService } from '@modules/platform/notification/application/services/notification-dispatcher.service';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Randevu oluşturulunca (hasta portalı) bildirim dağıtır: personel panel-içi +
@@ -17,7 +17,7 @@ export class AppointmentBookedNotificationListener {
 
   constructor(private readonly dispatcher: NotificationDispatcherService) {}
 
-  @OnEvent(APPOINTMENT_EVENTS.BOOKED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.BOOKED)
   async handle(event: AppointmentBookedEvent): Promise<void> {
     try {
       await this.dispatcher.notifyAppointmentBooked({

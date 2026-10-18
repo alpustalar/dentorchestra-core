@@ -65,7 +65,9 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-4">
       <span>{label}</span>
-      <span className="text-foreground truncate font-mono text-xs">{value}</span>
+      <span className="text-foreground truncate font-mono text-xs">
+        {value}
+      </span>
     </div>
   );
 }

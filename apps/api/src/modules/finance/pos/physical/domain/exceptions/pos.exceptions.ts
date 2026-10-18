@@ -200,3 +200,20 @@ export class PosTransactionAlreadySettledException extends DomainException<{
     super('POS işlemi zaten sonuçlanmış.', { posTransactionId, status });
   }
 }
+
+/**
+ * Tutar kuruştan (2 hane) daha ince: DB kolonu `Decimal(10,2)` ve cihaza giden
+ * tutar minor-unit'e çevrildiği için fazla hane **sessizce** yuvarlanır —
+ * çekilen tutar ile kayda geçen tutar ayrışır.
+ */
+export class PosAmountInvalidPrecisionException extends DomainException<{
+  amount: string;
+}> {
+  public readonly errorCode = ERROR_CODES.POS.INVALID_PRECISION;
+
+  constructor(amount: string) {
+    super(`Tutar en fazla 2 ondalık basamak taşıyabilir (gelen: ${amount}).`, {
+      amount,
+    });
+  }
+}

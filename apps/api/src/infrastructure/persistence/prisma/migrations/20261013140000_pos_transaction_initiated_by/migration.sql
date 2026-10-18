@@ -1,0 +1,18 @@
+-- POS işlemini terminalde başlatan personelin kalıcı damgası.
+--
+-- Neden: kart çekimi, iptali (VOID) ve iadesi (REFUND) birer para hareketiydi ama
+-- "kim yaptı" hiçbir yerde durmuyordu — dört ters-kayıt handler'ı da `ctx.actor`'ü
+-- yalnız YETKİ KONTROLÜ için okuyup atıyordu (ne kolon, ne event, ne audit log).
+-- CLAUDE.md kural 7: storno/iade gibi yüksek etkili işlemler kalıcı damga ister.
+-- Kasa oturumunda (opened_by), fatura iptalinde (cancelled_by_id) ve işlem satırı
+-- iptalinde (voided_by) bu damga vardı; POS dış para taşıyan tek istisnaydı.
+-- Pratik sonucu: chargeback/itiraz incelemesinde kartı hangi personelin çektiği,
+-- bir satışı kimin iptal ettiği sorulamıyordu.
+--
+-- Kolon NULLABLE: mevcut satırların aktörü geriye dönük bilinemez ve uydurulamaz.
+-- Varsayılan değer DE verilmez — 'SYSTEM' gibi bir damga, kartı fiilen çeken kişinin
+-- yerine geçtiği an izi yok eder (kural 10: okunmayan/yanlış dolan kolon süstür).
+-- Yeni kayıtlarda zorlama uygulama tarafındadır: `CreatePosTransactionProps`
+-- alanı ZORUNLU tutar, böylece yeni bir POS akışı eklendiğinde derleyici damgayı
+-- atlamaya izin vermez.
+ALTER TABLE "pos_transactions" ADD COLUMN "initiated_by_id" TEXT;

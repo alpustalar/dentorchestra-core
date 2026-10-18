@@ -44,6 +44,7 @@ export class Subscription extends AggregateRoot {
     this._organizationId = UUID.fromTrusted(data.organizationId);
     this._clinicId = UUID.create(data.clinicId).instance ?? null;
     this._externalId = data.externalId;
+    this._providerPaymentId = data.providerPaymentId;
     this._status = data.status;
     this._trialEndsAt = data.trialEndsAt;
 
@@ -83,6 +84,17 @@ export class Subscription extends AggregateRoot {
   private _clinicId: UUID | null;
   get clinicId(): UUID | null {
     return this._clinicId;
+  }
+
+  /**
+   * Son BAŞARILI tahsilatın sağlayıcı kimliği. **`externalId`'den ayrıdır:**
+   * `externalId` callback'in korelasyon anahtarıdır (conversationId) ve
+   * ödeme kimliğiyle ezilirse sağlayıcının ikinci bildirimi aboneliği bulamaz.
+   * Tahsilat GEÇMİŞİ burada değil `SubscriptionCharge` defterindedir.
+   */
+  private _providerPaymentId: string | null;
+  get providerPaymentId(): string | null {
+    return this._providerPaymentId;
   }
 
   private _externalId: string | null;
@@ -244,6 +256,7 @@ export class Subscription extends AggregateRoot {
       organizationId: orgId.value,
       clinicId: clinicId?.value ?? null,
       externalId: props.externalId ?? null,
+      providerPaymentId: null,
       status: SubStatusSchema.enum.ACTIVE,
       trialEndsAt: props.trialEndsAt ?? null,
       currentPeriodStart: props.currentPeriodStart ?? null,
@@ -318,7 +331,8 @@ export class Subscription extends AggregateRoot {
     ).orThrow();
     this._status = SubStatusSchema.enum.ACTIVE;
     this._cancelAtPeriodEnd = false;
-    this._externalId = input.iyzicoPaymentId;
+    // Korelasyon anahtarı KORUNUR; ödeme kimliği kendi kolonuna yazılır.
+    this._providerPaymentId = input.iyzicoPaymentId;
     this._updatedAt = DateTimeManager.create();
 
     this.addDomainEvent(
@@ -341,7 +355,7 @@ export class Subscription extends AggregateRoot {
       'subscriptionId' | 'organizationId' | 'iyzicoPaymentId'
     >
   ): void {
-    this._externalId = iyzicoPaymentId;
+    this._providerPaymentId = iyzicoPaymentId;
     this._status = SubStatusSchema.enum.ACTIVE;
     this._cancelAtPeriodEnd = false;
     this.addDomainEvent(
@@ -401,6 +415,7 @@ export class Subscription extends AggregateRoot {
       organizationId: this.organizationId.value,
       clinicId: this.clinicId?.value ?? null,
       externalId: this.externalId,
+      providerPaymentId: this.providerPaymentId,
       status: this.status,
       trialEndsAt: this.trialEndsAt,
       currentPeriodStart: this.currentPeriodStart,

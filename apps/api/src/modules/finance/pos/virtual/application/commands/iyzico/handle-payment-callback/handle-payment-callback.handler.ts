@@ -4,6 +4,9 @@ import { HandlePaymentCallbackCommandResponse } from './handle-payment-callback.
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
 import { Inject, Logger } from '@nestjs/common';
 import { IyzicoTransactionNotFoundException } from '@modules/finance/pos/virtual/domain/exceptions/iyzico.exceptions';
+import { checkIyzicoCallbackBinding } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/rules/iyzico-callback-binding.rule';
+import { IyzicoCallbackRejectedException } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/rules/iyzico-callback-rejected.exception';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import {
   IIyzicoProvider,
   IYZICO_PROVIDER,
@@ -36,7 +39,8 @@ export class HandlePaymentCallbackHandler implements ICommandHandler<
     @Inject(IYZICO_TRANSACTION_COMMAND_REPOSITORY)
     private readonly iyzicoCommandRepo: IIyzicoTransactionCommandRepository,
     private readonly txManager: TransactionManager,
-    private readonly commandBus: TSCommandBus
+    private readonly commandBus: TSCommandBus,
+    private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
   async execute(
@@ -60,6 +64,28 @@ export class HandlePaymentCallbackHandler implements ICommandHandler<
 
       const transaction = new IyzicoTransaction(iyzicoTx);
 
+      // Token ↔ konuşma bağı. Kontrol bu handler'da **vardı** ama yalnız
+      // burada: aynı sağlayıcı hesabından gelen token'ları işleyen diğer iki
+      // callback (rezervasyon, abonelik) korumasızdı. Artık üçü de aynı kuralı
+      // çağırıyor — gerekçe `checkIyzicoCallbackBinding` içinde.
+      // Yerel token'a ek olarak sağlayıcının yankıladığı conversationId de
+      // sınanıyor (iki bağımsız kanıt).
+      const binding = checkIyzicoCallbackBinding({
+        claimedConversationId: conversationId,
+        token,
+        storedToken: transaction.token,
+        retrievedConversationId: sdkResult.conversationId,
+      });
+
+      if (!binding.bound) {
+        this.alertUnbound(conversationId, binding.reason);
+        throw new IyzicoCallbackRejectedException({
+          recordId: conversationId,
+          flow: 'pos-virtual-installment',
+          reason: binding.reason,
+        });
+      }
+
       // Idempotency: başarıyla işlenmiş bir işlem callback/webhook yarışında tekrar gelirse yok say.
       if (transaction.validate.status.isSuccess.value) {
         this.logger.warn(
@@ -79,9 +105,14 @@ export class HandlePaymentCallbackHandler implements ICommandHandler<
         });
         await this.iyzicoCommandRepo.update(transaction);
 
-        // Taksit COMPLETED + PaymentPaidEvent payment command handler'ında fırlatılır.
+        // Taksit COMPLETED; PaymentPaidEvent entity içinde (yalnız gerçek
+        // geçişte) fırlatılır. Aktör sanal POS callback'i olduğu için iç bağlam.
         await this.commandBus.execute(
-          new MarkInstallmentAsPaidCommand(installment.id, 'Ödeme Başarılı')
+          new MarkInstallmentAsPaidCommand({
+            installmentId: installment.id,
+            details: 'Ödeme Başarılı',
+            ctx: ExecutionContextFactory.createInternal(),
+          })
         );
 
         // Muhasebe köprüsü: cari garanti + ekonomik olay (aynı outboxRun → atomik).
@@ -90,7 +121,7 @@ export class HandlePaymentCallbackHandler implements ICommandHandler<
           clinicId: payment.clinicId,
           installmentId: installment.id,
           paymentId: payment.id,
-          amount: installment.amount.toString(),
+          amount: installment.amount.toFixed(2),
         });
       } else {
         transaction.markAsFailed({
@@ -100,14 +131,34 @@ export class HandlePaymentCallbackHandler implements ICommandHandler<
         });
         await this.iyzicoCommandRepo.update(transaction);
 
-        // Taksit PENDING'e döner + PaymentFailedEvent payment command handler'ında fırlatılır.
+        // Taksit PENDING'e döner; PaymentFailedEvent entity içinde fırlatılır.
         await this.commandBus.execute(
-          new MarkInstallmentAsFailedCommand(
-            installment.id,
-            sdkResult.errorMessage
-          )
+          new MarkInstallmentAsFailedCommand({
+            installmentId: installment.id,
+            details: sdkResult.errorMessage,
+            ctx: ExecutionContextFactory.createInternal(),
+          })
         );
       }
+    });
+  }
+
+  /**
+   * Bağı kanıtlanamayan bildirim duyurulur: bu ya bir **saldırı denemesi** ya da
+   * sağlayıcının davranış değişikliğidir (yankı alanı gelmiyor) — ikisi de
+   * sessiz kalmamalı. İkincisinde her ödeme reddedilir, yani alarm olmazsa
+   * tahsilatların durduğu fark edilmez.
+   */
+  private alertUnbound(conversationId: string, reason: string): void {
+    this.criticalFailure.publish({
+      operation: 'pos.virtual.iyzico.callback',
+      severity: 'CRITICAL',
+      summary:
+        'iyzico taksit bildirimi bu kayda ait olduğu kanıtlanamadı; ödeme güncellenmedi.',
+      errorMessage: reason,
+      context: { conversationId, reason },
+      clinicId: null,
+      dedupeKey: `iyzico-callback-unbound:${conversationId}`,
     });
   }
 

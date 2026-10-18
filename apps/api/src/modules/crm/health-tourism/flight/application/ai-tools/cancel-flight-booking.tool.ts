@@ -79,9 +79,14 @@ export class CancelFlightBookingTool implements IAiSubToolHandler {
       reason: 'Hasta talebiyle iptal edildi.',
     } as CancelFlightBookingDto;
 
-    await this.commandBus.execute(new CancelFlightBookingCommand(dto, ctx));
+    const cancellation = await this.commandBus.execute(
+      new CancelFlightBookingCommand(dto, ctx)
+    );
 
-    const refunded = await this.support.refundForCancelledBooking(owned.id);
+    const refunded = await this.support.refundForCancelledBooking({
+      bookingId: owned.id,
+      retained: cancellation.retained,
+    });
 
     return {
       content: JSON.stringify({

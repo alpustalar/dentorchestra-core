@@ -5,6 +5,7 @@ import { RetrieveCheckoutFormResult } from '@src/infrastructure/payment/pos/virt
 import { CancelPaymentRequest } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/cancel-payment.request';
 import {
   CreateSubMerchantRequest,
+  RetrieveSubMerchantRequest,
   SubMerchantResult,
   UpdateSubMerchantRequest,
 } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/create-submerchant.request';
@@ -46,6 +47,11 @@ export interface IIyzicoProvider {
   ): Promise<SubMerchantResult>;
 
   updateSubMerchant(request: UpdateSubMerchantRequest): Promise<void>;
+
+  /** Dış kimlikten (clinicId) alt üye işyerini okur; yoksa `null`. */
+  retrieveSubMerchant(
+    request: RetrieveSubMerchantRequest
+  ): Promise<SubMerchantResult | null>;
 
   get callbackUrl(): string;
 }

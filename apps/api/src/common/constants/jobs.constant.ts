@@ -5,6 +5,12 @@ export const FINANCE_JOBS = {
 
 export const E_DOCUMENT_JOBS = {
   SEND: 'send-e-document',
+  /**
+   * Entegratörde iptal bildirimi. Fatura iptali **yerel** bir muhasebe kararıdır
+   * (storno atılır, belge CANCELLED damgalanır); entegratöre haber vermek doc 07
+   * §5 uyarınca ayrı bir outbound adımdır ve iptali bloklamaz.
+   */
+  CANCEL: 'cancel-e-document',
 } as const;
 
 export const ORGANIZATION_JOBS = {
@@ -64,4 +70,26 @@ export const SUBSCRIPTION_TRIAL_DAYS = 10;
 export const WORK_ORDER_JOBS = {
   /** Termini geçmiş dış iş emirlerini tarar, personele gecikme bildirimi ürettirir. */
   SCAN_OVERDUE: 'work-order-scan-overdue',
+} as const;
+
+export const ACCOUNTING_JOBS = {
+  /**
+   * Gelecek yılın muhasebe dönemini her defter (clinic) için önceden açar.
+   * Dönem yoksa posting tümüyle durur (`NoAccountingPeriodForDateException`) ve
+   * ekonomik olaylar fişsiz kalır — bu iş o takvim uçurumunu kapatır.
+   */
+  OPEN_NEXT_YEAR_PERIODS: 'accounting-open-next-year-periods',
+} as const;
+
+export const POSTING_JOBS = {
+  /**
+   * Fişlenmemiş ekonomik olayları süpürür (bütün defterler).
+   *
+   * Posting hatası dinleyicide yutuluyor (olay defteri bozulmasın diye): CRITICAL
+   * uyarı düşüyor ama iş **kalıcı olarak** yapılmamış kalıyordu. Elle backfill
+   * komutu vardı; onu tetikleyen tek otomatik kontrol yılda bir kez çalışan dönem
+   * kapanışı kapısıydı — yani bir fiş boşluğu aylarca fark edilmeden durabilirdi.
+   * Bu iş o aralığı bir güne indirir (at-least-once teslimin yerine geçen tur).
+   */
+  SWEEP_UNPOSTED_FINANCIAL_EVENTS: 'posting-sweep-unposted-financial-events',
 } as const;

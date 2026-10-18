@@ -32,11 +32,18 @@ export const ROUTE_PATHS = {
   },
   // Sağlık turizmi (otel/transfer) ödeme-önce tahsilatı — iyzico callback + Stripe webhook
   BOOKING_PAYMENTS: {
-    ROOT: `${BASE_PATHS.HEALTH_TOURISM}/${BASE_PATHS.BOOKING_PAYMENTS}`,
-    IYZICO_ROOT: `${BASE_PATHS.HEALTH_TOURISM}/${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.IYZICO}`,
-    STRIPE_ROOT: `${BASE_PATHS.HEALTH_TOURISM}/${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.STRIPE}`,
+    // `*_ROOT` @Controller() içinde kullanılır ve modül ön ekine GÖREDİR:
+    // RouterModule zaten `health-tourism` ön ekini ekliyor, burada tekrarlanırsa
+    // yol /health-tourism/health-tourism/... olur ve sağlayıcı geri çağrısı 404 alır.
+    // `*_FULL_*` ise mutlak yoldur; dışarıya verilen URL'i kurmakta kullanılır.
+    ROOT: BASE_PATHS.BOOKING_PAYMENTS,
+    IYZICO_ROOT: `${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.IYZICO}`,
+    STRIPE_ROOT: `${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.STRIPE}`,
     CALLBACK: BASE_PATHS.CALLBACK,
     WEBHOOK: BASE_PATHS.WEBHOOK,
+    // Platform defteri mutabakatı: eksik fiş raporu + telafi turu.
+    UNBRIDGED: 'unbridged',
+    BACKFILL_LEDGER: 'backfill-ledger',
     IYZICO_FULL_CALLBACK_PATH: `${BASE_PATHS.HEALTH_TOURISM}/${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.IYZICO}/${BASE_PATHS.CALLBACK}`,
     STRIPE_FULL_WEBHOOK_PATH: `${BASE_PATHS.HEALTH_TOURISM}/${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.STRIPE}/${BASE_PATHS.WEBHOOK}`,
   },

@@ -22,13 +22,23 @@ import {
   ISubscriptionPaymentMethodCommandRepository,
   SUBSCRIPTION_PAYMENT_METHOD_COMMAND_REPOSITORY,
 } from '@modules/platform/subscription/domain/repositories/subscription-payment-method/subscription-payment-method.command.repository';
+import {
+  ISubscriptionChargeCommandRepository,
+  SUBSCRIPTION_CHARGE_COMMAND_REPOSITORY,
+} from '@modules/platform/subscription/domain/repositories/subscription-charge/subscription-charge.command.repository';
+import { SubscriptionCharge } from '@modules/platform/subscription/domain/entities/subscription-charge.entity';
+import { CurrencyType } from '@input-type-schemas/CurrencySchema';
+import { checkIyzicoCallbackBinding } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/rules/iyzico-callback-binding.rule';
+import { IyzicoCallbackRejectedException } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/rules/iyzico-callback-rejected.exception';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 
 const BILLING_PERIOD_MONTHS = 1;
 
 @CommandHandler(HandleSubscriptionCallbackCommand)
-export class HandleSubscriptionCallbackHandler
-  implements ICommandHandler<HandleSubscriptionCallbackCommand, void>
-{
+export class HandleSubscriptionCallbackHandler implements ICommandHandler<
+  HandleSubscriptionCallbackCommand,
+  void
+> {
   private readonly logger = new Logger(HandleSubscriptionCallbackHandler.name);
 
   constructor(
@@ -36,8 +46,11 @@ export class HandleSubscriptionCallbackHandler
     private readonly subscriptionRepo: ISubscriptionCommandRepository,
     @Inject(SUBSCRIPTION_PAYMENT_METHOD_COMMAND_REPOSITORY)
     private readonly paymentMethodRepo: ISubscriptionPaymentMethodCommandRepository,
+    @Inject(SUBSCRIPTION_CHARGE_COMMAND_REPOSITORY)
+    private readonly chargeRepo: ISubscriptionChargeCommandRepository,
     @Inject(BILLING_ADAPTER)
     private readonly billingAdapter: IBillingAdapter,
+    private readonly criticalFailure: CriticalFailurePublisher,
     private readonly txManager: TransactionManager
   ) {}
 
@@ -48,6 +61,40 @@ export class HandleSubscriptionCallbackHandler
     // Böylece hem kilit dış HTTP çağrısı boyunca tutulmaz, hem de yazılan kopya
     // adaptör çağrısı öncesine ait bayat bir kopya olmaz (`update()` tüm alanları yazar).
     const result = await this.billingAdapter.handlePaymentResult(token);
+
+    // Bildirim ↔ abonelik bağı. Uç `@Public`: sonuç `token` ile sağlayıcıdan
+    // okunuyor ama güncellenecek abonelik **gövdedeki** `conversationId`'den
+    // bulunuyordu. Bağlanmadığı için başka bir ödemenin (hatta başka bir
+    // akışın — aynı sağlayıcı hesabı) geçerli token'ı, ödenmemiş bir aboneliği
+    // aktive etmeye yetiyordu. Kontrol üç callback'te aynı kuraldan geçer.
+    //
+    // Abonelikte **yerel token kanıtı yok**: `subscribe-to-plan` yalnız
+    // `conversationId`'i (externalId) saklıyor, token'ı saklamıyor → kanıt
+    // sağlayıcının yankısıdır. Yankı gelmezse kural fail-closed davranır.
+    const binding = checkIyzicoCallbackBinding({
+      claimedConversationId: conversationId,
+      token,
+      storedToken: null,
+      retrievedConversationId: result.conversationId,
+    });
+
+    if (!binding.bound) {
+      this.criticalFailure.publish({
+        operation: 'subscription.iyzico.callback',
+        severity: 'CRITICAL',
+        summary:
+          'Abonelik ödeme bildirimi bu aboneliğe ait olduğu kanıtlanamadı; abonelik aktive edilmedi.',
+        errorMessage: binding.reason,
+        context: { conversationId, reason: binding.reason },
+        clinicId: null,
+        dedupeKey: `subscription-callback-unbound:${conversationId}`,
+      });
+      throw new IyzicoCallbackRejectedException({
+        recordId: conversationId,
+        flow: 'platform-subscription',
+        reason: binding.reason,
+      });
+    }
 
     await this.txManager.outboxRun(async () => {
       // Kilitli okuma: iyzico aynı ödeme için callback + webhook gönderiyor.
@@ -66,16 +113,36 @@ export class HandleSubscriptionCallbackHandler
       }
 
       if (result.success && result.iyzicoPaymentId) {
-        subscription.confirmPayment(result.iyzicoPaymentId, {
-          action: LogAction.SUBSCRIPTION_ACTIVATED,
-          type: LogType.INFO,
-          source: LogSource.SYSTEM,
-        });
-        // İlk başarılı ödeme fatura dönemini başlatır → yenileme günü bu tarihten hesaplanır.
-        this.startInitialPeriod(subscription);
-        await this.subscriptionRepo.update(subscription);
+        // iyzico aynı ödeme için callback + webhook gönderir: ikisi de buraya
+        // düşer. Mükerrer bildirim dönemi İKİNCİ KEZ başlatmamalı — ama sessizce
+        // atılmamalı da: kayıtlı kart bildirimlerden yalnız birinde gelebiliyor
+        // ve o bildirim yutulursa sonraki yenileme kartsız kalır (PAST_DUE).
+        const isDuplicate =
+          subscription.providerPaymentId === result.iyzicoPaymentId;
 
-        // Müşteri kartını sakladıysa sonraki dönemler için otomatik tahsilat yöntemini kaydet.
+        if (isDuplicate) {
+          this.logger.log(
+            `Subscription callback yinelenmiş, dönem yeniden başlatılmadı: paymentId=${result.iyzicoPaymentId}`
+          );
+        } else {
+          subscription.confirmPayment(result.iyzicoPaymentId, {
+            action: LogAction.SUBSCRIPTION_ACTIVATED,
+            type: LogType.INFO,
+            source: LogSource.SYSTEM,
+          });
+          // İlk başarılı ödeme fatura dönemini başlatır → yenileme günü bu tarihten hesaplanır.
+          this.startInitialPeriod(subscription);
+          await this.subscriptionRepo.update(subscription);
+          await this.recordInitialCharge({
+            subscription,
+            conversationId,
+            providerPaymentId: result.iyzicoPaymentId,
+            paidAmount: result.paidAmount,
+          });
+        }
+
+        // Kart her iki durumda da kaydedilir: yinelenen bildirim onu İLK kez
+        // taşıyan bildirim olabilir (upsert olduğu için tekrar yazmak zararsız).
         if (result.savedCard) {
           await this.persistSavedCard(subscription.id.value, result.savedCard);
         }
@@ -89,6 +156,47 @@ export class HandleSubscriptionCallbackHandler
         await this.subscriptionRepo.update(subscription);
       }
     });
+  }
+
+  /**
+   * İlk ödemeyi deftere yazar.
+   *
+   * Para biz haberdar olmadan önce çekildiği için satır doğrudan `SUCCEEDED`
+   * doğar (bkz. `SubscriptionCharge.recordCompleted`). Tutar aboneliğin aktif
+   * kalemlerinin toplamıdır — `subscribe-to-plan` sağlayıcıya tam bu tutarı
+   * gönderir. Kalemi olmayan abonelik (deneme süresi) tahsilat satırı üretmez.
+   */
+  private async recordInitialCharge(input: {
+    subscription: Subscription;
+    conversationId: string;
+    providerPaymentId: string;
+    paidAmount?: string;
+  }): Promise<void> {
+    const { subscription, conversationId, providerPaymentId, paidAmount } =
+      input;
+
+    const periodStart = subscription.currentPeriodStart;
+    const periodEnd = subscription.currentPeriodEnd;
+    if (!periodStart || !periodEnd) return;
+
+    const charge = await this.subscriptionRepo.findRenewalCharge(
+      subscription.id.value
+    );
+    if (!charge) return;
+
+    await this.chargeRepo.claim(
+      SubscriptionCharge.recordCompleted({
+        subscriptionId: subscription.id.value,
+        organizationId: subscription.organizationId.value,
+        periodStart,
+        periodEnd,
+        amount: charge.amount,
+        currency: charge.currency as CurrencyType,
+        conversationId,
+        providerPaymentId,
+        paidAmount,
+      })
+    );
   }
 
   private startInitialPeriod(subscription: Subscription): void {

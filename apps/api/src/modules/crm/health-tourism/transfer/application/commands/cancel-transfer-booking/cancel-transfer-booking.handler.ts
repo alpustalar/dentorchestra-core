@@ -1,6 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { CancelTransferBookingCommand } from './cancel-transfer-booking.command';
+import type { CancelTransferBookingResponse } from './cancel-transfer-booking.response';
+import { toSupplierRetainedCost } from '@modules/crm/health-tourism/booking-payment/domain/rules/supplier-retained-cost.rule';
 import {
   HOTELBEDS_TRANSFER_API_SERVICE,
   IHotelbedsTransferApiService,
@@ -13,9 +15,10 @@ import {
 } from '@modules/crm/health-tourism/transfer/domain/repositories/hotelbeds-transfer-booking/hotelbeds-transfer-booking.command.repository';
 
 @CommandHandler(CancelTransferBookingCommand)
-export class CancelTransferBookingHandler
-  implements ICommandHandler<CancelTransferBookingCommand, void>
-{
+export class CancelTransferBookingHandler implements ICommandHandler<
+  CancelTransferBookingCommand,
+  CancelTransferBookingResponse
+> {
   constructor(
     @Inject(HOTELBEDS_TRANSFER_API_SERVICE)
     private readonly transferApi: IHotelbedsTransferApiService,
@@ -30,7 +33,9 @@ export class CancelTransferBookingHandler
    * iki eşzamanlı iptal isteği de rezervasyonu "aktif" görüp HotelBeds'e iki kez
    * iptal (ve arkasındaki iade akışını iki kez) tetiklerdi.
    */
-  async execute(command: CancelTransferBookingCommand): Promise<void> {
+  async execute(
+    command: CancelTransferBookingCommand
+  ): Promise<CancelTransferBookingResponse> {
     const { dto } = command;
 
     const claimed = await this.txManager.run(async () => {
@@ -49,8 +54,20 @@ export class CancelTransferBookingHandler
       return true;
     });
 
-    if (!claimed) return;
+    // Zaten iptalliydi: sağlayıcıya gitmedik, iptal ekonomisi öğrenilemez.
+    if (!claimed) return { reference: null, retained: null };
 
-    await this.transferApi.cancelBooking(dto.language, dto.reference);
+    const result = await this.transferApi.cancelBooking(
+      dto.language,
+      dto.reference
+    );
+
+    return {
+      reference: result.reference,
+      retained: toSupplierRetainedCost(
+        result.cancellationAmount,
+        result.currency
+      ),
+    };
   }
 }

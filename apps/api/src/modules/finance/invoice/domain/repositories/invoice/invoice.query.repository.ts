@@ -12,4 +12,12 @@ export interface IInvoiceQueryRepository {
     filter: FindInvoicesFilter,
     pagination: Pagination
   ): Promise<{ items: Invoice[]; total: number }>;
+
+  /**
+   * Verilen ödemelerden faturası OLANLARIN id'leri. Fatura eksiği taramasında
+   * N+1 sorguyu önler; mutasyon kararını beslemediği için (aday listesi üretir,
+   * nihai kontrol `IssueInvoiceCommand` içinde Command Repo'dan yapılır) okuma
+   * tarafında durur.
+   */
+  findExistingPaymentIds(paymentIds: string[]): Promise<string[]>;
 }

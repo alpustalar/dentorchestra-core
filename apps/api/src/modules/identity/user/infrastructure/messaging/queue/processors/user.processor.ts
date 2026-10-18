@@ -2,14 +2,20 @@
 import { Job } from 'bullmq';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { QUEUES, USER_JOBS } from '@common/constants';
-import { FirebaseService } from '@src/infrastructure/firebase/firebase.service';
-import { Logger } from '@nestjs/common';
+import {
+  FIREBASE_SERVICE,
+  IFirebaseService,
+} from '@src/infrastructure/firebase/firebase.service.interface';
+import { Inject, Logger } from '@nestjs/common';
 
 @Processor(QUEUES.USER)
 export class UserProcessor extends WorkerHost {
   private readonly logger = new Logger(UserProcessor.name);
 
-  constructor(private readonly firebaseService: FirebaseService) {
+  constructor(
+    @Inject(FIREBASE_SERVICE)
+    private readonly firebaseService: IFirebaseService
+  ) {
     super();
   }
 

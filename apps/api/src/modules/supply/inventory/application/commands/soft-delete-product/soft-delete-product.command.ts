@@ -5,6 +5,6 @@ export class SoftDeleteProductCommand implements ICommand {
   readonly __responseType!: void;
   constructor(
     public readonly productId: string,
-    public readonly ctx: IGetContext,
+    public readonly ctx: IGetContext
   ) {}
 }

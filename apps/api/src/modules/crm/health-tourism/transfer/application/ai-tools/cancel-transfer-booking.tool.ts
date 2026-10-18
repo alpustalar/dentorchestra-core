@@ -79,12 +79,15 @@ export class CancelTransferBookingTool implements IAiSubToolHandler {
       reference,
       language: 'en',
     } as CancelTransferBookingDto;
-    await this.commandBus.execute(
+    const cancellation = await this.commandBus.execute(
       new CancelTransferBookingCommand(cancelDto, ctx)
     );
 
     // İade dahili rezervasyon id'si (owned.id) ile BookingPayment'a bağlanır.
-    const refunded = await this.support.refundForCancelledBooking(owned.id);
+    const refunded = await this.support.refundForCancelledBooking({
+      bookingId: owned.id,
+      retained: cancellation.retained,
+    });
 
     return {
       content: JSON.stringify({

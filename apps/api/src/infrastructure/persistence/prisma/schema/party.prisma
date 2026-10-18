@@ -44,7 +44,14 @@ model Party {
   isEInvoiceUser  Boolean @default(false) @map("is_einvoice_user")
   eInvoiceMailbox String? @map("einvoice_mailbox")
 
-  // muhasebe bağı — Account.id (genelde 120 / 320). Posting rol bazında default'lar.
+  // muhasebe bağı — Account.id (genelde 120 / 320).
+  //
+  // ⚠️ BUGÜN OKUNMUYOR VE YAZILMIYOR: fişleme hesabı **rol bazında** çözüyor
+  // (bkz. account-resolver). Yani bu iki kolon "bu cari için özel hesap"
+  // sözü veriyor ama hiçbir yol onu dikkate almıyor. Cari-özel hesap ihtiyacı
+  // doğduğunda ya çözümleme noktasında (account-resolver) zorlanır ya da
+  // kolonlar kaldırılır — okunmayan kolon güvence değil süstür
+  // (CLAUDE.md finans kuralı 10).
   receivableAccountId String? @map("receivable_account_id")
   payableAccountId    String? @map("payable_account_id")
 

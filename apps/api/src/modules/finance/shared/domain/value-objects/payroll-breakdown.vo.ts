@@ -1,4 +1,5 @@
 import { Decimal } from 'decimal.js';
+import { UnbalancedPayrollBreakdownException } from '@modules/finance/shared/domain/exceptions';
 
 export interface PayrollBreakdownProps {
   grossSalary: string | number | Decimal;
@@ -58,11 +59,16 @@ export class PayrollBreakdown {
     // Domain Kuralı: Brüt = net + GV stopajı + işçi SGK
     const decomposed = netPayable.plus(taxWithholding).plus(employeeSgk);
 
-    let error: string | undefined;
+    let error: UnbalancedPayrollBreakdownException | undefined;
     let instance: PayrollBreakdown | undefined;
 
     if (!grossSalary.equals(decomposed)) {
-      error = `Bordro dengesiz: brüt (${grossSalary.toFixed(2)}) = net + stopaj + işçi SGK (${decomposed.toFixed(2)}) olmalı.`;
+      // Tipli domain hatası: çıplak `Error` 500'e dönüşüyor ve frontend hangi
+      // iki tutarın uyuşmadığını göremiyordu.
+      error = new UnbalancedPayrollBreakdownException({
+        grossSalary: grossSalary.toFixed(2),
+        decomposed: decomposed.toFixed(2),
+      });
     } else {
       // Başarılıysa instance SADECE BİR KERE burada oluşturulur
       instance = new PayrollBreakdown(
@@ -77,8 +83,13 @@ export class PayrollBreakdown {
     return {
       instance,
       orThrow: (): PayrollBreakdown => {
-        if (error || !instance)
-          throw new Error(error ?? 'Bordro dökümü oluşturulamadı.');
+        if (error) throw error;
+        if (!instance) {
+          throw new UnbalancedPayrollBreakdownException({
+            grossSalary: grossSalary.toFixed(2),
+            decomposed: decomposed.toFixed(2),
+          });
+        }
         return instance; // Aynı instance güvenle dönülür
       },
     };

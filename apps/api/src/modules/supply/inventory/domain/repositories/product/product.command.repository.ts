@@ -3,8 +3,7 @@ import { Product } from '@modules/supply/inventory/domain/entities/product.entit
 
 export const PRODUCT_COMMAND_REPOSITORY = Symbol('IProductCommandRepository');
 
-export interface IProductCommandRepository
-  extends IBaseCommandRepository<Product> {
+export interface IProductCommandRepository extends IBaseCommandRepository<Product> {
   /**
    * Ürünü `FOR UPDATE` ile kilitleyerek yükler — o ürüne ait eşzamanlı stok
    * değişimlerini (batch quantity oku-değiştir-yaz) serialize eder, lost-update'i

@@ -4,7 +4,10 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User } from 'firebase/auth';
-import { meEndpoints, type ActorContextResponse } from '@core-crm/shared/client';
+import {
+  meEndpoints,
+  type ActorContextResponse,
+} from '@core-crm/shared/client';
 
 import { api } from '@/lib/api';
 

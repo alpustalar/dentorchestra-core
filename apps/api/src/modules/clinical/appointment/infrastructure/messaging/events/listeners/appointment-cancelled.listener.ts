@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentCancelledEvent } from '@modules/clinical/appointment/domain/events/cancelled-appointment.event';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Randevu iptalinin yan etkilerini işler (AppointmentCancelledEvent).
@@ -13,7 +13,7 @@ import { AppointmentCancelledEvent } from '@modules/clinical/appointment/domain/
 export class AppointmentCancelledListener {
   private readonly logger = new Logger(AppointmentCancelledListener.name);
 
-  @OnEvent(APPOINTMENT_EVENTS.CANCELLED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.CANCELLED)
   async handle(event: AppointmentCancelledEvent): Promise<void> {
     this.logger.log(
       `Randevu iptal edildi: appointmentId=${event.appointmentId}, clinicId=${event.clinicId}, canceledBy=${event.canceledBy}`

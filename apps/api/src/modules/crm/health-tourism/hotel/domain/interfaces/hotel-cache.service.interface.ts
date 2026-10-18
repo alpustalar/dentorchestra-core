@@ -10,8 +10,8 @@ export const HOTEL_CACHE_SERVICE = Symbol('IHotelCacheService');
  */
 export interface IHotelCacheService {
   readonly hotelRateOption: {
-    /** Token yoksa veya bozuk JSON ise `null`. */
-    get(token: string): Promise<HotelRateOptionToken | null>;
+    /** Token yoksa veya bozuk JSON ise `null`. Anahtar kiracı kapsamlıdır. */
+    get(clinicId: string, token: string): Promise<HotelRateOptionToken | null>;
     set(
       token: string,
       data: HotelRateOptionToken,

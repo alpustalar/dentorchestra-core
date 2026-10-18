@@ -16,16 +16,21 @@ import {
   IJournalCommandRepository,
   JOURNAL_COMMAND_REPOSITORY,
 } from '@modules/finance/accounting/posting/domain/repositories/journal.repository';
+import {
+  IJournalEntryNumberingService,
+  JOURNAL_ENTRY_NUMBERING_SERVICE,
+} from '@modules/finance/accounting/periods/domain/services/entry-numbering/journal-entry-numbering.service.interface';
 import { JournalEntry } from '@modules/finance/accounting/posting/domain/entities/journal-entry.entity';
 import { AccountResolver } from '@modules/finance/accounting/posting/domain/posting/account-resolver';
 import { FxConversion } from '@modules/finance/accounting/posting/domain/posting/fx-conversion';
 import { PostingRuleRegistry } from '@modules/finance/accounting/posting/domain/posting/posting-rule.registry';
 import { PostFinancialEventCommand } from './post-financial-event.command';
 import { CreateJournalEntryLineProps } from '@modules/finance/accounting/posting/domain/contracts/journal-line';
-import { AccountingPeriodStatusSchema } from '@shared';
+import { isPeriodPostable } from '@modules/finance/accounting/periods/domain/rules/postable-period-statuses.constant';
 import {
-  AccountNotPostableException,
+  ConflictingFxBasisException,
   NoAccountingPeriodForDateException,
+  FinancialEventNotFoundForPostingException,
   PartyRequiredForAccountException,
   PeriodNotOpenForPostingException,
   UnbalancedJournalEntryException,
@@ -44,6 +49,8 @@ export class PostFinancialEventHandler implements ICommandHandler<
     private readonly registry: PostingRuleRegistry,
     @Inject(FX_RATE_PROVIDER)
     private readonly fxRateProvider: IFxRateProvider,
+    @Inject(JOURNAL_ENTRY_NUMBERING_SERVICE)
+    private readonly entryNumbering: IJournalEntryNumberingService,
     private readonly queryBus: TSQueryBus,
     private readonly txManager: TransactionManager
   ) {}
@@ -55,10 +62,9 @@ export class PostFinancialEventHandler implements ICommandHandler<
       new GetFinancialEventByIdQuery(financialEventId, ctx)
     );
     if (!event) {
-      this.logger.warn(
-        `FinancialEvent bulunamadı, atlandı: ${financialEventId}`
-      );
-      return null;
+      // Sessizce atlamak, "ekonomik olay var ama fişi yok" durumunu kalıcı ve
+      // görünmez kılardı. Hata, dinleyicideki CRITICAL uyarısını tetikler.
+      throw new FinancialEventNotFoundForPostingException(financialEventId);
     }
 
     // İdempotentlik: olay zaten fişlenmişse mevcut fişi döndür.
@@ -71,13 +77,20 @@ export class PostFinancialEventHandler implements ICommandHandler<
       return null;
     }
 
+    // Bu okuma yalnız "fiş hangi döneme düşüyor" sorusunu yanıtlar ve **hızlı-ret**
+    // sağlar; dönem kapısının otoriter kontrolü değildir. Kesin kapı, fişin
+    // yazıldığı transaction içindeki `lockAndAllocateEntryNo` (status='OPEN'
+    // koşullu, satır kilitli) çağrısıdır — arada dönem kapanırsa orada reddedilir.
     const { data: period } = await this.queryBus.execute(
       new FindPeriodByDateQuery(event.clinicId, event.occurredAt, ctx)
     );
     if (!period) {
       throw new NoAccountingPeriodForDateException(event.occurredAt);
     }
-    if (period.status !== AccountingPeriodStatusSchema.enum.OPEN) {
+    // Kabul kümesi tek sabitten: belge tarihini alan yazma kapısı
+    // (`PERIOD_GATE_SERVICE`) ile burası aynı listeyi görmek zorunda, aksi halde
+    // yazılabilen ama fişlenemeyen belge üretilir (CLAUDE.md finans kuralı 12).
+    if (!isPeriodPostable(period.status)) {
       throw new PeriodNotOpenForPostingException(period.year, period.status);
     }
 
@@ -86,10 +99,7 @@ export class PostFinancialEventHandler implements ICommandHandler<
     );
     const resolver = new AccountResolver(accounts);
 
-    const draft = rule.build(event, {
-      organizationId: event.organizationId,
-      clinicId: event.clinicId,
-    });
+    const draft = rule.build(event);
 
     // Model A — defter tek fonksiyonel para biriminde tutulur. İşlem yabancı para
     // ise posting anında çevrilir: debit/credit fonksiyonel olur, orijinal tutar +
@@ -111,11 +121,9 @@ export class PostFinancialEventHandler implements ICommandHandler<
           );
 
     const lines: CreateJournalEntryLineProps[] = draft.lines.map((line) => {
+      // Hesabın kendi kuralları (var / aktif / yaprak) `resolve` içinde zorlanır;
+      // burada yalnız satıra bağlı kural kalır.
       const account = resolver.resolve(line.accountCode);
-
-      if (!account.isPostable) {
-        throw new AccountNotPostableException(account.code);
-      }
 
       if (account.requiresParty && !line.partyId) {
         throw new PartyRequiredForAccountException(account.code);
@@ -130,11 +138,34 @@ export class PostFinancialEventHandler implements ICommandHandler<
         rate: fxRate,
       });
 
+      // Satırın kendi yabancı para temeli: gövde fonksiyonel parada yazılmışken
+      // o satırın altındaki yükümlülük yabancı paraysa (rezervasyon tahsilatında
+      // para TRY girer ama 320 sağlayıcıya EUR borçtur) kural kilitli kuru
+      // satıra iliştirir. Fiş-seviyesi çevrimle birlikte olamaz: aynı kolonları
+      // iki kaynak yazardı ve hangi kurun geçerli olduğu belirsizleşirdi.
+      if (fxRate && line.originalCurrency) {
+        throw new ConflictingFxBasisException({
+          accountCode: line.accountCode,
+          entryCurrency: txCurrency,
+          lineOriginalCurrency: line.originalCurrency,
+        });
+      }
+
+      const lineBasis = line.originalCurrency
+        ? {
+            originalDebit: line.originalDebit ?? null,
+            originalCredit: line.originalCredit ?? null,
+            originalCurrency: line.originalCurrency,
+            fxRate: line.fxRate ?? null,
+          }
+        : {};
+
       return {
         accountId: account.id,
         partyId: line.partyId,
         lineDesc: line.desc,
         ...converted,
+        ...lineBasis,
       };
     });
 
@@ -199,18 +230,18 @@ export class PostFinancialEventHandler implements ICommandHandler<
       lines,
     });
 
-    // 1. entryNo'yu izole transaction'da üret; commit olunca numara kesinleşir.
-    const entryNo = await this.txManager.outboxRun(async () =>
-      this.journalCommandRepo.nextEntryNo(event.clinicId, period.id)
-    );
-
-    // 2. Entity'yi transaction dışında saf olarak mühürle.
-    //    Save başarısız olsa bile mutation, commit edilmiş entryNo'ya bağlı kalır.
-    entry.post(entryNo);
-
-    // 3. Mühürlenmiş entity'yi kaydet.
+    // Numara tahsisi ve fiş yazımı **tek** transaction: numara dönem satırındaki
+    // sayaçtan kilit altında alınır, böylece
+    //   (a) iki eşzamanlı fiş aynı numarayı alamaz,
+    //   (b) numara ayrı commit edilip kayıp (boşluk) bırakmaz,
+    //   (c) satır kilidi eşzamanlı dönem kapanışıyla serileşir → kapanmış döneme
+    //       fiş sızmaz (tahsis `status='OPEN'` koşuluyla 0 satır döner ve reddedilir).
     try {
       return await this.txManager.outboxRun(async () => {
+        const entryNo = await this.entryNumbering.lockAndAllocateEntryNo(
+          period.id
+        );
+        entry.post(entryNo);
         const saved = await this.journalCommandRepo.create(entry);
         return saved.id;
       });

@@ -3,7 +3,6 @@ import { IBaseCommandRepository } from '@common/domain/repositories/base-command
 
 export const MODULE_COMMAND_REPOSITORY = Symbol('IModuleCommandRepository');
 
-export interface IModuleCommandRepository
-  extends IBaseCommandRepository<Module> {
+export interface IModuleCommandRepository extends IBaseCommandRepository<Module> {
   findByKey(key: string): Promise<Module | null>;
 }

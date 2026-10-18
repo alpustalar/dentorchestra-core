@@ -37,6 +37,15 @@ export const PosTransactionSchema = z.object({
    * handler'da, orijinal satır FOR UPDATE kilitliyken yapılır.
    */
   activeVoidOriginalId: z.string().nullable(),
+  /**
+   * İşlemi terminalde başlatan personel (Firebase UID — ham string, UUID değil).
+   * SALE'de kartı çeken, VOID/REFUND'da ters kaydı atan kişidir: her ters kayıt
+   * kendi satırı olduğu için tek kolon ikisini de damgalar (CLAUDE.md kural 7 —
+   * yüksek etkili işlem kalıcı damga ister). Eski satırlar için null; yeni kayıtta
+   * `CreatePosTransactionProps.initiatedById` ZORUNLU, çünkü varsayılanı olamaz:
+   * "sistem" damgası, kartı fiilen çeken kişinin yerine geçtiği an izi yok eder.
+   */
+  initiatedById: z.string().nullable(),
   rawRequest: JsonValueSchema.nullable(),
   rawResponse: JsonValueSchema.nullable(),
   initiatedAt: z.coerce.date(),

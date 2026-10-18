@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { BaseRepository } from '@src/infrastructure/persistence/prisma/base.repository';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { paginate } from '@src/infrastructure/persistence/prisma/helpers/paginate.helper';
@@ -35,9 +36,15 @@ export class CashSessionQueryRepository
   async findByClinic(
     filter: FindCashSessionsFilter
   ): Promise<Paginated<ICashSession>> {
-    const where: Record<string, unknown> = { clinicId: filter.clinicId };
+    const where: Prisma.CashSessionWhereInput = { clinicId: filter.clinicId };
     if (filter.cashRegisterId) where.cashRegisterId = filter.cashRegisterId;
     if (filter.status) where.status = filter.status;
+    // Sayım farkı olan kapanışlar: fark kapanışta deftere yazıldığı için
+    // (689 kasa açığı / 679 kasa fazlası) denetlenebilir olmalı. `null` olanlar
+    // henüz kapanmamış oturumlardır, farkı yoktur.
+    if (filter.hasDifference) {
+      where.difference = { not: new Prisma.Decimal(0) };
+    }
 
     return await paginate({
       delegate: this.db.cashSession,

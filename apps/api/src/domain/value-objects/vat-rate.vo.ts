@@ -1,4 +1,5 @@
 import { Decimal } from 'decimal.js';
+import { STATUTORY_VAT_RATES } from '@src/domain/constants/tax';
 import {
   InvalidVatRateException,
   VatRateMustNotBeZeroException,
@@ -6,8 +7,11 @@ import {
 } from '@src/domain/exceptions';
 
 export class VatRate {
-  // 2026 güncel yasal KDV oranları (%0, %1, %10, %20)
-  private static readonly VALID_RATES = [0, 1, 10, 20];
+  // Yasal KDV oranları TEK KAYNAKTAN gelir: aynı liste vergi parametresi yazma
+  // kapısında da zorlanıyor (`TaxParameter.assertValidRate`). Burada kopya durduğu
+  // sürece iki taraf ayrışabiliyordu: parametre tablosuna yazılabilen bir oran
+  // (ör. %8) faturalama anında burada reddediliyor, faturalama duruyordu.
+  private static readonly VALID_RATES = STATUTORY_VAT_RATES;
   private readonly _value: Decimal;
 
   private constructor(value: Decimal) {

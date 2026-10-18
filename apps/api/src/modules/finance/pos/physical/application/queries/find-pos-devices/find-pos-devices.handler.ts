@@ -12,9 +12,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @QueryHandler(FindPosDevicesQuery)
-export class FindPosDevicesHandler
-  implements IQueryHandler<FindPosDevicesQuery, FindPosDevicesResponse>
-{
+export class FindPosDevicesHandler implements IQueryHandler<
+  FindPosDevicesQuery,
+  FindPosDevicesResponse
+> {
   constructor(
     @Inject(POS_DEVICE_QUERY_REPOSITORY)
     private readonly posDeviceRepo: IPosDeviceQueryRepository,

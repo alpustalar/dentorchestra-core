@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { AppointmentCompletedEvent } from '@modules/clinical/appointment/domain/events/complete-appointment.event';
 import {
   IMetaLeadCommandRepository,
   META_LEAD_COMMAND_REPOSITORY,
 } from '@modules/crm/meta-ads/domain/repositories/meta-lead.repository';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class MetaLeadConversionListener {
@@ -17,7 +17,7 @@ export class MetaLeadConversionListener {
     private readonly txManager: TransactionManager
   ) {}
 
-  @OnEvent(AppointmentCompletedEvent.NAME, { async: true })
+  @OnDomainEvent(AppointmentCompletedEvent.NAME)
   async handle(event: AppointmentCompletedEvent): Promise<void> {
     if (!event.patientId) return;
 

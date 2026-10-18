@@ -69,6 +69,7 @@ import { ConsentFormModule } from '@modules/clinical/consent-form/consent-form.m
 import { WorkOrderModule } from '@modules/supply/work-order/work-order.module';
 import { ProjectModule } from '@modules/organization/project/project.module';
 import { CriticalFailureModule } from '@common/observability/critical-failure.module';
+import { SubscriptionModule } from '@modules/platform/subscription/subscription.module';
 
 @Module({
   imports: [
@@ -134,6 +135,7 @@ import { CriticalFailureModule } from '@common/observability/critical-failure.mo
     ConsentFormModule,
     WorkOrderModule,
     ProjectModule,
+    SubscriptionModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: ExecutionSourceInterceptor },

@@ -13,6 +13,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UsersBulkSoftDeletedEvent } from '@modules/identity/user/domain/events/user-bulk-soft-deleted.event';
 import { ChangeUsersStatusEvent } from '@modules/identity/user/domain/events/change-users-status.event';
 import { IUserCommandRepository } from '@modules/identity/user/domain/repositories/user/user.command.repository';
+import { emitDetached } from '@common/utils';
 
 @Injectable()
 export class UserCommandRepository
@@ -199,7 +200,8 @@ export class UserCommandRepository
       data: { status },
     });
 
-    this.eventEmitter.emit(
+    emitDetached(
+      this.eventEmitter,
       ChangeUsersStatusEvent.NAME,
       new ChangeUsersStatusEvent({
         userIds: ids,
@@ -239,7 +241,8 @@ export class UserCommandRepository
       },
     });
 
-    this.eventEmitter.emit(
+    emitDetached(
+      this.eventEmitter,
       UsersBulkSoftDeletedEvent.NAME,
       new UsersBulkSoftDeletedEvent({
         userIds: ids,

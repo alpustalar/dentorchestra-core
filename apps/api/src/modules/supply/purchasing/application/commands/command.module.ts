@@ -10,6 +10,7 @@ import { CancelPurchaseOrderHandler } from './cancel-purchase-order/cancel-purch
 import { ApplyInvoiceToPurchaseOrderHandler } from './apply-invoice-to-purchase-order/apply-invoice-to-purchase-order.handler';
 import { RevertInvoiceFromPurchaseOrderHandler } from './revert-invoice-from-purchase-order/revert-invoice-from-purchase-order.handler';
 import { PurchasingInfrastructureModule } from '@modules/supply/purchasing/infrastructure/infrastructure.module';
+import { InventoryDomainServicesModule } from '@modules/supply/inventory/domain/services/services.module';
 
 export const PURCHASING_COMMAND_HANDLERS = [
   CreatePurchaseRequestHandler,
@@ -25,7 +26,9 @@ export const PURCHASING_COMMAND_HANDLERS = [
 ];
 
 @Module({
-  imports: [PurchasingInfrastructureModule],
+  // Katalog kapısı (tedarikçi/ürün kullanılabilirliği) için **yaprak** domain
+  // servis modülü import edilir; `InventoryModule` değil (bkz. CLAUDE.md).
+  imports: [PurchasingInfrastructureModule, InventoryDomainServicesModule],
   providers: PURCHASING_COMMAND_HANDLERS,
 })
 export class PurchasingCommandModule {}

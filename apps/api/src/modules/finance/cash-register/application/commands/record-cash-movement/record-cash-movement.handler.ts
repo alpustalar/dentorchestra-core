@@ -6,6 +6,7 @@ import {
   ICashMovementCommandRepository,
 } from '@modules/finance/cash-register/domain/repositories/cash-movement/cash-movement.command.repository';
 import { CashMovement } from '@modules/finance/cash-register/domain/entities/cash-movement.entity';
+import { CashMovementDirectionSchema } from '@input-type-schemas/CashMovementDirectionSchema';
 import { CashSessionNotFoundException } from '@modules/finance/cash-register/domain/exceptions/cash-register.exceptions';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import {
@@ -19,14 +20,15 @@ import {
 } from '@modules/finance/cash-register/domain/repositories/cash-session/cash-session.command.repository';
 
 @CommandHandler(RecordCashMovementCommand)
-export class RecordCashMovementHandler
-  implements ICommandHandler<RecordCashMovementCommand, void>
-{
+export class RecordCashMovementHandler implements ICommandHandler<
+  RecordCashMovementCommand,
+  void
+> {
   constructor(
     @Inject(CASH_SESSION_COMMAND_REPOSITORY)
     private readonly cashSessionRepo: ICashSessionCommandRepository,
     @Inject(CASH_MOVEMENT_COMMAND_REPOSITORY)
-    private readonly movementCommandRepo: ICashMovementCommandRepository,
+    private readonly cashMovementRepo: ICashMovementCommandRepository,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
     private readonly txManager: TransactionManager
@@ -64,7 +66,23 @@ export class RecordCashMovementHandler
         performedById: ctx.actor.userId,
       });
 
-      await this.movementCommandRepo.create(movement);
+      // Çıkış, çekmecedeki nakitle sınırlıdır. Yön, hareketin **kendi**
+      // türetmesinden okunur (IN/OUT eşlemesinin ikinci bir kopyası burada
+      // tutulmaz); toplamlar oturum satırı kilitliyken aynı transaction içinde
+      // Command Repo'dan okunur — kilitsiz okuma iki eşzamanlı çıkışın aynı
+      // parayı iki kez harcamasına izin verirdi.
+      if (movement.direction === CashMovementDirectionSchema.enum.OUT) {
+        const totals = await this.cashSessionRepo.sumMovements(
+          session.id.value
+        );
+        session.assertCanWithdraw({
+          totalIn: totals.totalIn,
+          totalOut: totals.totalOut,
+          requested: movement.amount,
+        });
+      }
+
+      await this.cashMovementRepo.create(movement);
     });
   }
 }

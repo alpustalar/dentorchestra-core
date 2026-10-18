@@ -1,9 +1,14 @@
 import { InstallmentNotFoundException } from '@modules/finance/payment/domain/exceptions/payment.exceptions';
-import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
+import { LogSource } from '@src/domain/constants/log-action.constant';
 import { MarkInstallmentAsPaidHandler } from './mark-installment-as-paid.handler';
 import { MarkInstallmentAsPaidCommand } from './mark-installment-as-paid.command';
 
 describe('MarkInstallmentAsPaidHandler', () => {
+  const ctx = {
+    actor: { userId: 'u1', source: LogSource.SYSTEM },
+    source: 'INTERNAL_CASCADE',
+  } as never;
+
   const makePayment = () => ({
     id: { value: 'pay-1' },
     appointmentId: { value: 'appt-1' },
@@ -17,7 +22,6 @@ describe('MarkInstallmentAsPaidHandler', () => {
       findByInstallmentIdForUpdate: jest.fn().mockResolvedValue(payment),
       update: jest.fn().mockResolvedValue(payment),
     };
-    const publisher = { paymentPaid: jest.fn() };
     const txManager = {
       outboxRun: jest
         .fn()
@@ -25,49 +29,63 @@ describe('MarkInstallmentAsPaidHandler', () => {
     };
     const handler = new MarkInstallmentAsPaidHandler(
       paymentCommandRepo as never,
-      publisher as never,
       txManager as never
     );
-    return { handler, paymentCommandRepo, publisher };
+    return { handler, paymentCommandRepo, txManager };
   };
 
-  it('taksiti COMPLETED yapar, kaydeder ve PaymentPaid event fırlatır (aggregate’ten türetilmiş alanlarla)', async () => {
+  const run = (
+    handler: MarkInstallmentAsPaidHandler,
+    installmentId: string,
+    details?: string
+  ) =>
+    handler.execute(
+      new MarkInstallmentAsPaidCommand({ installmentId, details, ctx })
+    );
+
+  it('taksiti entity üzerinden tahsil eder ve aktörü audit alanlarına taşır', async () => {
+    // Event'i handler DEĞİL entity raise eder: handler koşulsuz yayınladığı
+    // sürece tekrarlanan POS callback'i, taksit zaten COMPLETED olsa bile
+    // ikinci bir cari kayıt işi ve ikinci bir faturalama denemesi üretiyordu.
     const payment = makePayment();
-    const { handler, paymentCommandRepo, publisher } = make(payment);
+    const { handler, paymentCommandRepo } = make(payment);
 
-    await handler.execute(
-      new MarkInstallmentAsPaidCommand('inst-1', 'POS ödemesi tahsil edildi')
-    );
+    await run(handler, 'inst-1', 'POS ödemesi tahsil edildi');
 
-    expect(payment.completeInstallment).toHaveBeenCalledWith('inst-1');
-    expect(paymentCommandRepo.update).toHaveBeenCalledWith(payment);
-    expect(publisher.paymentPaid).toHaveBeenCalledWith({
+    expect(payment.completeInstallment).toHaveBeenCalledWith({
       installmentId: 'inst-1',
-      paymentId: 'pay-1',
-      appointmentId: 'appt-1',
-      clinicId: 'clinic-1',
-      action: LogAction.PAYMENT_SUCCESS,
-      type: LogType.INFO,
       details: 'POS ödemesi tahsil edildi',
+      actorId: 'u1',
+      logSource: LogSource.SYSTEM,
     });
+    expect(paymentCommandRepo.update).toHaveBeenCalledWith(payment);
   });
 
-  it('details verilmezse varsayılan detayla event fırlatır', async () => {
-    const { handler, publisher } = make(makePayment());
+  it('details verilmezse entity varsayılan metni yazsın diye undefined geçilir', async () => {
+    const payment = makePayment();
+    const { handler } = make(payment);
 
-    await handler.execute(new MarkInstallmentAsPaidCommand('inst-1'));
+    await run(handler, 'inst-1');
 
-    expect(publisher.paymentPaid).toHaveBeenCalledWith(
-      expect.objectContaining({ details: 'Ödeme tahsil edildi' })
+    expect(payment.completeInstallment).toHaveBeenCalledWith(
+      expect.objectContaining({ details: undefined })
     );
   });
 
-  it('taksit yoksa InstallmentNotFoundException atar ve event fırlatmaz', async () => {
-    const { handler, publisher } = make(null);
+  it('okuma ve yazma aynı transaction içinde (kilit etkili olsun diye)', async () => {
+    const { handler, txManager } = make(makePayment());
 
-    await expect(
-      handler.execute(new MarkInstallmentAsPaidCommand('missing'))
-    ).rejects.toThrow(InstallmentNotFoundException);
-    expect(publisher.paymentPaid).not.toHaveBeenCalled();
+    await run(handler, 'inst-1');
+
+    expect(txManager.outboxRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('taksit yoksa InstallmentNotFoundException atar ve yazma yapmaz', async () => {
+    const { handler, paymentCommandRepo } = make(null);
+
+    await expect(run(handler, 'missing')).rejects.toThrow(
+      InstallmentNotFoundException
+    );
+    expect(paymentCommandRepo.update).not.toHaveBeenCalled();
   });
 });

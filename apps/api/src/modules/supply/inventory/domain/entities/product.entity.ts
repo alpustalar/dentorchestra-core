@@ -1,8 +1,4 @@
-import {
-  Product as IProduct,
-  StockMovementDirectionSchema,
-  StockMovementTypeSchema,
-} from '@shared';
+import { Product as IProduct } from '@shared';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { ProductBatch } from '@modules/supply/inventory/domain/entities/product-batch.entity';
 import { ProductConditionType as ProductCondition } from '@input-type-schemas/ProductConditionSchema';
@@ -21,7 +17,11 @@ import {
   HandleStockChangeProps,
   UpdateProductProps,
 } from '@modules/supply/inventory/domain/contracts';
-import { StockQuantityChangedEvent } from '@modules/supply/inventory/domain/events/stock-quantity-changed.event';
+import {
+  NoLotToDeductException,
+  ProductNotUsableInClinicException,
+  StockIncreaseRequiresReceiptException,
+} from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
 
 export class Product extends AggregateRoot {
   constructor(data: IProduct) {
@@ -168,7 +168,13 @@ export class Product extends AggregateRoot {
         ? Quantity.create(props.reorderQty).orThrow()
         : props.reorderQty;
 
-    vatRate.validate.hasTax.orThrow();
+    // KDV oranı **sıfır olabilir**: 0 yasal kümenin (`STATUTORY_VAT_RATES`) bir
+    // üyesidir ve istisna/muafiyet kapsamındaki malın oranı gerçekten sıfırdır
+    // (bazı tıbbi cihazlar, basılı yayın). Burada `hasTax.orThrow()` vardı; DTO
+    // ise 0'ı kabul ediyordu → kapı kullanım yerinden **geniş**ti (CLAUDE.md
+    // finans kuralı 12) ve 0 gönderen istek, sebebinden kopuk bir "KDV oranı
+    // sıfır olamaz" hatasıyla duruyordu. Alış faturası, satış faturası ve işlem
+    // satırı 0'ı zaten kabul ediyor; tek istisna bu entity'ydi.
     const now = DateTimeManager.create();
 
     const barcode = props.barcode
@@ -239,9 +245,11 @@ export class Product extends AggregateRoot {
     if (isNotUndefined(props.unit)) this._unit = props.unit;
 
     if (isNotUndefined(props.vatRate)) {
-      const vatRate = VatRate.create(props.vatRate).orThrow();
-      vatRate.validate.hasTax.orThrow();
-      this._vatRate = vatRate;
+      // 0 meşrudur (bkz. `create`): `hasTax.orThrow()` burada dururken sıfır
+      // KDV'li bir ürünün oranı **hiç güncellenemiyordu** — oluşturma kapısı
+      // 0'ı kabul ettiği için böyle bir ürün var olabiliyor, ama kartı artık
+      // düzenlenemiyordu.
+      this._vatRate = VatRate.create(props.vatRate).orThrow();
     }
 
     if (isNotUndefined(props.criticalStockQty)) {
@@ -274,15 +282,17 @@ export class Product extends AggregateRoot {
    * kaydı (StockMovement) bu metodun dönüşü değildir: miktarı değiştiren aggregate
    * `StockQuantityChangedEvent` fırlatır, kaydı dinleyici yazar.
    *
-   * Parti bulunmayan artış durumunda (henüz hiç lot açılmamış ürün) olayı ürünün
-   * kendisi fırlatır ve `null` döner — çağıran bu durumda ürünü kalıcılaştırarak
-   * olayı boşaltır.
+   * Parti **her zaman** gereklidir (artışta da): stok seviyesi
+   * `Σ product_batches.quantity` olduğu için partisi olmayan bir artış miktarı
+   * hiç değiştirmez, yalnız hareket kaydı bırakır — bkz.
+   * {@link StockIncreaseRequiresReceiptException}.
    */
-  public handleStockChange(props: HandleStockChangeProps): ProductBatch | null {
+  public handleStockChange(props: HandleStockChangeProps): ProductBatch {
     if (props.clinicId !== this.clinicId.value) {
-      throw new Error(
-        'Ürünün ait olduğu şube ile işlem yapılmak istenen şube uyuşmuyor.'
-      );
+      throw new ProductNotUsableInClinicException({
+        productId: this.id.value,
+        reason: 'OTHER_CLINIC',
+      });
     }
     const isIncrease = Quantity.isDeltaAnIncrease(props.quantityDelta);
     const absQty = Quantity.createAbsFromDelta(props.quantityDelta);
@@ -298,43 +308,31 @@ export class Product extends AggregateRoot {
       targetBatch = props.availableBatches[0];
     }
 
-    if (!targetBatch && !isIncrease) {
-      throw new Error('Düşüm yapılacak uygun bir lot/batch bulunamadı.');
+    if (!targetBatch) {
+      // Düşümde düşülecek lot yok; artışta ise maliyeti olmayan bir giriş
+      // doğacaktı (eski kod yalnız hareket kaydı yazıp miktarı değiştirmiyordu).
+      throw isIncrease
+        ? new StockIncreaseRequiresReceiptException({
+            productId: this.id.value,
+          })
+        : new NoLotToDeductException({ productId: this.id.value });
     }
 
-    if (targetBatch) {
-      if (isIncrease) {
-        targetBatch.addQuantity({
-          qty: absQty,
-          performedById: props.performedById,
-          notes: props.notes,
-        });
-      } else {
-        targetBatch.deductQuantity({
-          qty: absQty,
-          performedById: props.performedById,
-          notes: props.notes,
-        });
-      }
-
-      return targetBatch;
-    }
-
-    this.addDomainEvent(
-      new StockQuantityChangedEvent({
-        movementId: UUID.generate().value,
-        productId: this.id.value,
-        clinicId: props.clinicId,
-        batchId: null,
-        type: StockMovementTypeSchema.enum.ADJUSTMENT,
-        direction: StockMovementDirectionSchema.enum.IN,
-        quantity: absQty.value.toString(),
+    if (isIncrease) {
+      targetBatch.addQuantity({
+        qty: absQty,
         performedById: props.performedById,
-        notes: props.notes ?? 'Batch bağımsız stok girişi yapıldı.',
-      })
-    );
+        notes: props.notes,
+      });
+    } else {
+      targetBatch.deductQuantity({
+        qty: absQty,
+        performedById: props.performedById,
+        notes: props.notes,
+      });
+    }
 
-    return null;
+    return targetBatch;
   }
 
   toPersistence(): IProduct {

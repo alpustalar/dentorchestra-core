@@ -11,6 +11,10 @@ import {
 } from '@modules/finance/pos/physical/domain/exceptions/pos.exceptions';
 import { PaxService } from '@src/infrastructure/payment/pos/physical/providers/pax/pax.service';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
+import {
+  PosAccountingBridgeInput,
+  PosAccountingBridgeService,
+} from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
 import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
@@ -34,6 +38,10 @@ describe('PaxRefundHandler — iade (kilit + kümülatif tutar)', () => {
       clinicId: CLINIC_ID,
       amount: SALE_AMOUNT,
       currency: CurrencySchema.enum.TRY,
+      initiatedById: 'firebase-staff-uid-1',
+      // Cari sahibi: iade köprüsü hastayı ORİJİNAL satıştan çözer (istek
+      // gövdesinden değil — başka bir hastanın carisine yazılamaz).
+      patientId: PATIENT_ID,
     });
     sale.markSuccess('HOSTREF-ORIGINAL');
     return sale;
@@ -50,6 +58,8 @@ describe('PaxRefundHandler — iade (kilit + kümülatif tutar)', () => {
       host: '127.0.0.1',
       port: 10009,
     });
+
+  const PATIENT_ID = '44444444-4444-4444-8444-444444444444';
 
   const noReversal: PosTransactionReversalSummary = {
     hasActiveVoid: false,
@@ -119,6 +129,17 @@ describe('PaxRefundHandler — iade (kilit + kümülatif tutar)', () => {
       markRefunded: jest.fn(() => Promise.resolve()),
     } as unknown as PosPaymentSyncService;
 
+    // Muhasebe köprüsü: ters kayıt artık PAYMENT_REFUNDED olayını da yazar
+    // (120 / 108). Çağrıldığı testlerde girdisi doğrulanıyor.
+    // Argümansız `jest.fn()` çağrı tuple'ını `[]` olarak tipler ve
+    // `mock.calls[0][0]` TS2493 verir — mock'u girdi tipiyle tiple.
+    const bridgeRecord = jest.fn<Promise<void>, [PosAccountingBridgeInput]>(
+      () => Promise.resolve()
+    );
+    const accountingBridge = {
+      recordBestEffort: bridgeRecord,
+    } as unknown as PosAccountingBridgeService;
+
     // Kiracı kapsamı kontrolü: aktör bu kliniğe erişebiliyor kabul edilir.
     // Reddedilme yolu ayrı testte doğrulanıyor.
     const policyFactory = {
@@ -136,6 +157,7 @@ describe('PaxRefundHandler — iade (kilit + kümülatif tutar)', () => {
         paxService,
         txManager,
         posPaymentSync,
+        accountingBridge,
         policyFactory
       ),
       posTransactionRepo,
@@ -143,6 +165,7 @@ describe('PaxRefundHandler — iade (kilit + kümülatif tutar)', () => {
       findLiveReversalSummary,
       created,
       refundCall,
+      bridgeRecord,
       depthAtCall,
     };
   };
@@ -256,5 +279,50 @@ describe('PaxRefundHandler — iade (kilit + kümülatif tutar)', () => {
     expect(refundCall).toHaveBeenCalledWith(
       expect.objectContaining({ amountInMinorUnits: 1234 })
     );
+  });
+
+  it('iade muhasebe köprüsünü TERS KAYIT olarak çağırır (120 / 108)', async () => {
+    // P0 regresyonu: iade yevmiyeye hiç ulaşmıyordu. Taksit REFUNDED oluyor,
+    // cari defter düzeliyor, POS satırı damgalanıyordu — ama tahsilat fişi
+    // olduğu gibi kalıyordu: 108'de hiç gelmeyecek para, 120'de kapanmış
+    // görünen borç.
+    const sale = makeSuccessfulSale();
+    const { handler, bridgeRecord } = build(sale);
+
+    await handler.execute(
+      new PaxRefundCommand(
+        {
+          clinicId: CLINIC_ID,
+          originalPosTransactionId: sale.id.value,
+          amount: 40,
+        } as never,
+        ctx
+      )
+    );
+
+    expect(bridgeRecord).toHaveBeenCalledTimes(1);
+    const bridged = bridgeRecord.mock.calls[0][0];
+    expect(bridged.kind).toBe('REVERSAL');
+    // Hasta ORİJİNAL satıştan gelir; tutar fiilen iade edilen tutardır.
+    expect(bridged.patientId).toBe(PATIENT_ID);
+    expect(bridged.amount.toFixed(2)).toBe('40.00');
+    expect(bridged.originalPosTransactionId).toBe(sale.id.value);
+  });
+
+  it('iade kaydı hasta bağını orijinal satıştan devralır', async () => {
+    const sale = makeSuccessfulSale();
+    const { handler, created } = build(sale);
+
+    await handler.execute(
+      new PaxRefundCommand(
+        {
+          clinicId: CLINIC_ID,
+          originalPosTransactionId: sale.id.value,
+        } as never,
+        ctx
+      )
+    );
+
+    expect(created[0].patientId?.value).toBe(PATIENT_ID);
   });
 });

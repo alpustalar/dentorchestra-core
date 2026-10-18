@@ -20,6 +20,7 @@ import {
 } from '@src/infrastructure/payment/pos/physical/providers/pax/pax.errors';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
+import { PosAccountingBridgeService } from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import PosTransactionStatusSchema from '@input-type-schemas/PosTransactionStatusSchema';
 import PosTransactionKindSchema from '@input-type-schemas/PosTransactionKindSchema';
 import { PosTransaction } from '@modules/finance/pos/physical/domain/entities/pos-transaction.entity';
@@ -48,6 +49,7 @@ export class PaxVoidHandler implements ICommandHandler<
     private readonly paxService: PaxService,
     private readonly txManager: TransactionManager,
     private readonly posPaymentSync: PosPaymentSyncService,
+    private readonly accountingBridge: PosAccountingBridgeService,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory
   ) {}
@@ -68,7 +70,14 @@ export class PaxVoidHandler implements ICommandHandler<
     // durumu eşzamanlı değiştiricilerden (mutabakat taraması, cihaz callback'i)
     // yalıtır; kilitsiz okumada "SUCCESS" görülüp iptal edilen işlem aslında bu
     // arada TIMEOUT'a düşmüş olabilirdi.
-    const { voidTx, device, originalPaymentId, originalExternalRef } =
+    const {
+      voidTx,
+      device,
+      originalPaymentId,
+      originalPatientId,
+      originalTransactionId,
+      originalExternalRef,
+    } =
       await this.txManager.outboxRun(async () => {
         const originalTx = await this.posTransactionRepo.findByIdForUpdate(
           input.originalPosTransactionId
@@ -111,9 +120,15 @@ export class PaxVoidHandler implements ICommandHandler<
 
         const voidTx = await this.posTransactionRepo.create(
           PosTransaction.create({
+            initiatedById: ctx.actor.userId,
             posDeviceId: device.id.value,
             clinicId: input.clinicId,
             paymentId: originalTx.paymentId ?? undefined,
+            // Hasta bağı orijinal satıştan DEVRALINIR: ters kayıt kendi satırı
+            // olduğu için bu kolon boş kalıyordu ve "kim iade edildi" ancak
+            // orijinale join atarak bulunabiliyordu. Muhasebe köprüsü de cariyi
+            // buradan çözüyor.
+            patientId: originalTx.patientId?.value ?? undefined,
             amount: originalTx.amount.value.toNumber(),
             currency: originalTx.amount.currency,
             kind: PosTransactionKindSchema.enum.VOID,
@@ -125,6 +140,8 @@ export class PaxVoidHandler implements ICommandHandler<
           voidTx,
           device,
           originalPaymentId: originalTx.paymentId,
+          originalPatientId: originalTx.patientId?.value ?? null,
+          originalTransactionId: originalTx.id.value,
           originalExternalRef,
         };
       });
@@ -151,6 +168,25 @@ export class PaxVoidHandler implements ICommandHandler<
             await this.posPaymentSync.markRefunded({
               paymentId: originalPaymentId,
               clinicId: input.clinicId,
+              // Tutar zorunlu: ters kaydın tutarına EŞİT taksit aranır. Önceden
+              // ilk tamamlanmış taksit koşulsuz REFUNDED yapılıyordu — kısmi
+              // iadede tüm taksit iade sayılıp ters kayıt fazla gelir düşürüyordu.
+              amount: voidTx.amount.value,
+              ctx,
+            });
+          }
+          // Muhasebe köprüsü: kart iptalsi → 120 / 108. Bu yarısı HİÇ YOKTU:
+          // taksit REFUNDED oluyor, cari defter düzeliyor ama yevmiyede tahsilat
+          // olduğu gibi kalıyordu (108'de hiç gelmeyecek para, 120'de kapanmış
+          // görünen borç).
+          if (originalPatientId) {
+            await this.accountingBridge.recordBestEffort({
+              kind: 'REVERSAL',
+              patientId: originalPatientId,
+              clinicId: input.clinicId,
+              amount: voidTx.amount.value,
+              posTransactionId: voidTx.id.value,
+              originalPosTransactionId: originalTransactionId,
             });
           }
         } else {

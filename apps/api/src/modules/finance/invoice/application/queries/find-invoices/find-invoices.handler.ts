@@ -16,9 +16,10 @@ import {
 } from '@modules/finance/invoice/domain/repositories/invoice/invoice.query.repository';
 
 @QueryHandler(FindInvoicesQuery)
-export class FindInvoicesHandler
-  implements IQueryHandler<FindInvoicesQuery, FindInvoicesResponse>
-{
+export class FindInvoicesHandler implements IQueryHandler<
+  FindInvoicesQuery,
+  FindInvoicesResponse
+> {
   constructor(
     @Inject(INVOICE_QUERY_REPOSITORY)
     private readonly invoiceRepo: IInvoiceQueryRepository,

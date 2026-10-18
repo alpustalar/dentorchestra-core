@@ -16,6 +16,7 @@ import {
   RaiseStockQuantityChangedProps,
 } from '@modules/supply/inventory/domain/contracts';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { BatchExpiredException } from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
 
 export class ProductBatch extends AggregateRoot {
   constructor(data: IProductBatch) {
@@ -106,6 +107,9 @@ export class ProductBatch extends AggregateRoot {
             type: props.movementType,
             direction: props.direction,
             quantity: props.quantity.value.toString(),
+            // Maliyet temeli partiden gelir: hareket kaydı bu fiyatla değerlenir.
+            unitPrice: this.purchasePrice.value.toFixed(2),
+            currency: this.purchasePrice.currency,
             performedById: props.performedById,
             notes: props.notes ?? null,
           })
@@ -118,9 +122,9 @@ export class ProductBatch extends AggregateRoot {
     props: CreateBatchFromPurchaseProps
   ): ProductBatch {
     if (props.expiresAt && props.expiresAt <= DateTimeManager.create()) {
-      throw new Error(
-        'Son kullanma tarihi geçmiş bir ürün partisi (batch) oluşturulamaz.'
-      );
+      throw new BatchExpiredException({
+        expiresAt: props.expiresAt.toISOString(),
+      });
     }
 
     const totalAmount = props.purchasePrice.multiply(props.quantity.value);

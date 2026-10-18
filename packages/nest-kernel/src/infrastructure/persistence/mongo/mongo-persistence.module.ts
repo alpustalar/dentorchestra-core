@@ -6,8 +6,7 @@ import { MongoOutbox, MongoOutboxSchema } from './outbox/mongo-outbox.schema';
 import { MongoOutboxRelay } from './outbox/mongo-outbox.relay';
 
 /**
- * Mongo tarafının transaction + outbox altyapısı. `PrismaModule` gibi `@Global`
- * sağlanır — `MongoTransactionManager` handler'lara ek modül importu olmadan
+ * Mongo tarafının transaction + outbox altyapısı. `MongoTransactionManager` handler'lara ek modül importu olmadan
  * inject edilir.
  *
  * `MongoOutboxRelay` outbox'ı boşaltan taraftır ve manager ile birlikte sağlanır:

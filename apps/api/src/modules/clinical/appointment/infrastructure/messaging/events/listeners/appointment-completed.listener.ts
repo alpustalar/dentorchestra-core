@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentCompletedEvent } from '@modules/clinical/appointment/domain/events/complete-appointment.event';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Randevu tamamlanmasının yan etkilerini işler (AppointmentCompletedEvent).
@@ -13,7 +13,7 @@ import { AppointmentCompletedEvent } from '@modules/clinical/appointment/domain/
 export class AppointmentCompletedListener {
   private readonly logger = new Logger(AppointmentCompletedListener.name);
 
-  @OnEvent(APPOINTMENT_EVENTS.COMPLETED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.COMPLETED)
   async handle(event: AppointmentCompletedEvent): Promise<void> {
     this.logger.log(
       `Randevu tamamlandı: appointmentId=${event.appointmentId}, clinicId=${event.clinicId}`

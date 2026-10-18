@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ChargeTotalsServiceModule } from '@modules/finance/treatment-charge/domain/services/charge-totals';
 import { CreatePaymentHandler } from './create-payment/create-payment.handler';
 import { CreatePaymentPlanHandler } from './create-payment-plan/create-payment-plan.handler';
 import { MarkInstallmentAsPaidHandler } from './mark-installment-as-paid/mark-installment-as-paid.handler';
@@ -17,7 +18,7 @@ const CommandHandlers = [
 ];
 
 @Module({
-  imports: [PaymentInfrastructureModule],
+  imports: [PaymentInfrastructureModule, ChargeTotalsServiceModule],
   providers: CommandHandlers,
 })
 export class PaymentCommandModule {}

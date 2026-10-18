@@ -13,10 +13,10 @@ import {
 import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 
 @QueryHandler(GetAccountingPeriodsQuery)
-export class GetAccountingPeriodsHandler
-  implements
-    IQueryHandler<GetAccountingPeriodsQuery, GetAccountingPeriodsResponse>
-{
+export class GetAccountingPeriodsHandler implements IQueryHandler<
+  GetAccountingPeriodsQuery,
+  GetAccountingPeriodsResponse
+> {
   constructor(
     @Inject(ACCOUNTING_PERIOD_QUERY_REPOSITORY)
     private readonly accountingPeriodRepo: IAccountingPeriodQueryRepository,
@@ -41,8 +41,7 @@ export class GetAccountingPeriodsHandler
       )
       .orThrow(ACCOUNTING_EVENTS.PERIODS);
 
-    const periods =
-      await this.accountingPeriodRepo.findAllByClinicId(clinicId);
+    const periods = await this.accountingPeriodRepo.findAllByClinicId(clinicId);
 
     return {
       data: periods,

@@ -14,6 +14,7 @@ import {
 import { CancelPaymentRequest } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/cancel-payment.request';
 import type {
   CreateSubMerchantRequest,
+  RetrieveSubMerchantRequest,
   SubMerchantResult,
   UpdateSubMerchantRequest,
 } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/create-submerchant.request';
@@ -61,6 +62,13 @@ export class IyzicoProvider implements IIyzicoProvider {
       paymentTransactionId: sdkResult.paymentItems?.[0]?.paymentTransactionId,
       errorCode: sdkResult.errorCode,
       errorMessage: sdkResult.errorMessage,
+      // Bağ ve tutar kanıtı: ikisi de sağlayıcının yanıtında geliyordu ama
+      // mapping'de düşüyordu (CLAUDE.md finans kuralı 9). Düşen alan hata
+      // vermez, log üretmez — burada düşen şey callback'in KİMLİK kanıtıydı.
+      conversationId: sdkResult.conversationId,
+      price: this.readAmount(sdkResult.price),
+      currency: sdkResult.currency,
+      paidPrice: this.readAmount(sdkResult.paidPrice),
       savedCard: this.extractSavedCard(sdkResult),
       buyer: this.extractBuyer(sdkResult),
       rawResponse: sdkResult as unknown,
@@ -155,30 +163,59 @@ export class IyzicoProvider implements IIyzicoProvider {
   async createSubMerchant(
     request: CreateSubMerchantRequest
   ): Promise<SubMerchantResult> {
-    const result = await this.client.createSubMerchant({
+    const result = (await this.client.createSubMerchant({
       locale: 'TR',
       currency: 'TRY',
       ...request,
-    });
-    if ((result as any).status !== 'success') {
+    })) as { status?: string; errorMessage?: string; subMerchantKey?: string };
+
+    if (result.status !== 'success' || !result.subMerchantKey) {
       throw new BadRequestException(
-        (result as any).errorMessage ?? 'Alt üye işyeri oluşturulamadı.'
+        result.errorMessage ?? 'Alt üye işyeri oluşturulamadı.'
       );
     }
-    return { subMerchantKey: (result as any).subMerchantKey };
+    return { subMerchantKey: result.subMerchantKey };
+  }
+
+  /**
+   * Alt üye işyerini dış kimlikten (clinicId) okur; yoksa `null` döner.
+   * Kurtarma yolu: iyzico'da açılmış ama yerelde yazılamamış kaydın anahtarını
+   * geri getirir (bkz. RetrieveSubMerchantRequest).
+   */
+  async retrieveSubMerchant(
+    request: RetrieveSubMerchantRequest
+  ): Promise<SubMerchantResult | null> {
+    const result = (await this.client.retrieveSubMerchant({
+      locale: 'TR',
+      ...request,
+    })) as { status?: string; subMerchantKey?: string };
+
+    if (result.status !== 'success' || !result.subMerchantKey) return null;
+    return { subMerchantKey: result.subMerchantKey };
   }
 
   async updateSubMerchant(request: UpdateSubMerchantRequest): Promise<void> {
-    const result = await this.client.updateSubMerchant({
+    const result = (await this.client.updateSubMerchant({
       locale: 'TR',
       currency: 'TRY',
       ...request,
-    });
-    if ((result as any).status !== 'success') {
+    })) as { status?: string; errorMessage?: string };
+
+    if (result.status !== 'success') {
       throw new BadRequestException(
-        (result as any).errorMessage ?? 'Alt üye işyeri güncellenemedi.'
+        result.errorMessage ?? 'Alt üye işyeri güncellenemedi.'
       );
     }
+  }
+
+  /**
+   * Tutar alanları **string** taşınır: SDK `number | string` döndürüyor ve
+   * sayıyı `Decimal`'e doğrudan vermek ikili gösterim artığı taşır (string
+   * üzerinden geçmek zorunlu).
+   */
+  private readAmount(value: number | string | undefined): string | undefined {
+    if (value === undefined || value === null) return undefined;
+    return typeof value === 'string' ? value : String(value);
   }
 
   /** Checkout retrieve yanıtından kart saklama token'larını çıkarır (SDK tipinde cardUserKey yok). */

@@ -14,13 +14,10 @@ import {
 } from '@modules/platform/subscription/domain/repositories/subscription/subscription.query.repository';
 
 @QueryHandler(GetActiveSubscriptionQuery)
-export class GetActiveSubscriptionHandler
-  implements
-    IQueryHandler<
-      GetActiveSubscriptionQuery,
-      QueryResponse<GetActiveSubscriptionQueryResponse | null>
-    >
-{
+export class GetActiveSubscriptionHandler implements IQueryHandler<
+  GetActiveSubscriptionQuery,
+  QueryResponse<GetActiveSubscriptionQueryResponse | null>
+> {
   constructor(
     @Inject(SUBSCRIPTION_QUERY_REPOSITORY)
     private readonly subscriptionRepo: ISubscriptionQueryRepository,

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Observable, tap } from 'rxjs';
 import { User } from '@model-schema/UserSchema';
+import { redactSensitive } from '@common/utils';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -44,22 +45,23 @@ export class LoggingInterceptor implements NestInterceptor {
     );
   }
 
+  /**
+   * Gövde maskeleme **ortak kurala** bağlı (`redactSensitive`).
+   *
+   * Eski hâli iki yönden eksikti: (1) liste yalnız **en üst seviyeye** bakıyordu
+   * — `{ paymentCard: { cardToken } }` gibi iç içe gelen credential'ları hiç
+   * görmüyordu; (2) kendi listesini taşıyordu, yani sağlayıcı ham yanıtı için
+   * tutulan listeyle ayrışmaya açıktı (kural 12).
+   *
+   * NOT: bu satır `logger.debug` ile yazılıyor ve winston'un varsayılan seviyesi
+   * `info` → gövde log'u bugün **hiçbir transport'a ulaşmıyor**. Yani bu
+   * maskeleme bugün bir şeyi korumuyor; seviyeyi bir olay incelemesi için
+   * `debug`'a çeken kişinin karşılaşacağı davranışı doğru kılıyor. Koruma
+   * kalitesinin, ona ihtiyaç duyulan güne kadar görünmez kalması tam olarak
+   * sorunun kendisiydi.
+   */
   private sanitizeBody(body: unknown) {
     if (!body) return {};
-    const sanitized = { ...body };
-    const blackList = [
-      'password',
-      'passwordConfirm',
-      'oldPassword',
-      'token',
-      'accessToken',
-      'fbToken',
-    ];
-
-    blackList.forEach((key: string) => {
-      if (key in sanitized) sanitized[key] = '********';
-    });
-
-    return sanitized;
+    return redactSensitive(body) as Record<string, unknown>;
   }
 }

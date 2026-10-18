@@ -50,3 +50,24 @@ export class CurrencyMismatchException extends DomainException<{
     );
   }
 }
+
+/**
+ * Döviz kuru çevrime uygun değil (sıfır, negatif, NaN/Infinity).
+ *
+ * Sessiz alternatifi yoktu: kur çözülemediğinde 1 varsaymak yabancı tutarı
+ * fonksiyonel para sanıp defterin kasa/borç satırını kur katı kadar yanlış
+ * yazar, 0 varsaymak satırı sıfırlar. İkisi de dengeyi bozmaz → hiçbir kontrol
+ * yakalamaz. Kur bilinmiyorsa çevrim yapılmaz, hata yükselir.
+ */
+export class InvalidFxRateException extends DomainException<{
+  rate?: string;
+}> {
+  readonly errorCode = ERROR_CODES.MONEY.INVALID_FX_RATE;
+  public override readonly httpStatus = HttpStatus.UNPROCESSABLE_ENTITY;
+
+  constructor(rate?: string) {
+    super(`Geçersiz döviz kuru: ${rate ?? 'tanımsız'} — çevrim yapılamaz.`, {
+      rate,
+    });
+  }
+}

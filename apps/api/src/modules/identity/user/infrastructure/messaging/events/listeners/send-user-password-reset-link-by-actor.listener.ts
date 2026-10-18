@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { SendUserPasswordResetLinkByActorEvent } from '@modules/identity/user/domain/events/send-user-password-reset-link-by-actor.event';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { LogType } from '@src/domain/constants/log-action.constant';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class SendUserPasswordResetLinkByActorListener {
@@ -12,7 +12,7 @@ export class SendUserPasswordResetLinkByActorListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(SendUserPasswordResetLinkByActorEvent.NAME, { async: true })
+  @OnDomainEvent(SendUserPasswordResetLinkByActorEvent.NAME)
   async handle(event: SendUserPasswordResetLinkByActorEvent) {
     const { log, metadata } = event;
 

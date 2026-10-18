@@ -90,7 +90,10 @@ export class BookHotelTool implements IAiSubToolHandler {
     const { optionId, holderName, holderSurname } = parsed.data;
 
     const { data: option } = await this.queryBus.execute(
-      new GetHotelRateOptionQuery(optionId)
+      new GetHotelRateOptionQuery(optionId, {
+        clinicId: context.clinicId,
+        conversationId: context.conversationId,
+      })
     );
     if (!option) {
       return {

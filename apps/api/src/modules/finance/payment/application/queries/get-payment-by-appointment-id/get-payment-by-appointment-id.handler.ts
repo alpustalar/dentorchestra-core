@@ -8,13 +8,10 @@ import {
 } from '@modules/finance/payment/domain/repositories/payment/payment.query.repository';
 
 @QueryHandler(GetPaymentByAppointmentIdQuery)
-export class GetPaymentByAppointmentIdHandler
-  implements
-    IQueryHandler<
-      GetPaymentByAppointmentIdQuery,
-      GetPaymentByAppointmentIdResponse
-    >
-{
+export class GetPaymentByAppointmentIdHandler implements IQueryHandler<
+  GetPaymentByAppointmentIdQuery,
+  GetPaymentByAppointmentIdResponse
+> {
   constructor(
     @Inject(PAYMENT_QUERY_REPOSITORY)
     private readonly paymentRepo: IPaymentQueryRepository

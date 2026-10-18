@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { PolicyAccessDeniedEvent } from '@modules/platform/policy/staff/domain/events/policy-access-denied.event';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class PolicyAccessDeniedListener {
@@ -9,7 +9,7 @@ export class PolicyAccessDeniedListener {
 
   constructor(private readonly auditLogService: AuditLogService) {}
 
-  @OnEvent(PolicyAccessDeniedEvent.NAME, { async: true })
+  @OnDomainEvent(PolicyAccessDeniedEvent.NAME)
   async handle(event: PolicyAccessDeniedEvent): Promise<void> {
     const {
       log,

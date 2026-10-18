@@ -35,6 +35,17 @@ export class InvoiceResponseDto {
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
   einvoiceStatus: EDocumentStatus;
 
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  cancelledAt: Date | null;
+
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  cancelReason: string | null;
+
+  /** İptali yapan personel (Firebase UID) — yalnız yönetim/denetim tier'ı. */
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  cancelledById: string | null;
+
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   paymentId: string | null;
 
@@ -135,6 +146,15 @@ export class InvoiceViewResponseDto {
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
   @Type(() => Date)
   issuedAt: Date | null;
+
+  // İptal izi operasyon tier'ında: resepsiyon da "bu belge iptal edilmiş, neden"
+  // sorusunun cevabını görmek zorunda (tutarı görmesi gerekmeden).
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  cancelledAt: Date | null;
+
+  @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  cancelReason: string | null;
 
   // --- KDV kırılımı ve tutarlar (finans) ---
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })

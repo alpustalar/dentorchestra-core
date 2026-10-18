@@ -38,9 +38,7 @@ describe('MarkInstallmentAsCancelledHandler', () => {
     const payment = makePayment();
     const { handler, paymentCommandRepo } = make(payment);
 
-    await handler.execute(
-      new MarkInstallmentAsCancelledCommand('inst-1', ctx)
-    );
+    await handler.execute(new MarkInstallmentAsCancelledCommand('inst-1', ctx));
 
     expect(
       paymentCommandRepo.findByInstallmentIdForUpdate
@@ -52,9 +50,7 @@ describe('MarkInstallmentAsCancelledHandler', () => {
   it('okuma ve yazma aynı transaction içinde yapılır (kilit etkili olsun diye)', async () => {
     const { handler, txManager } = make(makePayment());
 
-    await handler.execute(
-      new MarkInstallmentAsCancelledCommand('inst-1', ctx)
-    );
+    await handler.execute(new MarkInstallmentAsCancelledCommand('inst-1', ctx));
 
     expect(txManager.run).toHaveBeenCalledTimes(1);
   });

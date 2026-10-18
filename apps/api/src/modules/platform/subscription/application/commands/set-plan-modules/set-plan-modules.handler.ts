@@ -8,9 +8,10 @@ import {
 } from '@modules/platform/subscription/domain/repositories/plan/plan.command.repository';
 
 @CommandHandler(SetPlanModulesCommand)
-export class SetPlanModulesHandler
-  implements ICommandHandler<SetPlanModulesCommand, void>
-{
+export class SetPlanModulesHandler implements ICommandHandler<
+  SetPlanModulesCommand,
+  void
+> {
   constructor(
     @Inject(PLAN_COMMAND_REPOSITORY)
     private readonly planRepo: IPlanCommandRepository

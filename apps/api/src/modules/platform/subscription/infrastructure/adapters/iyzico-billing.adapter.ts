@@ -1,9 +1,12 @@
 import { getGlobalPrefix } from '@common/constants';
 import { ENV } from '@common/constants/env.constant';
 import { ROUTE_PATHS } from '@common/constants/routes.constant';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IyzicoProvider } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/iyzico.provider';
+import {
+  IIyzicoProvider,
+  IYZICO_PROVIDER,
+} from '@src/infrastructure/payment/pos/virtual/providers/iyzico/interfaces/iyzico.provider.interface';
 import { RetrieveCheckoutFormResult } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/retrieve-checkout-form.result';
 import { randomUUID } from 'crypto';
 import {
@@ -19,7 +22,8 @@ const PLACEHOLDER_IDENTITY_NUMBER = '11111111111';
 @Injectable()
 export class IyzicoBillingAdapter implements IBillingAdapter {
   constructor(
-    private readonly iyzicoProvider: IyzicoProvider,
+    @Inject(IYZICO_PROVIDER)
+    private readonly iyzicoProvider: IIyzicoProvider,
     private readonly configService: ConfigService
   ) {}
 
@@ -84,6 +88,9 @@ export class IyzicoBillingAdapter implements IBillingAdapter {
       success: result.isSuccess,
       iyzicoPaymentId: result.paymentId,
       errorMessage: result.errorMessage,
+      paidAmount: result.paidPrice,
+      // Bağ kanıtı: gövdeden değil sağlayıcının yanıtından gelir.
+      conversationId: result.conversationId,
       savedCard: this.mapSavedCard(result),
     };
   }

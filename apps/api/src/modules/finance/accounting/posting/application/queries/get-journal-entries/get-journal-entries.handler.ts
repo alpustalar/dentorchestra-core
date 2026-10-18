@@ -17,9 +17,10 @@ import {
 } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
 
 @QueryHandler(GetJournalEntriesQuery)
-export class GetJournalEntriesHandler
-  implements IQueryHandler<GetJournalEntriesQuery, GetJournalEntriesResponse>
-{
+export class GetJournalEntriesHandler implements IQueryHandler<
+  GetJournalEntriesQuery,
+  GetJournalEntriesResponse
+> {
   constructor(
     @Inject(JOURNAL_QUERY_REPOSITORY)
     private readonly journalQueryRepo: IJournalQueryRepository,

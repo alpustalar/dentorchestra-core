@@ -6,6 +6,14 @@ import { InputJsonValueType as InputJsonValue } from '@input-type-schemas/InputJ
 // ==========================================
 
 export interface FindFinancialEventsFilter {
+  /**
+   * Satır kapsamı — **zorunlu**. Yetki kontrolü klinik seviyesinde yapıldığı için
+   * (`canAccessClinicFinances`) filtre de klinik seviyesinde olmak zorundadır:
+   * yalnız `organizationId` ile filtrelenirse tek şubeye erişimi olan personel
+   * organizasyondaki **tüm** şubelerin finansal olaylarını okur.
+   */
+  clinicId: string;
+  /** Kiracı güvenlik ağı — kapsam her zaman `clinicId`'den çözülür. */
   organizationId: string;
   type?: FinancialEventType;
   sourceModule?: string;

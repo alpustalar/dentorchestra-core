@@ -7,6 +7,14 @@ export const PaxSaleSchema = z.object({
   patientId: z.uuid().optional(),
   appointmentId: z.uuid().optional(),
   paymentId: z.uuid().optional(),
-  amount: z.number().positive(),
+  amount: z
+    .number()
+    .positive()
+    // Kuruştan ince tutar hem DB kolonunda (`Decimal(10,2)`) hem cihaza giden
+    // minor-unit çevriminde sessizce yuvarlanır: çekilen tutar ile kayda geçen
+    // tutar ayrışır.
+    .multipleOf(0.01, {
+      message: 'Tutar en fazla 2 ondalık basamak taşıyabilir',
+    }),
   currency: CurrencySchema,
 });

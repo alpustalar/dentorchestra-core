@@ -17,9 +17,10 @@ import { ITenantScopeResolver } from '@shared';
  * zaten varsa hiçbir şey yapmaz (register-clinic saga'sından çağrılır).
  */
 @CommandHandler(InitializeTaxParametersCommand)
-export class InitializeTaxParametersHandler
-  implements ICommandHandler<InitializeTaxParametersCommand, void>
-{
+export class InitializeTaxParametersHandler implements ICommandHandler<
+  InitializeTaxParametersCommand,
+  void
+> {
   constructor(
     @Inject(TAX_PARAMETER_COMMAND_REPOSITORY)
     private readonly taxParameterRepo: ITaxParameterCommandRepository,

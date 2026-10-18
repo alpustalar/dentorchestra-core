@@ -14,6 +14,22 @@ export class EDocumentProducer {
     @InjectQueue(QUEUES.E_DOCUMENT) private readonly eDocumentQueue: Queue
   ) {}
 
+  /**
+   * Entegratörde iptal bildirimi. `jobId` fatura kimliğinden türetilir →
+   * idempotent: aynı faturanın iptali iki kez enqueue edilse tek job çalışır.
+   * Gönderim job'undan ayrı bir jobId kullanılır, aksi halde fatura kesilirken
+   * eklenen (ve `removeOnComplete` ile silinmiş olabilen) kaydın adıyla çakışırdı.
+   */
+  async enqueueCancel(input: CancelJobInput): Promise<void> {
+    await this.eDocumentQueue.add(E_DOCUMENT_JOBS.CANCEL, input, {
+      jobId: `e-document-cancel:${input.invoiceId}`,
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: true,
+      removeOnFail: false,
+    });
+  }
+
   async enqueueSend(invoiceId: string): Promise<void> {
     await this.eDocumentQueue.add(
       E_DOCUMENT_JOBS.SEND,
@@ -27,4 +43,12 @@ export class EDocumentProducer {
       }
     );
   }
+}
+
+export interface CancelJobInput {
+  invoiceId: string;
+  /** Entegratördeki belge referansı (ETTN/UUID). */
+  uuid: string;
+  reason: string;
+  clinicId: string;
 }

@@ -24,9 +24,10 @@ import {
 } from '@modules/platform/subscription/domain/repositories/subscription-item/subscription-item.command.repository';
 
 @CommandHandler(StartTrialCommand)
-export class StartTrialHandler
-  implements ICommandHandler<StartTrialCommand, void>
-{
+export class StartTrialHandler implements ICommandHandler<
+  StartTrialCommand,
+  void
+> {
   constructor(
     @Inject(SUBSCRIPTION_COMMAND_REPOSITORY)
     private readonly subscriptionRepo: ISubscriptionCommandRepository,

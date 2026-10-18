@@ -23,13 +23,10 @@ interface GetSummaryInput {
 }
 
 @QueryHandler(GetPatientFinanceSummaryQuery)
-export class GetPatientFinanceSummaryHandler
-  implements
-    IQueryHandler<
-      GetPatientFinanceSummaryQuery,
-      GetPatientFinanceSummaryQueryResponse
-    >
-{
+export class GetPatientFinanceSummaryHandler implements IQueryHandler<
+  GetPatientFinanceSummaryQuery,
+  GetPatientFinanceSummaryQueryResponse
+> {
   constructor(
     @Inject(FINANCE_LEDGER_QUERY_REPOSITORY)
     private readonly financeLedgerRepository: IFinanceLedgerQueryRepository,
@@ -75,11 +72,7 @@ export class GetPatientFinanceSummaryHandler
     });
   }
 
-  private async getSummary({
-    patientId,
-    clinicId,
-    ctx,
-  }: GetSummaryInput) {
+  private async getSummary({ patientId, clinicId, ctx }: GetSummaryInput) {
     const summary =
       await this.financeLedgerRepository.getPatientSummary(patientId);
 

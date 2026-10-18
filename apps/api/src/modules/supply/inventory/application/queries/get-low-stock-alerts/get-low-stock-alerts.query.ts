@@ -6,6 +6,6 @@ export class GetLowStockAlertsQuery implements IQuery {
   readonly __responseType!: GetLowStockAlertsResponse;
   constructor(
     public readonly clinicId: string,
-    public readonly ctx: IGetContext,
+    public readonly ctx: IGetContext
   ) {}
 }

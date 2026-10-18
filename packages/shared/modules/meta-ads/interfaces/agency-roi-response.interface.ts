@@ -19,6 +19,17 @@ export interface RoiPeriodTotals {
   roiPercent: number;
   attributedLeads: number;
   convertedPatients: number;
+  /**
+   * `revenue` ve `roas` bu para biriminde hesaplanır (kliniğin fonksiyonel
+   * para birimi). Cari defter geliri para birimi başına tutulduğu için tek bir
+   * orana ancak tek para birimi girebilir — kur uydurulmaz.
+   */
+  revenueCurrency: string;
+  /**
+   * Dönemde görülen ama orana **dahil edilmeyen** para birimleri. Boş değilse
+   * gerçek gelir rapordaki `revenue`den yüksektir; arayüz bunu göstermelidir.
+   */
+  excludedRevenueCurrencies: string[];
 }
 
 /** Ajans ROI raporu — cari dönem + önceki eşit dönem + değişim yüzdeleri + kampanya kırılımı. */

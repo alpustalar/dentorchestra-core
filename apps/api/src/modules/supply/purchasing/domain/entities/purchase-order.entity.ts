@@ -11,9 +11,9 @@ import {
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
-import { randomUUID } from 'crypto';
 import { CreatePurchaseOrderProps } from '@modules/supply/purchasing/domain/contracts';
 import {
+  PurchaseOrderCancelWithInvoicesException,
   PurchaseOrderEmptyItemsException,
   PurchaseOrderInvalidStateException,
   PurchaseOrderItemNotFoundException,
@@ -25,6 +25,7 @@ import PurchaseOrderBillingStatusSchema, {
   PurchaseOrderBillingStatusType as PurchaseOrderBillingStatus,
 } from '@input-type-schemas/PurchaseOrderBillingStatusSchema';
 import { calculateReceivedValue } from '@modules/supply/purchasing/domain/rules/purchase-order-billing.rules';
+import { Money } from '@src/domain/value-objects/money.vo';
 
 export interface PurchaseOrderLine {
   id: string;
@@ -187,12 +188,12 @@ export class PurchaseOrder extends AggregateRoot {
       const quantity = new Decimal(item.quantity);
       const unitPrice = new Decimal(item.unitPrice);
       const vatRate = item.vatRate ?? 0;
-      const lineNet = quantity.mul(unitPrice).toDecimalPlaces(2);
-      const lineVat = lineNet.mul(vatRate).div(100).toDecimalPlaces(2);
+      const lineNet = Money.scale(quantity.mul(unitPrice));
+      const lineVat = Money.scale(lineNet.mul(vatRate).div(100));
       const lineTotal = lineNet.plus(lineVat);
 
       return {
-        id: randomUUID(),
+        id: UUID.generate().value,
         productId: item.productId ?? null,
         description: item.description,
         quantityOrdered: quantity,
@@ -257,6 +258,21 @@ export class PurchaseOrder extends AggregateRoot {
         'cancel'
       );
     }
+
+    // Fatura eşleştirmesi `SENT` durumunda da yapılabiliyor (peşin/ön fatura
+    // meşrudur). Sayacı dolu bir siparişi iptal etmek, iptal edilmiş bir
+    // siparişe bağlı borç bırakır: `applyInvoice` artık reddedildiği için sayaç
+    // bir daha asla doğru değere getirilemez ve üçlü eşleştirme (sipariş ↔
+    // teslim ↔ fatura) o sipariş için kalıcı olarak anlamsızlaşır. Doğru sıra
+    // ters yönde: önce fatura eşleştirmesi kaldırılır, sonra sipariş iptal edilir.
+    if (!this._invoicedTotal.isZero()) {
+      throw new PurchaseOrderCancelWithInvoicesException({
+        orderId: this._id.value,
+        invoicedTotal: this._invoicedTotal.toFixed(2),
+        billingStatus: this._billingStatus,
+      });
+    }
+
     this._status = PurchaseOrderStatusSchema.enum.CANCELLED;
     this._updatedAt = DateTimeManager.create();
   }
@@ -327,7 +343,7 @@ export class PurchaseOrder extends AggregateRoot {
       });
     }
 
-    this._invoicedTotal = newTotal.toDecimalPlaces(2);
+    this._invoicedTotal = Money.scale(newTotal);
     this.refreshBillingStatus();
     this._updatedAt = DateTimeManager.create();
   }
@@ -347,7 +363,7 @@ export class PurchaseOrder extends AggregateRoot {
       );
     }
 
-    this._invoicedTotal = newTotal.toDecimalPlaces(2);
+    this._invoicedTotal = Money.scale(newTotal);
     this.refreshBillingStatus();
     this._updatedAt = DateTimeManager.create();
   }

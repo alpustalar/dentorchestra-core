@@ -1,3 +1,4 @@
+import { JournalEntryKindSchema } from '@input-type-schemas/JournalEntryKindSchema';
 import { Decimal } from 'decimal.js';
 import { CreateJournalEntryLineProps } from '../contracts/journal-line';
 import { JOURNAL_DESCRIPTIONS } from '@modules/finance/shared/domain/constants/journal-descriptions.constant';
@@ -79,6 +80,10 @@ export class YearEndClosingService {
       ...commonProps,
       description: JOURNAL_DESCRIPTIONS.YEAR_END_INCOME_EXPENSE_CLOSING,
       eventId: null,
+      // Kapanış fişi ekonomik bir olay değil, dönem sonu tekniğidir: 6/7'yi ters
+      // kayıtla sıfırlar. İşaretlenmezse gelir tablosu onu da sayar ve kapanmış
+      // yılın cirosu **sıfır** görünür (satırlar gerçek satışları birebir götürür).
+      kind: JournalEntryKindSchema.enum.CLOSING,
       lines: entryALines,
     });
     entries.push(entryA);
@@ -122,6 +127,7 @@ export class YearEndClosingService {
         ...commonProps,
         description: JOURNAL_DESCRIPTIONS.YEAR_END_PROFIT_LOSS_TRANSFER,
         eventId: null,
+        kind: JournalEntryKindSchema.enum.CLOSING,
         lines: entryBLines,
       });
       entries.push(entryB);

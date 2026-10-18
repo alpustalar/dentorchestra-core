@@ -1,12 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { FinancialEvent, FinancialEventTypeSchema } from '@shared';
-import { ACCOUNTING_RULES } from '@modules/finance/shared/domain/constants/accounting-rules.constant';
-import {
-  DraftJournalEntry,
-  PostingContext,
-  PostingRule,
-} from '../posting-rule.interface';
+import { DraftJournalEntry, PostingRule } from '../posting-rule.interface';
 import { PaymentMadeEventPayload } from '../event-payloads';
+import { resolvePaymentFundsAccount } from '@modules/finance/shared/domain/constants/payment-method-ledger.constant';
+import { UnmappedPaymentMethodException } from '@modules/finance/accounting/posting/domain/exceptions/posting.exceptions';
 
 /** Satıcılar — 320 `requiresParty`, cari bazında takip edilir. */
 const SUPPLIERS_320 = '320';
@@ -24,13 +21,22 @@ const SUPPLIERS_320 = '320';
 export class PaymentMadeRule implements PostingRule {
   readonly eventType = FinancialEventTypeSchema.enum.PAYMENT_MADE;
 
-  build(event: FinancialEvent, _ctx: PostingContext): DraftJournalEntry {
+  build(event: FinancialEvent): DraftJournalEntry {
     const payload = event.payload as unknown as PaymentMadeEventPayload;
 
-    const fundsAccountCode =
-      payload.method === 'CASH'
-        ? ACCOUNTING_RULES.TARGET_ACCOUNTS.CASH_100
-        : ACCOUNTING_RULES.TARGET_ACCOUNTS.BANKS_102;
+    // Çıkışta kabul edilen küme tahsilattan DARDIR (kart yok): bkz.
+    // `OUTBOUND_PAYMENT_METHODS`. Eşleme bulunamazsa hata — varsayılan hesaba
+    // düşmek borcu yanlış kaynaktan kapatırdı.
+    const fundsAccountCode = resolvePaymentFundsAccount(
+      payload.method,
+      'OUTBOUND'
+    );
+    if (!fundsAccountCode) {
+      throw new UnmappedPaymentMethodException({
+        method: payload.method,
+        direction: 'OUTBOUND',
+      });
+    }
 
     const description = payload.reference
       ? `Satıcı ödemesi (${payload.reference})`

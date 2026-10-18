@@ -1,7 +1,8 @@
 import { Expose, Type } from 'class-transformer';
 import { TreatmentChargeResponseGroups } from '@modules/finance/treatment-charge/domain/contracts/treatment-charge';
 
-const { INTERNAL, FINANCIAL, MANAGEMENT, ADMIN } = TreatmentChargeResponseGroups;
+const { INTERNAL, FINANCIAL, MANAGEMENT, ADMIN } =
+  TreatmentChargeResponseGroups;
 
 /** "Ne yapıldı" tarafı — randevuyu yürüten klinik personeline açık. */
 const OPS = { groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] };

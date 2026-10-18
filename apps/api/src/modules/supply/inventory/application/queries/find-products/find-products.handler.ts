@@ -15,9 +15,10 @@ import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/servi
 import { ITenantScopeResolver } from '@shared';
 
 @QueryHandler(FindProductsQuery)
-export class FindProductsHandler
-  implements IQueryHandler<FindProductsQuery, FindProductsResponse>
-{
+export class FindProductsHandler implements IQueryHandler<
+  FindProductsQuery,
+  FindProductsResponse
+> {
   constructor(
     @Inject(PRODUCT_QUERY_REPOSITORY)
     private readonly productRepo: IProductQueryRepository,
@@ -28,23 +29,35 @@ export class FindProductsHandler
   ) {}
 
   async execute(query: FindProductsQuery): Promise<FindProductsResponse> {
-    const { pagination, ctx } = query.payload;
+    const { pagination, clinicId, ctx } = query.payload;
 
-    const organizationId = await this.tenantScopeResolver.resolve(
-      query.payload
+    // Kiracı sınırı: `clinicId` istekle geliyor, kliniğin organizasyonu
+    // çözülüp aktörün ona erişimi doğrulanır.
+    const organizationId = await this.tenantScopeResolver.resolve({ clinicId });
+
+    const { evaluator, policy } = this.policyFactory.clinic(
+      ctx.actor,
+      ctx.source
     );
 
-    const result = await this.productRepo.findMany(organizationId, pagination);
+    evaluator
+      .check((p) =>
+        p.actorCanAccessClinicOrOwnsOrganization(clinicId, organizationId)
+      )
+      .orThrow('inventory.product.list');
 
-    const clinicId = result.items[0].clinicId;
+    // Liste kliniğin kataloğu. Eskiden organizasyon kapsamında listelenip
+    // serileştirme ayarları `result.items[0].clinicId`'den okunuyordu: boş
+    // katalogda (ya da son sayfadan sonra) bu satır TypeError ile 500 veriyordu,
+    // dolu listede ise alan görünürlüğü **rastgele bir satırın** kliniğine göre
+    // hesaplanıyordu.
+    const result = await this.productRepo.findMany(clinicId, pagination);
 
     return {
       data: result.items,
       meta: {
         pagination: buildPaginationMeta(pagination, result.total),
-        serializationOptions: this.policyFactory
-          .clinic(ctx.actor, ctx.source)
-          .policy.getSerializationOptions({ clinicId }),
+        serializationOptions: policy.getSerializationOptions({ clinicId }),
       },
     };
   }

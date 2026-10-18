@@ -7,6 +7,7 @@ import { HotelbedsTransferBookingRepositoryModule } from '../../infrastructure/p
 import { TransferCacheModule } from '@modules/crm/health-tourism/transfer/infrastructure/cache/transfer-cache.module';
 import { GetTransferRateOptionHandler } from './get-transfer-rate-option/get-transfer-rate-option.handler';
 import { HotelbedsTransferApiModule } from '@modules/crm/health-tourism/transfer/infrastructure/adapters/hotelbeds/hotelbeds-transfer-api.module';
+import { QuoteOptionModule } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.module';
 
 export const TRANSFER_QUERY_HANDLERS = [
   SearchTransferAvailabilityHandler,
@@ -21,6 +22,7 @@ export const TRANSFER_QUERY_HANDLERS = [
     HotelbedsTransferApiModule,
     HotelbedsTransferBookingRepositoryModule,
     TransferCacheModule,
+    QuoteOptionModule,
   ],
   providers: [...TRANSFER_QUERY_HANDLERS],
   exports: TRANSFER_QUERY_HANDLERS,

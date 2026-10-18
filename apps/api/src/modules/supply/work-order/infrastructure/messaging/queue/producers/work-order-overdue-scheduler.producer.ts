@@ -12,9 +12,7 @@ import { QUEUES, WORK_ORDER_JOBS } from '@common/constants';
 export class WorkOrderOverdueSchedulerProducer implements OnModuleInit {
   private readonly logger = new Logger(WorkOrderOverdueSchedulerProducer.name);
 
-  constructor(
-    @InjectQueue(QUEUES.WORK_ORDER) private readonly queue: Queue
-  ) {}
+  constructor(@InjectQueue(QUEUES.WORK_ORDER) private readonly queue: Queue) {}
 
   async onModuleInit(): Promise<void> {
     await this.queue.add(

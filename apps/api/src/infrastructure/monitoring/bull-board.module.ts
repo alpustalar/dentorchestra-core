@@ -20,6 +20,18 @@ import basicAuth from 'express-basic-auth';
       name: QUEUES.FINANCE,
       adapter: BullMQAdapter,
     }),
+    // Muhasebe dönemi kontrolü: yıl dönümünde çalışmazsa tüm posting durur,
+    // bu yüzden panelden görünür olmalı.
+    BullBoardModule.forFeature({
+      name: QUEUES.ACCOUNTING,
+      adapter: BullMQAdapter,
+    }),
+    // Fişlenmemiş olay süpürmesi: mizanın olay defteriyle mutabık kalmasını bu iş
+    // sağlıyor; sessizce durursa fiş boşlukları birikir.
+    BullBoardModule.forFeature({
+      name: QUEUES.POSTING,
+      adapter: BullMQAdapter,
+    }),
   ],
 })
 export class MonitoringModule {}

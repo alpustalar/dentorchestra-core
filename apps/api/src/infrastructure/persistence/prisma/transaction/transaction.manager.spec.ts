@@ -94,6 +94,52 @@ describe('TransactionManager', () => {
       expect(eventEmitter.emitAsync).toHaveBeenCalledTimes(2);
     });
 
+    it('listener hatası WARNING uyarısı üretir (sessiz düşmez)', async () => {
+      const { manager, eventEmitter, criticalFailure } = build();
+      (eventEmitter.emitAsync as jest.Mock).mockRejectedValueOnce(
+        new Error('listener patladı')
+      );
+
+      await manager.run(async () => {
+        addEvent('foo.created');
+      });
+
+      // `emitDetached` hatayı mikrotask'ta yakalar.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(criticalFailure.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'events.in-memory-dispatch',
+          severity: 'WARNING',
+          dedupeKey: 'listener-failed:foo.created',
+        })
+      );
+    });
+
+    /**
+     * Kritik olmayan kanal isteği **bekletmez**: commit sonrası yayın, yanıtı bir
+     * SMTP/WhatsApp çağrısının arkasına koymamalı. Kritik yan etki outbox'tan
+     * gider; beklemek orada (kuyruk işçisinde) doğrudur.
+     */
+    it('in-memory kanal çağıranı bekletmez', async () => {
+      const { manager, eventEmitter } = build();
+      let listenerFinished = false;
+      (eventEmitter.emitAsync as jest.Mock).mockImplementationOnce(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        listenerFinished = true;
+      });
+
+      await manager.run(async () => {
+        addEvent('foo.created');
+      });
+
+      expect(listenerFinished).toBe(false);
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(listenerFinished).toBe(true);
+    });
+
     it('iş patlarsa transaction geri sarar ve hiçbir event yayınlanmaz', async () => {
       const { manager, state, eventEmitter } = build();
 
@@ -212,7 +258,7 @@ describe('TransactionManager', () => {
       });
 
       expect(outboxRepo.saveEvents).toHaveBeenCalledTimes(1);
-      const [savedEvents] = (outboxRepo.saveEvents as jest.Mock).mock.calls[0];
+      const [savedEvents] = outboxRepo.saveEvents.mock.calls[0];
       expect(savedEvents).toHaveLength(1);
       expect(eventEmitter.emitAsync).not.toHaveBeenCalled();
       expect(state.committed).toBe(true);

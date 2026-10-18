@@ -1,5 +1,5 @@
-import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
+import { InvoiceNumberInvalidException } from '@modules/finance/invoice/domain/exceptions/invoice.exceptions';
 
 export class InvoiceNumber {
   private readonly _value: string;
@@ -18,10 +18,16 @@ export class InvoiceNumber {
   }
 
   public static create(value: string): InvoiceNumber {
-    const result = this.SCHEMA.safeParse(value.trim().toUpperCase());
+    const normalized = value.trim().toUpperCase();
+    const result = this.SCHEMA.safeParse(normalized);
 
     if (!result.success) {
-      throw new BadRequestException(result.error.issues[0].message);
+      // Domain katmanı HTTP'den habersiz kalır: bu VO hem controller yolundan hem
+      // e-belge kuyruk işleyicisinden (HTTP yok) çağrılıyor.
+      throw new InvoiceNumberInvalidException({
+        value: normalized,
+        reason: result.error.issues[0].message,
+      });
     }
 
     return new InvoiceNumber(result.data);
@@ -29,6 +35,10 @@ export class InvoiceNumber {
 
   public get value(): string {
     return this._value;
+  }
+
+  public equals(other: InvoiceNumber): boolean {
+    return this._value === other._value;
   }
 
   public toString(): string {

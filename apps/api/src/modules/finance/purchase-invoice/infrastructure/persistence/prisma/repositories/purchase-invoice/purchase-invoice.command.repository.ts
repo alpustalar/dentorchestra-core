@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { IPurchaseInvoiceCommandRepository } from '@modules/finance/purchase-invoice/domain/repositories/purchase-invoice.repository';
 import { PurchaseInvoice } from '@modules/finance/purchase-invoice/domain/entities/purchase-invoice.entity';
 import { BaseCommandRepository } from '@src/infrastructure/persistence/prisma/base-command.repository';
+import { PurchaseInvoiceDuplicateException } from '@modules/finance/purchase-invoice/domain/exceptions/purchase-invoice.exceptions';
 
 @Injectable()
 export class PurchaseInvoiceCommandRepository
@@ -35,24 +37,36 @@ export class PurchaseInvoiceCommandRepository
     return new PurchaseInvoice(raw);
   }
 
+  /**
+   * Mükerrer alış faturasını nihai olarak DB kısıtı engeller
+   * (`clinic_id + supplier_id + invoice_number` unique): "zaten var mı" kontrolü
+   * ile yazma arasındaki pencerede ikinci istek gelirse burada P2002 alınır ve
+   * tipli bir domain hatasına çevrilir.
+   *
+   * Kazananın kaydı okunup idempotent şekilde DÖNÜLMEZ (satış faturasının aksine):
+   * alış belgesini kullanıcı girer, tutarı/tarihi farklı olabilir ve "sessizce
+   * mevcut olanı kabul ettim" demek yanlış tutarı onaylamak olur. Çakışma
+   * kullanıcıya görünür.
+   */
   async create(entity: PurchaseInvoice): Promise<PurchaseInvoice> {
     const data = entity.toPersistence();
-    const raw = await this.db.purchaseInvoice.create({
-      data,
-    });
-    entity.flushEvents();
-    return new PurchaseInvoice(raw);
-  }
 
-  async sync(entity: PurchaseInvoice): Promise<PurchaseInvoice> {
-    const create = entity.toPersistence();
-    const { id, ...update } = create;
-    const raw = await this.db.purchaseInvoice.upsert({
-      where: { id },
-      create,
-      update,
-    });
-    entity.flushEvents();
-    return new PurchaseInvoice(raw);
+    try {
+      const raw = await this.db.purchaseInvoice.create({ data });
+      entity.flushEvents();
+      return new PurchaseInvoice(raw);
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new PurchaseInvoiceDuplicateException({
+          clinicId: data.clinicId,
+          supplierId: data.supplierId,
+          invoiceNumber: data.invoiceNumber,
+        });
+      }
+      throw error;
+    }
   }
 }

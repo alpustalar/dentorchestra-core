@@ -1,0 +1,56 @@
+/// Sağlayıcı hesap kapaması (settlement/payout).
+///
+/// Kartla tahsil edilen para üye işyeri hesabına **anında** geçmez: sağlayıcı
+/// (iyzico, banka POS) tutarı biriktirir, komisyonunu keser ve valör günü net
+/// tutarı bankaya aktarır. Defterde bu bekleyen para 108 Diğer Hazır Değerler'de
+/// durur; kapanışı yazılmadığı sürece üç hata birlikte yaşar:
+///   (1) 108 sonsuza kadar şişer (bilanço yanlış),
+///   (2) para 102 Bankalar'a hiç girmez (banka ekstresiyle mutabakat imkânsız),
+///   (3) sağlayıcı komisyonu hiç gider yazılmaz (653) → kâr fazla görünür.
+///
+/// Kayıt **sağlayıcının kendi payout raporundan** girilir (bugün API yok, banka
+/// ekstresi importu da elle). Bu yüzden `reference` sağlayıcının referansıdır ve
+/// idempotency anahtarıdır: aynı payout iki kez girilirse 108 iki kez kapanır.
+enum SettlementProvider {
+  IYZICO /// sanal POS (ödeme kuruluşu)
+  IYZICO_TERMINAL /// fiziksel iyzico terminali
+  PAX_BANK /// PAX terminalinin bağlı olduğu banka
+  STRIPE
+  OTHER
+}
+
+model ProviderSettlement {
+  id             String @id
+  organizationId String @map("organization_id")
+  clinicId       String @map("clinic_id") // defter sahibi şube
+
+  provider SettlementProvider
+  /// Sağlayıcının payout referansı — kiracı+sağlayıcı içinde tekil (idempotency).
+  reference String
+  /// Paranın hesaba geçtiği gün — fişin belge tarihi (dönem kapısı buna bakar).
+  payoutDate DateTime @map("payout_date")
+
+  /// 108'den düşen brüt tutar = net + komisyon (entity'de birebir zorunlu).
+  grossAmount      Decimal  @map("gross_amount") @db.Decimal(14, 2)
+  /// Sağlayıcının kestiği komisyon → 653 Komisyon Giderleri.
+  commissionAmount Decimal  @map("commission_amount") @db.Decimal(14, 2)
+  /// Bankaya fiilen geçen tutar → 102 Bankalar.
+  netAmount        Decimal  @map("net_amount") @db.Decimal(14, 2)
+  currency         Currency @default(TRY)
+
+  /// Hangi banka hesabına yattı (opsiyonel; verilirse kiracısı doğrulanır).
+  bankAccountId String? @map("bank_account_id")
+  note          String?
+
+  /// Muhasebe köprüsü izi — mükerrer fiş ve yarıda kalma koruması.
+  accountingEventId    String?   @map("accounting_event_id")
+  postedToAccountingAt DateTime? @map("posted_to_accounting_at")
+
+  recordedById String   @map("recorded_by_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([clinicId, provider, reference])
+  @@index([clinicId, payoutDate])
+  @@map("provider_settlements")
+}

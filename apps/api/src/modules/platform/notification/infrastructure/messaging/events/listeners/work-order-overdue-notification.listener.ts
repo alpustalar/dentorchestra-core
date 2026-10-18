@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { WORK_ORDER_EVENTS } from '@src/domain/constants/events';
 import { WorkOrderOverdueEvent } from '@modules/supply/work-order/domain/events/work-order-overdue.event';
 import { NotificationDispatcherService } from '@modules/platform/notification/application/services/notification-dispatcher.service';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Dış iş emri termini geçtiğinde personele panel-içi bildirim üretir. Cross-module
@@ -17,7 +17,7 @@ export class WorkOrderOverdueNotificationListener {
 
   constructor(private readonly dispatcher: NotificationDispatcherService) {}
 
-  @OnEvent(WORK_ORDER_EVENTS.OVERDUE, { async: true })
+  @OnDomainEvent(WORK_ORDER_EVENTS.OVERDUE)
   async handle(event: WorkOrderOverdueEvent): Promise<void> {
     try {
       await this.dispatcher.notifyWorkOrderOverdue({

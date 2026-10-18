@@ -63,6 +63,17 @@ export interface HotelContentItem {
   phones?: unknown[];
 }
 
+/**
+ * Otel iptalinin sonucu. `retainedAmount === null` → sağlayıcının alıkoyduğu
+ * ceza **bilinmiyor** (0 ile aynı şey değil; bkz. adapter notu). Para birimi
+ * yalnız tutar varsa anlamlıdır.
+ */
+export interface CancelHotelBookingResult {
+  reference: string;
+  retainedAmount: number | null;
+  currency: string | null;
+}
+
 export interface IHotelbedsApiService {
   searchAvailability(
     params: HotelSearchParams
@@ -71,7 +82,7 @@ export interface IHotelbedsApiService {
   createBooking(
     params: CreateHotelbedsBookingParams
   ): Promise<HotelbedsBookingResult>;
-  cancelBooking(reference: string): Promise<void>;
+  cancelBooking(reference: string): Promise<CancelHotelBookingResult>;
   getHotelContent(params: {
     countryCode: string;
     from: number;

@@ -9,7 +9,10 @@ import {
 import { ClinicAppointmentSettings } from '@modules/organization/clinic/domain/entities/clinic-appointment-settings.entity';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { CLINIC_EVENTS } from '@src/domain/constants/events';
-import { ClinicCacheService } from '@modules/organization/clinic/infrastructure/cache/clinic-cache.service';
+import {
+  CLINIC_CACHE_SERVICE,
+  IClinicCacheService,
+} from '@modules/organization/clinic/domain/interfaces/clinic-cache.service.interface';
 import {
   CLINIC_APPOINTMENT_SETTINGS_COMMAND_REPOSITORY,
   IClinicAppointmentSettingsCommandRepository,
@@ -21,15 +24,17 @@ import {
  * bust. Cache bust DB commit'inden SONRA yapılır ki bir sonraki okuma taze veriyi çeksin.
  */
 @CommandHandler(UpdateClinicAppointmentSettingsCommand)
-export class UpdateClinicAppointmentSettingsHandler
-  implements ICommandHandler<UpdateClinicAppointmentSettingsCommand, void>
-{
+export class UpdateClinicAppointmentSettingsHandler implements ICommandHandler<
+  UpdateClinicAppointmentSettingsCommand,
+  void
+> {
   constructor(
     @Inject(CLINIC_APPOINTMENT_SETTINGS_COMMAND_REPOSITORY)
     private readonly clinicAppointmentSettingsRepo: IClinicAppointmentSettingsCommandRepository,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
-    private readonly cacheService: ClinicCacheService,
+    @Inject(CLINIC_CACHE_SERVICE)
+    private readonly cacheService: IClinicCacheService,
     private readonly txManager: TransactionManager
   ) {}
 

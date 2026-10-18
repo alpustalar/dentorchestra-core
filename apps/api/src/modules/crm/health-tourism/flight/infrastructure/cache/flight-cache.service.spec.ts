@@ -5,6 +5,7 @@ import { DateTimeManager } from '@common/infrastructure/date-time/date-time.mana
 
 const tokenWithExpiry = (expiresAt: string): FlightOfferToken =>
   ({
+    owner: { clinicId: 'clinic-1', conversationId: 'conv-1' },
     offerId: 'off_1',
     totalAmount: 100,
     currency: 'EUR',
@@ -84,19 +85,48 @@ describe('FlightCacheService — TTL teklifin ömründen türetilir', () => {
   });
 });
 
+describe('FlightCacheService — anahtar kapsamı', () => {
+  /**
+   * Anahtarın kiracısı **kaydın sahibinden** gelir: ikisi ayrışırsa bir kliniğin
+   * teklifi başka kliniğin kapsamında aranabilir hale gelirdi.
+   */
+  it('yazma anahtarı kaydın sahibiyle kiracı kapsamlı kurulur', async () => {
+    const { service, redis } = build();
+    const token = tokenWithExpiry('2099-01-01T00:00:00Z');
+
+    await service.flightOffer.set('fl_1', token);
+
+    const [key] = (redis.set as jest.Mock).mock.calls[0] as [string];
+    expect(key).toBe('flight:offer:clinic-1:fl_1');
+  });
+
+  it('okuma anahtarı çağıranın kliniğiyle kurulur', async () => {
+    const { service, redis } = build();
+    (redis.get as jest.Mock).mockResolvedValue(null);
+
+    await service.flightOffer.get('clinic-2', 'fl_1');
+
+    expect(redis.get).toHaveBeenCalledWith('flight:offer:clinic-2:fl_1');
+  });
+});
+
 describe('FlightCacheService — okuma', () => {
   it('kayıt yoksa null döner', async () => {
     const { service, redis } = build();
     (redis.get as jest.Mock).mockResolvedValue(null);
 
-    await expect(service.flightOffer.get('fl_yok')).resolves.toBeNull();
+    await expect(
+      service.flightOffer.get('clinic-1', 'fl_yok')
+    ).resolves.toBeNull();
   });
 
   it('bozuk JSON’da patlamaz, null döner', async () => {
     const { service, redis } = build();
     (redis.get as jest.Mock).mockResolvedValue('{bozuk');
 
-    await expect(service.flightOffer.get('fl_1')).resolves.toBeNull();
+    await expect(
+      service.flightOffer.get('clinic-1', 'fl_1')
+    ).resolves.toBeNull();
   });
 
   it('kayıtlı token’ı geri verir', async () => {
@@ -104,7 +134,9 @@ describe('FlightCacheService — okuma', () => {
     const token = tokenWithExpiry('2026-09-01T10:00:00Z');
     (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(token));
 
-    await expect(service.flightOffer.get('fl_1')).resolves.toMatchObject({
+    await expect(
+      service.flightOffer.get('clinic-1', 'fl_1')
+    ).resolves.toMatchObject({
       offerId: 'off_1',
     });
   });

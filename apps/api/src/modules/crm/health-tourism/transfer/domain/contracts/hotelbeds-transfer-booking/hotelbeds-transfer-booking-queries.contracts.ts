@@ -1,3 +1,6 @@
+// Barrel'dan DEĞİL: barrel yaprak NestJS modülünü ve uyarı yayıncısına bağlı
+// servisi de dışa açıyor; sözleşme dosyası yalnız TİPE bağımlı kalmalı.
+import { QuoteOptionOwner } from '@modules/crm/health-tourism/shared/domain/quote-option/quote-option.contracts';
 // ==========================================
 // SORGULAMA SÖZLEŞMELERİ (FILTERS)
 // ==========================================
@@ -18,6 +21,13 @@ export interface FindTransferBookingsFilter {
  * AI kısa bir optionId sunar; gerçek rateKey + yön/fiyat burada saklanır.
  */
 export interface TransferRateOptionToken {
+  /**
+   * Teklifi üreten kiracı + görüşme. Okuma anında **doğrulanır**: önbellek
+   * anahtarını bilmek teklifi kullanma yetkisi vermez
+   * (`QuoteOptionOwnershipService`).
+   */
+  owner: QuoteOptionOwner;
+
   rateKey: string;
   direction: 'ARRIVAL' | 'DEPARTURE';
   vehicleName: string;

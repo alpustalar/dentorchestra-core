@@ -54,6 +54,32 @@ export class BookingPaymentResponseDto {
   @Type(() => Number)
   netAmount: number;
 
+  // Sağlayıcının FİİLEN ücretlendirdiği maliyet. `netAmount` teklif anındaki
+  // fiyat; ikisi birlikte durmazsa sapma (komisyonun beklenenden düşük çıkması)
+  // yalnız alarm kaydında görünür, finans ekranından okunamaz.
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => Number)
+  supplierAmount: number | null;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  supplierCurrency: string | null;
+
+  // İptal ekonomisi: sağlayıcının alıkoyduğu ceza (689'a zarar olarak yazılan
+  // tutar) ve iadenin KENDİ tarihi. Ekranda durmazsa sağlayıcı faturası ile
+  // mutabakat yapan kişi cezanın ne kadarının kayda geçtiğini göremez.
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @Type(() => Number)
+  supplierRetainedAmount: number | null;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  supplierRetainedCurrency: string | null;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  refundedAt: Date | null;
+
+  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  refundReason: string | null;
+
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   @Type(() => Number)
   fxRate: number | null;
@@ -61,8 +87,11 @@ export class BookingPaymentResponseDto {
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   iyzicoConversationId: string | null;
 
-  @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
-  iyzicoToken: string | null;
+  // `iyzicoToken` BİLİNÇLİ olarak yok: §73'teki callback bağının **yerel
+  // kanıtı** o token'dır (gövdedeki token'la karşılaştırılıyor). Yanıtta
+  // taşımak, kanıtı okunabilir kılar ve kontrolün değerini düşürür. Ödeme
+  // bağlantıları (`iyzicoUrl`/`stripeUrl`) zaten hastaya gönderiliyor;
+  // operasyonun ihtiyacı onlar, token değil.
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
   stripeSessionId: string | null;

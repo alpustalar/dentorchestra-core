@@ -11,6 +11,7 @@ describe('NoopEInvoiceAdapter (entegratör kapalı fallback, doc 07 §1)', () =>
   const request: EDocumentRequest = {
     type: EDocumentTypeSchema.enum.E_ARSIV,
     invoiceId: 'inv-1',
+    idempotencyKey: 'inv-1',
     issueDate: new Date('2026-06-18'),
     seller: { taxId: '1234567890', name: '' },
     buyer: { taxId: '11111111111', name: 'Hasta', isEInvoiceUser: false },

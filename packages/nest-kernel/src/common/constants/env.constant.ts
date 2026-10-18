@@ -20,6 +20,12 @@ export const ENV = {
   IYZICO_SECRET_KEY: 'IYZICO_SECRET_KEY',
   IYZICO_BASE_URL: 'IYZICO_BASE_URL',
   IYZICO_TERMINAL_BASE_URL: 'IYZICO_TERMINAL_BASE_URL',
+  /**
+   * Fiziksel POS callback'inin HMAC-SHA256 imza anahtarı. **Tanımlı değilse
+   * callback reddedilir** (fail-closed): imzasız bir callback, PENDING bir POS
+   * işlemini "başarılı" yapıp para alınmadan tahsilat/gelir yazdırabilir.
+   */
+  POS_CALLBACK_SECRET: 'POS_CALLBACK_SECRET',
   // EMAIL
   EMAIL_ADDRESS: 'EMAIL_ADDRESS',
   EMAIL_PASSWORD: 'EMAIL_PASSWORD',

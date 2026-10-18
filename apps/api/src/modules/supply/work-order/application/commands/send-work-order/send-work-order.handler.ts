@@ -13,9 +13,10 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 
 @CommandHandler(SendWorkOrderCommand)
-export class SendWorkOrderHandler
-  implements ICommandHandler<SendWorkOrderCommand, void>
-{
+export class SendWorkOrderHandler implements ICommandHandler<
+  SendWorkOrderCommand,
+  void
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_COMMAND_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderCommandRepository,

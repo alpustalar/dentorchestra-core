@@ -2585,6 +2585,167 @@ if (exception instanceof DomainException) {
 
 **Neden:** Handler/service'ler HTTP'den habersiz kalır → aynı use-case bir kuyruk işleyicisinden, CLI'dan veya başka bir bounded-context'ten çağrıldığında HTTP semantiği sızmaz. Hata kimliği `errorCode` ile sabittir, HTTP statüsü her exception'ın `httpStatus` alanında polimorfik olarak yaşar (merkezi map bakımı gerekmez) ve frontend, tip-güvenli `meta` payload'ı ile hata anında akıllı kararlar (alternatif slot önerme, validasyon detayı gösterme) alabilir.
 
+## Finans / Muhasebe — Para Güvenliği Kuralları (KURAL)
+
+Finans modüllerinde (`src/modules/finance/**`) aşağıdaki kurallar **derleyicinin göremediği**
+ama defteri bozan hataları kapatır. Yeni finans kodu bunlara uymadan yazılmaz; denetim listesi ve
+açık bulgular: `apps/api/documents/finans/09-guvence-denetimi.md`.
+
+**1. Dönem kapısı (period gate) kilit altında okunur.** Bir fişin hangi döneme düştüğü ve dönemin
+açık olup olmadığı bir **yazma kararıdır**: dönem satırı, fişin yazıldığı **aynı transaction**
+içinde ve **satır kilidi altında** Command Repo'dan okunur. Dönem durumunu QueryBus/Query Repo'dan
+okuyup ayrı tx'te fiş yazmak, kapanış ile fiş arasında yarış açar (kapanmış yılın mizanı değişir).
+
+**2. Yevmiye numarası tek-UPDATE ile tahsis edilir.** `MAX(entry_no) + 1` **yasaktır** — kilitsiz
+okuma iki eşzamanlı fişe aynı numarayı verir. Numara, dönem satırındaki sayaçtan
+`UPDATE ... SET last_entry_no = last_entry_no + 1 ... RETURNING` ile, fişle **aynı tx** içinde
+alınır; DB'de `@@unique([clinicId, periodId, entryNo])` emniyet kemeri olarak durur. Numara ayrı
+bir tx'te "rezerve" edilemez: aggregate okuma hiçbir şey rezerve etmez, yalnız boşluk üretir.
+
+**3. Koşulsuz `update(entity)` bir durum yarışını kapatmaz.** `claim*` (koşullu `updateMany`) ya da
+`version` ile korunan bir aggregate'te, aynı aggregate'in **diğer** geçişleri de korunmalıdır;
+aksi halde koşulsuz yazan geçiş, atomik claim'i geri alır (ör. `reopen`, `claimForClosing` ile
+kapatılmış dönemi tekrar OPEN'a çeker). Bir aggregate için ya **bütün** geçişler korumalı, ya
+hiçbiri.
+
+**4. Yutulan hata retry değildir.** Kritik finansal yan etki (fiş üretimi, muhasebe köprüsü) bir
+listener'da `try/catch` ile yutuluyorsa, outbox'ın at-least-once garantisi iptal olur: kayıt
+`processedAt` ile kapanır ve iş **kalıcı olarak** yapılmamış kalır. Alarm (CRITICAL) tek başına
+çözüm değildir; her yutulan kritik iş için (a) yeniden deneme veya (b) **backfill komutu +
+"eksik kalanlar" sorgusu** bulunmak zorundadır.
+
+**5. Takvime bağlı ön koşullar otomasyona bağlanır.** Muhasebe dönemi, vergi parametresi gibi
+yıl/ay dönümünde yenilenmesi gereken kayıtlar yalnız kurulum akışında açılıyorsa, dönüm gününde
+tüm yazma yolu sessizce durur. Bu kayıtlar idempotent bir zamanlanmış işle önceden açılır.
+
+**6. Dönem kapanışı ön koşulsuz çalıştırılmaz.** Kapanış öncesi "fişlenmemiş ekonomik olay var mı"
+kontrolü zorunludur (bkz. `documents/finans/04-muhasebe-defterler.md` §5 adım 1): dönem
+kapandıktan sonra o olaylar hiç fişlenemez ve mizan kalıcı eksik kalır.
+
+**7. Yüksek etkili finansal işlem ayrı yetki ister.** Mali yılı kapatmak, kilitli dönemi yeniden
+açmak, storno, iade tavanı aşımı gibi işlemler sıradan `update` capability'siyle yapılamaz; ayrı
+capability (gerekirse step-up doğrulama) ve **kalıcı damga** (kim/ne zaman: event + kolon) ister.
+
+**8. Storno defterden kayıt silmez — rapor süzgeci `POSTED` + `REVERSED`'dir.** Ters kayıt
+atıldığında orijinal fiş `REVERSED` olarak **yerinde kalır** ve etkisini storno fişi götürür;
+`REVERSED` "bu fiş hiç olmadı" değil "etkisi şu fişle iptal edildi" demektir. Defter/bakiye
+üreten her sorgu (mizan, kebir, yevmiye defteri, nakit akışı, KDV, mutabakat adayları) bu iki
+durumu **birlikte** süzer — tek yerden: `LEDGER_EFFECTIVE_ENTRY_STATUSES`. Yalnız `POSTED`
+süzmek orijinali düşürür, ters fişi bırakır ve hesap bakiyesini **ters işaretle** yanlış
+gösterir. Bu hata sessizdir: ters fiş kendi içinde dengeli olduğu için "Σborç = Σalacak"
+kontrolü yine tutar.
+
+**9. Repository mapping'inde alan düşmesi sessiz veri kaybıdır.** Nested `create` içinde
+alanlar tek tek yazılıyorsa (Prisma'nın `entryId` gibi alanları kendisi kurduğu için
+gerekir), şemaya eklenen her yeni kolon bu listeye de eklenmek **zorundadır**. Entity'nin
+hesapladığı ama mapping'in yazmadığı alan hata vermez, log üretmez ve geri getirilemez —
+`original*`/`fxRate` (yabancı para izlenebilirliği) tam böyle kaybolmuştu. Para/kur taşıyan
+kolonlar için mapping'i kilitleyen bir repository testi yazılır.
+
+**10. Bir varlığın kendi değişmez kuralları, o varlık çözümlenirken zorlanır.**
+Kontrolü tek bir çağrı yerine (ör. bir handler'ın satır döngüsüne) koymak, aynı varlığı çözen
+diğer N−1 yolu korumasız bırakır — `isPostable` kontrolü yalnız `post-financial-event`'te
+durduğu için yıl sonu kapanışı ve kambiyo farkı satırı kolektif hesaba fiş atabiliyordu.
+Kural: lookup/resolver fonksiyonu varlığa **içkin** olan her koşulu (var mı, aktif mi, kullanıma
+uygun mu) kendisi zorlar; yalnız **çağrı bağlamına** bağlı koşullar (ör. "bu satırda party
+verilmiş mi") çağırana kalır. Okunmayan bir bayrak kolonu (`isActive` gibi) güvence değil
+süstür: ya çözüm noktasında zorlanır ya da kaldırılır.
+
+**11. Referans veri şablondan kuruluyorsa sapma raporu zorunludur.** Hesap planı, vergi
+parametresi gibi şablondan üretilen kümelerde kurulum komutu idempotent olsun diye genelde
+"yalnız ekler" — mevcut kayıtların niteliklerine dokunmaz. Şablon ise yaşayan bir dosyadır:
+düzeltildiği an **yeni kiracılar yeni davranışı, eskiler eskisini** taşır ve fark hiçbir yerde
+görünmez (ör. `requiresParty` düzeltmesi yeni kliniklerde cari zorunlu tutar, eskilerde
+tutmaz → cari mutabakatı yapılamaz). Şablon ↔ fiilî durum farkını **alan alan** gösteren bir
+mutabakat sorgusu bulunmak zorundadır. Otomatik onarım varsayılan değildir: geçmişi geriye
+dönük yorumlayan alanlarda (hesap tipi/karakteri, vergi oranı) düzeltme muhasebe kararıdır.
+Şablonun kendi tutarlılığı ise **açılışta** doğrulanır, ilk kullanımda değil.
+
+**12. Bir değeri doğrulayan kural, o değerin kullanıldığı kuralla aynı olmalıdır.**
+Aynı büyüklüğü (KDV oranı, para birimi, tutar sınırı) iki ayrı yerde tanımlamak, ikisi
+uyuşmadığında **yazılabilen ama kullanılamayan** veri üretir: vergi parametresi tablosuna %8
+yazılabiliyordu (0–100 kontrolü), fatura kesilirken `VatRate` VO'su onu reddediyordu
+(`{0,1,10,20}`) → faturalama, sebebinden kopuk bir hatayla duruyordu. Kural: kabul kümesi **tek
+bir sabitte** yaşar, hem yazma kapısı hem kullanım yeri onu import eder; kopya liste yazılmaz.
+Kapı daima kullanım yerinin kabul ettiğinden **daha geniş olamaz**. Tarih-versiyonlu tablolarda
+(`validFrom`/`validTo`) aralık **yarı açıktır** (`[from, to)`) ve "aynı anda en fazla bir açık
+sürüm" kısıtı DB'de durur — `validTo IS NULL` üzerine kısmî unique index; uygulama kilidi ilk
+sürüm henüz yokken serileştirecek satır bulamaz.
+
+**13. "Teslim edildi" damgası, dinleyicinin bittiğini kanıtlamak zorundadır.** Outbox'ın tek
+varlık sebebi kritik event'in mutlaka teslim edilmesidir; damga teslim yerine *kuyruğa atmayı*
+kanıtlıyorsa araya düşen bir yeniden başlatma işi kalıcı kaybettirir ve kayıt kapalı olduğu
+için kimse bakmaz. Bu yüzden domain event dinleyicileri **yalnız `@OnDomainEvent` ile**
+kaydedilir (`async` + `promisify` + `suppressErrors: false`): çıplak `@OnEvent` ile dinleyici
+`emitAsync` tarafından beklenmez ve fırlattığı hata framework'te yutulur (ikisi de ölçüldü;
+tarama testi çıplak kullanımı engeller). **Hatayı kimin yutacağına çağıran karar verir:**
+beklenen yol (outbox işçisi) yeniden dener ve sınırda **ölü mektuba** düşürür (kayıt silinmez,
+CRITICAL + sorgu), beklemeyen fire-and-forget yol `emitDetached()` ile yayınlar ve hatayı çağrı
+yerinde yakalar — aksi hâlde yakalanmayan promise süreci düşürür. At-least-once'ın bedeli
+tüketicinin idempotent olmasıdır; kayıt **sahiplenilir** (`FOR UPDATE SKIP LOCKED` + kiralama),
+yoksa iki işçi aynı event'i iki kez yayınlar. Son olarak **sıra zamanlamaya bırakılmaz**: bir
+işin başka bir işten sonra olması gerekiyorsa aynı transaction'a alınır — "dinleyici sonra
+çalışır" varsayımı, teslim gerçekleştiği gün bozulur (ölçüldü: commit sonrası tazelenen bir
+önbellek, AI'ın hastanın yeni mesajını görmeden yanıt üretmesine yol açıyordu).
+
+**14. Bir değişmez, uygulamada değil **saklanan veride** doğru olmak zorundadır.** Yazma anı
+kontrolü yalnız o kapıdan geçen satır için çalışır: kapı yokken yazılmış satırlar için hiç
+çalışmamıştır, kapıyı atlayan yol (raw SQL, veri taşıma betiği, bir `updateMany`) için de
+çalışmaz. Bundan üç sonuç çıkar. (a) **Ölçü kapısı en içte durur:** para kolonu `Decimal(x,2)`
+ise üçüncü basamak hata vermez, **sessizce yuvarlanır**; denge kontrolü yuvarlamadan önce ham
+`Decimal`'lerde yapıldığı için uygulama `Σborç = Σalacak` görürken veritabanı bir kuruş şaşmış
+fiş saklayabilir (10.005 + 89.995 = 100.00 doğrulanır, 10.01 + 90.00 = 100.01 saklanır) ve fark
+fişin içinde kaldığı için mizan yine dengeli görünür. Ölçünün tanımı tek yerde yaşar
+(`Money.isKurusScaled` / `Money.scale`), hatanın kimliği her katmanın kendisinde. (b) **Fiziken
+imkânsız olanı kaydın önünde durdur:** bakiye kontrolü (kasa çekmecesi, stok, cari tavanı)
+hesaplandığı yerde değil **yazıldığı yerde** olur ve okuması kilitli olur. Eksi bakiye kayda
+girdiğinde "eksi bakiye" olarak görünmez: kasa kapanışında **uydurma gelir** (sayım fazlası →
+679) ve **olmayan banka mevcudu** (yatırılmamış para → 102) olarak görünür, ikisi de dengeli fiş
+ürettiği için her kontrol sessiz kalır. Aynı büyüklüğü hesaplayan formül **tek metot** olur —
+kapı ile kapanış beklentisi ayrı formüllerden okunursa biri düzeltildiğinde boşluk geri gelir.
+(c) **Saklanan veriye soru soran bir tarama bulunmak zorundadır:** çok satırı ilgilendiren
+değişmezler (fiş başına denge) tek satırlık `CHECK` ile ifade edilemez; ifade edilebilenler
+migration'a **`NOT VALID`** olarak girer (doğrulama uzun bir `ACCESS EXCLUSIVE` kilidi demektir;
+ayrıca aykırı tek bir eski satır dağıtımı durdurur — oysa o bir **veri** sorunudur) ve tarama
+temiz çıktığında `VALIDATE CONSTRAINT` ile tamamlanır. Tarama **onarmaz**: dengesiz bir fişi
+düzeltmek muhasebe kararıdır (kural 8). Bugün: `pnpm finans:degismezler`.
+
+**15. Uyarıya bağlanmış bir güvence, uyarının ulaştığı kanıtlanmadıkça güvence değildir.**
+"Hata yutuluyor ama CRITICAL uyarı çıkıyor" cümlesi bir kalemi kapatıyorsa, o kalem artık uyarı
+zincirinin sağlamlığına bağlıdır — zincir sessizce kopabilir ve kimse fark etmez. Dört yerde
+kopabilir, dördü de kapatılmak zorundadır. (a) **Kanal:** uyarı kanalının yapılandırılmadığı
+durumda sistem çalışmaya devam eder (uyarı göndermek iş gereksinimi değil, operasyon
+gereksinimidir) ama bu seçim **sessiz yapılmaz** — açılışta duyurulur, üretimde `error`
+seviyesinde, ve değişken `envs/.env.example`'da **ne işe yaradığıyla** belgelenir; yazılı olmayan
+bir değişkenin eksik olduğu görülemez. Burada fail-closed yoktur: "uyarı gönderemiyorsan çalışmayı
+durdur" denemez. (b) **Dinleyici:** kaydolmayan bir CQRS handler'ı uç çağrıldığında patlar, ama
+kaydolmayan bir **dinleyici hiç patlamaz** (`emitAsync` sıfır dinleyiciye yayın yapar) ve bağlı
+olduğu güvenceyi sessizce iptal eder; bu yüzden dinleyicilerin DI grafiğine kaydı **testle**
+kilitlenir (`app.module.spec.ts`) ve yayıncı, dinleyici yoksa uyarının içeriğini log'a basar.
+(c) **Altyapı servisi hatayı herkes adına yutmaz** (kural 13'ün uzantısı): yutan bir servis,
+çağıranların yazdığı `catch` bloklarını ölü koda çevirir — niyet koda yazılmış ama etkisiz olur.
+Servis uyarır ve **fırlatır**; yutma kararı çağıranın. (d) **Sürecin ölümü de bir uyarıdır:**
+yakalanmayan bir promise reddi uçuşta olan istekleri yarıda bırakır ("para alındı, defter
+yazılmadı") ve yeniden başlatma sessiz kalırsa geriye kimsenin izlemediği bir stdout satırı kalır.
+Uyarı basılır, süreç **yine kapatılır** — durumu bozulmuş bir süreci ayakta tutmak para hareketine
+devam etmesi demektir.
+
+**16. Bir geçiş (kontrol) hesabı açan akış, onu kapatan akışla birlikte tasarlanır.**
+"Para yolda" demek için açılan hesaplar — 108 Diğer Hazır Değerler (kart tahsilatı sağlayıcıda),
+159/326 (mal geldi fatura gelmedi), 191/391 (KDV) — borç tarafı yazılıp **alacak tarafı hiç
+yazılmazsa** üç hata birlikte doğar ve hiçbiri denge kontrolüne yakalanmaz: (a) geçiş hesabı
+sonsuza kadar şişer (bilançoda var olmayan bir değer), (b) paranın gittiği gerçek hesap (102)
+boş kalır → **banka ekstresiyle mutabakat imkânsızlaşır**, kalıcı `UNMATCHED` üretir, (c) aradaki
+kesinti (komisyon) hiç gider yazılmaz → kâr sistematik olarak fazla görünür. Üçü de kendi içinde
+dengeli fiş ürettiği için `Σborç = Σalacak` tutar; eksik olan bir kontrol değil, **bir ekonomik
+olayın kendisidir** ve kod incelemesiyle değil **hesap bakiyesine bakarak** fark edilir. Bu yüzden:
+yeni bir geçiş hesabı kullanan ilk kural yazılırken kapatan olay tipi + kuralı + komutu da
+tanımlanır; kapatma akışı erteleniyorsa hangi hesabın hangi koşulda kapanacağı erteleme tablosuna
+**hesap koduyla** yazılır. Kapatma tutarı ayrıca **bekleyen bakiyeyi aşamaz** (kural 14/b): aşarsa
+hazır değer hesabı alacak bakiyesine düşer — imkânsız bir durum — ve karşılığında gelmemiş para
+102'ye girer. Bakiye binlerce satırın toplamı olduğu için kilitlenecek bir satırı yoktur: isme
+danışma kilidi (`lockConcept` + `lockAndGetAccountBalance`) tek atomik metotta tutulur.
+
 ## Important Notes
 
 ### Database Migrations

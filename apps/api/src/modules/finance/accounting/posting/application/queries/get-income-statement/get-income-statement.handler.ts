@@ -27,6 +27,7 @@ import {
 import { Account } from '@shared';
 import { IGetContext } from '@common/decorators';
 import { resolvePreviousPeriod } from '@modules/finance/accounting/posting/domain/reporting/previous-period.calculator';
+import { INCOME_STATEMENT_ENTRY_KINDS } from '@modules/finance/accounting/posting/domain/posting/ledger-entry-kind.constant';
 
 interface PeriodRange {
   dateFrom: Date;
@@ -165,10 +166,14 @@ export class GetIncomeStatementHandler implements IQueryHandler<
   private async computePeriod(
     input: ComputePeriodInput
   ): Promise<IncomeStatementResult> {
+    // Kapanış fişi dışarıda: 6/7'yi sıfırlayan teknik kayıt sayılırsa kapanmış
+    // yılın gelir tablosu **sıfır ciro** gösterir. Bilanço aynı veriye zıt
+    // süzgeçle bakar (kapanışı sayar) — bkz. INCOME_STATEMENT_ENTRY_KINDS.
     const rows = await this.journalQueryRepo.trialBalance({
       clinicId: input.clinicId,
       dateFrom: input.dateFrom,
       dateTo: input.dateTo,
+      kinds: INCOME_STATEMENT_ENTRY_KINDS,
     });
 
     const { data: accounts } = await this.queryBus.execute(

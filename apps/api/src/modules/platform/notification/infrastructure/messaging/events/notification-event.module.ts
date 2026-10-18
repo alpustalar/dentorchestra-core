@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
 import { StaffNotificationRepositoryModule } from '@modules/platform/notification/infrastructure/persistence/prisma/repositories/staff-notification/staff-notification.repository.module';
 import { NotificationDispatcherService } from '@modules/platform/notification/application/services/notification-dispatcher.service';
 import { MailPatientNotificationAdapter } from '@modules/platform/notification/infrastructure/delivery/mail-patient-notification.adapter';
@@ -31,11 +31,30 @@ export const opsAlertPortFactory = (
   config: ConfigService,
   slack: SlackOpsAlertAdapter,
   log: LogOpsAlertAdapter
-): OpsAlertPort =>
-  config.get<string>(ENV.SLACK_OPS_WEBHOOK_URL) ||
-  config.get<string>(ENV.SLACK_OPS_WEBHOOK_URL_CRITICAL)
-    ? slack
-    : log;
+): OpsAlertPort => {
+  const logger = new Logger('OpsAlertPort');
+  const configured =
+    config.get<string>(ENV.SLACK_OPS_WEBHOOK_URL) ??
+    config.get<string>(ENV.SLACK_OPS_WEBHOOK_URL_CRITICAL);
+
+  if (configured) {
+    logger.log('Operasyonel uyarı kanalı: Slack webhook.');
+    return slack;
+  }
+
+  // Seçim **sessiz** yapılmaz. Kanal yapılandırılmadığında sistem çalışmaya devam
+  // eder (uyarı göndermek bir iş gereksinimi değil, operasyon gereksinimidir) ama
+  // o andan sonra "CRITICAL uyarı çıkar" diye kapatılmış onlarca güvence yalnız bir
+  // log satırına dayanır. Üretimde bunun fark edilmesi şansa bırakılamaz.
+  const message =
+    "Operasyonel uyarı kanalı YAPILANDIRILMADI: uyarılar yalnız log'a yazılacak. " +
+    `Bağlamak için ${ENV.SLACK_OPS_WEBHOOK_URL} tanımlayın (bkz. envs/.env.example).`;
+
+  if (config.get<string>(ENV.MODE) === 'PRODUCTION') logger.error(message);
+  else logger.warn(message);
+
+  return log;
+};
 
 /**
  * Bildirim yan etkilerini bağlar: domain event dinleyicileri (seam) + merkezi

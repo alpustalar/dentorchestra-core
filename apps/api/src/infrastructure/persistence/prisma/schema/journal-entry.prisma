@@ -8,6 +8,16 @@ enum JournalEntryStatus {
   REVERSED
 }
 
+/// Fişin **niteliği**: ekonomik bir olayı mı kaydediyor, yoksa dönem sonu tekniği mi?
+/// Gelir tablosu bu ayrımı okumak zorunda: kapanış fişi 6/7 hesaplarını sıfırlayan
+/// teknik bir kayıttır, kapanmış yılın gelir tablosu onu sayarsa **sıfır ciro**
+/// gösterir (her satır kendi içinde dengeli olduğu için hata sessizdir). Bilanço ise
+/// tersine kapanışı saymak ZORUNDADIR — kârı öz kaynağa (590) taşıyan fiş odur.
+enum JournalEntryKind {
+  OPERATIONAL /// ekonomik olay (posting kuralı) ve onun stornosu
+  CLOSING /// yıl sonu kapanış/devir fişi — gelir tablosuna girmez
+}
+
 model JournalEntry {
   id             String  @id
   clinicId       String  @map("clinic_id") // defter sahibi şube (source-of-truth)
@@ -22,6 +32,11 @@ model JournalEntry {
   description String?
   status      JournalEntryStatus @default(DRAFT)
 
+  // Storno, ters kaydettiği fişin niteliğini DEVRALIR (entity'de zorlanır): bir
+  // kapanış fişinin stornosu OPERATIONAL olsaydı gelir tablosuna ters işaretle
+  // girer ve kapanmış yılın cirosunu şişirirdi.
+  kind JournalEntryKind @default(OPERATIONAL)
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -32,6 +47,10 @@ model JournalEntry {
   reversals  JournalEntry[]   @relation("JournalReversal")
   lines      JournalLine[]
 
+  // Yevmiye numarası dönem içinde tekil. Tahsis zaten AccountingPeriod.lastEntryNo
+  // sayacıyla serileştirilir; bu kısıt emniyet kemeridir (NULL'lar çakışmaz →
+  // numarasız DRAFT fişler kısıtı tetiklemez).
+  @@unique([clinicId, periodId, entryNo])
   @@index([clinicId, entryDate])
   @@index([organizationId, entryDate])
   @@index([periodId])

@@ -141,7 +141,8 @@ describe('FxConversion — yuvarlama artığının büyüklüğü', () => {
     );
 
     const residue = exactTotal.minus(roundedTotal).abs();
-    expect(residue.lessThanOrEqualTo(new Decimal(amounts.length).mul('0.005')))
-      .toBe(true);
+    expect(
+      residue.lessThanOrEqualTo(new Decimal(amounts.length).mul('0.005'))
+    ).toBe(true);
   });
 });

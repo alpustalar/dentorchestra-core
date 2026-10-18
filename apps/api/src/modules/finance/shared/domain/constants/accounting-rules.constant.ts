@@ -13,6 +13,8 @@ export const ACCOUNTING_RULES = {
     CASH_100: '100',
     BANKS_102: '102',
     POS_108: '108',
+    /// Sağlayıcı (POS/banka/ödeme kuruluşu) komisyonu — 108 kapanırken gider yazılır.
+    PROVIDER_COMMISSION_653: '653',
     VAT_INDUCED_191: '191',
     VAT_CALCULATED_391: '391',
   },

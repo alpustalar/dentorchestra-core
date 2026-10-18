@@ -22,10 +22,10 @@ import {
 import { POS_EVENTS } from '@src/domain/constants/events';
 
 @CommandHandler(IyzicoTerminalEodCommand)
-export class IyzicoTerminalEodHandler
-  implements
-    ICommandHandler<IyzicoTerminalEodCommand, IyzicoTerminalEodResponse>
-{
+export class IyzicoTerminalEodHandler implements ICommandHandler<
+  IyzicoTerminalEodCommand,
+  IyzicoTerminalEodResponse
+> {
   private readonly logger = new Logger(IyzicoTerminalEodHandler.name);
 
   constructor(

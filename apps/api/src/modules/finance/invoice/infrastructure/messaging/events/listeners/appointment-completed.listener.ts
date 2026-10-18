@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentCompletedEvent } from '@modules/clinical/appointment/domain/events/complete-appointment.event';
 import { IssueInvoiceCommand } from '@modules/finance/invoice/application/commands/issue-invoice/issue-invoice.command';
@@ -11,9 +10,9 @@ import {
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetPaymentByAppointmentIdQuery } from '@modules/finance/payment/application/queries/get-payment-by-appointment-id/get-payment-by-appointment-id.query';
-import { InvoiceTriggers } from '@modules/finance/invoice/domain/constants/invoice-triggers';
 import { Money } from '@src/domain/value-objects/money.vo';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
+import { OnDomainEvent } from '@common/decorators';
 
 @Injectable()
 export class AppointmentCompletedInvoiceListener {
@@ -27,7 +26,7 @@ export class AppointmentCompletedInvoiceListener {
     private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
-  @OnEvent(APPOINTMENT_EVENTS.COMPLETED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.COMPLETED)
   async handle(event: AppointmentCompletedEvent): Promise<void> {
     if (!event.patientId || !event.appointmentId) return;
 
@@ -46,7 +45,6 @@ export class AppointmentCompletedInvoiceListener {
           appointmentId: event.appointmentId,
           paymentId: payment.id,
           totalAmount: Money.fromTrusted(payment.totalAmount, payment.currency),
-          trigger: InvoiceTriggers.APPOINTMENT,
           action: LogAction.INVOICE_ISSUED,
           type: LogType.INFO,
           source: LogSource.SYSTEM,

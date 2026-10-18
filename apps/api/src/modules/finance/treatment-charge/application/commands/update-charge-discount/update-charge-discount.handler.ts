@@ -25,9 +25,10 @@ import { TREATMENT_CHARGE_EVENTS } from '@src/domain/constants/events';
  * pazarlık payı yalnız indirimdir; fiyatın kendisi satır doğduğunda dondu.
  */
 @CommandHandler(UpdateChargeDiscountCommand)
-export class UpdateChargeDiscountHandler
-  implements ICommandHandler<UpdateChargeDiscountCommand, void>
-{
+export class UpdateChargeDiscountHandler implements ICommandHandler<
+  UpdateChargeDiscountCommand,
+  void
+> {
   constructor(
     @Inject(TREATMENT_CHARGE_COMMAND_REPOSITORY)
     private readonly chargeRepo: ITreatmentChargeCommandRepository,
@@ -80,6 +81,7 @@ export class UpdateChargeDiscountHandler
           charge.clinicId.value
         ),
         actorId: ctx.actor.userId,
+        logSource: ctx.actor.source,
       });
 
       await this.chargeRepo.update(charge);

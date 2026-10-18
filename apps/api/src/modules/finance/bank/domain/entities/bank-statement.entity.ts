@@ -5,7 +5,12 @@ import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import { ImportBankStatementProps } from '@modules/finance/bank/domain/contracts';
 import { BankStatementLine } from '@modules/finance/bank/domain/entities/bank-statement-line.entity';
-import { BankStatementEmptyLinesException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
+import {
+  BankStatementBalanceMismatchException,
+  BankStatementEmptyLinesException,
+  BankStatementInvalidPrecisionException,
+} from '@modules/finance/bank/domain/exceptions/bank.exceptions';
+import { Money } from '@src/domain/value-objects/money.vo';
 import { isDefined, isEmpty } from '@common/utils';
 import { DateRange } from '@src/domain/value-objects';
 
@@ -109,6 +114,13 @@ export class BankStatement extends AggregateRoot {
     const now = DateTimeManager.create();
     const statementId = UUID.createOrGenerate(props.id).value;
 
+    const openingBalance = isDefined(props.openingBalance)
+      ? BankStatement.toKurus(props.openingBalance)
+      : null;
+    const closingBalance = isDefined(props.closingBalance)
+      ? BankStatement.toKurus(props.closingBalance)
+      : null;
+
     const lines = props.lines.map((line) =>
       BankStatementLine.createForImport({
         bankStatementId: statementId,
@@ -124,6 +136,16 @@ export class BankStatement extends AggregateRoot {
       })
     );
 
+    // Ekstrenin kendi tutarlılığı: açılış + Σ hareket = kapanış. Mutabakatın
+    // tamamı bu dosyanın doğru olduğu varsayımına dayanır; CSV ayrıştırmasında
+    // düşen/çiftlenen bir satır burada yakalanmazsa defterle farkı aylarca
+    // kovalanır.
+    BankStatement.assertBalancesAgreeWithLines({
+      openingBalance,
+      closingBalance,
+      lines,
+    });
+
     return new BankStatement(
       {
         id: statementId,
@@ -132,18 +154,55 @@ export class BankStatement extends AggregateRoot {
         organizationId: UUID.create(props.organizationId).orThrow().value,
         periodStart: props.periodStart,
         periodEnd: props.periodEnd,
-        openingBalance: isDefined(props.openingBalance)
-          ? new Decimal(props.openingBalance)
-          : null,
-        closingBalance: isDefined(props.closingBalance)
-          ? new Decimal(props.closingBalance)
-          : null,
+        openingBalance,
+        closingBalance,
         fileName: props.fileName ?? null,
-        importedById: UUID.create(props.importedById).orThrow().value,
+        // Aktör kimliği ham string: `ctx.actor.userId` bir Firebase UID'dir
+        // (`User.id = firebaseUid`), UUID değil — `UUID.create(...).orThrow()`
+        // her gerçek personel için patlıyor, ekstre hiç içe alınamıyordu.
+        importedById: props.importedById,
         createdAt: now,
       },
       lines
     );
+  }
+
+  /**
+   * `açılış + Σ hareket = kapanış`. Yalnız iki bakiye de verildiyse çalışır:
+   * bazı bankaların CSV'si bakiye kolonu taşımaz, o durumda kontrol edilecek
+   * bir şey yoktur (ekstrenin kendi beyanı yok).
+   */
+  private static assertBalancesAgreeWithLines(input: {
+    openingBalance: Decimal | null;
+    closingBalance: Decimal | null;
+    lines: BankStatementLine[];
+  }): void {
+    const { openingBalance, closingBalance, lines } = input;
+    if (openingBalance === null || closingBalance === null) return;
+
+    const lineTotal = lines.reduce(
+      (total, line) => total.plus(line.amount),
+      new Decimal(0)
+    );
+    const difference = openingBalance.plus(lineTotal).minus(closingBalance);
+
+    // Tolerans yok: banka ekstresi kuruşu kuruşuna denk gelir.
+    if (!difference.isZero()) {
+      throw new BankStatementBalanceMismatchException({
+        openingBalance: openingBalance.toFixed(2),
+        closingBalance: closingBalance.toFixed(2),
+        lineTotal: lineTotal.toFixed(2),
+        difference: difference.toFixed(2),
+      });
+    }
+  }
+
+  private static toKurus(amount: number): Decimal {
+    const decimal = new Decimal(amount);
+    if (decimal.decimalPlaces() > Money.PRECISION) {
+      throw new BankStatementInvalidPrecisionException(decimal.toString());
+    }
+    return decimal;
   }
 
   public toPersistence(): IBankStatement {

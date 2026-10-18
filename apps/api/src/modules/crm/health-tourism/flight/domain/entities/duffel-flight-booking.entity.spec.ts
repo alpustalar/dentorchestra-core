@@ -149,6 +149,18 @@ describe('DuffelFlightBooking — hold süresi', () => {
 });
 
 describe('DuffelFlightBooking — kalıcılık', () => {
+  it.each([0, -5])(
+    'tutarı %p olan sipariş kaydedilemez (tutar aynı zamanda ödeme talimatıdır)',
+    (totalAmount) => {
+      // Sağlayıcı yanıtında tutar eksikse eskiden `?? 0` ile sıfır taşınıyordu.
+      // Sıfır tutarlı bir HELD kayıt sessizce ödenemez hâle gelir: ödeme
+      // Duffel'a bu kolondan gönderilir.
+      expect(() =>
+        DuffelFlightBooking.create(buildProps({ totalAmount }))
+      ).toThrow();
+    }
+  );
+
   it('toPersistence tutarı ve para birimini korur', () => {
     const booking = DuffelFlightBooking.create(
       buildProps({ totalAmount: 1234.56, currency: 'USD' })

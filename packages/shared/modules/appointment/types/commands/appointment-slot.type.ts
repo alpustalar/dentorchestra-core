@@ -1,4 +1,4 @@
 import { z } from 'zod';
-import { AppointmentSlotSchema } from '../../schemas/command/appointment-slot.schema';
+import { AppointmentSlotSchema } from '@shared/modules';
 
 export type AppointmentSlot = z.infer<typeof AppointmentSlotSchema>;

@@ -2,6 +2,7 @@ import { ForbiddenException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { BasePolicy } from '@modules/platform/policy/staff/application/base.policy';
 import { PolicyAccessDeniedEvent } from '@modules/platform/policy/staff/domain/events/policy-access-denied.event';
+import { emitDetached } from '@common/utils';
 
 export class PolicyEvaluator<T extends BasePolicy> {
   private isValid: boolean = true;
@@ -43,16 +44,21 @@ export class PolicyEvaluator<T extends BasePolicy> {
 
       const actor = this.policy.getActorContext();
 
-      void this.eventEmitter?.emitAsync(
-        PolicyAccessDeniedEvent.NAME,
-        new PolicyAccessDeniedEvent({
-          actorId: actor.userId,
-          source: actor.source,
-          organizationId: actor.organizationId,
-          reason: finalMessage,
-          operation,
-        })
-      );
+      if (this.eventEmitter) {
+        // Yetki reddi denetim kaydı akışı bekletmez; dinleyicinin hatası
+        // burada yutulur (çağıran zaten 403 fırlatıyor).
+        emitDetached(
+          this.eventEmitter,
+          PolicyAccessDeniedEvent.NAME,
+          new PolicyAccessDeniedEvent({
+            actorId: actor.userId,
+            source: actor.source,
+            organizationId: actor.organizationId,
+            reason: finalMessage,
+            operation,
+          })
+        );
+      }
 
       throw new ForbiddenException(finalMessage);
     }

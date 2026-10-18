@@ -86,9 +86,13 @@ export class PaymentResponseDto {
 
 const FIN_ONLY = { groups: [FINANCIAL, MANAGEMENT, ADMIN] };
 
-/** Yaşlandırma kovası — açık taksitlerin vade yaşına göre dağılımı. */
+/**
+ * Yaşlandırma kovası — açık taksitlerin vade yaşına göre dağılımı.
+ * Kova başına `currency` zorunlu: farklı para birimleri toplanmaz.
+ */
 export class ArAgingBucketResponseDto {
   @Expose(FIN_ONLY) label: string;
+  @Expose(FIN_ONLY) currency: string;
   @Expose(FIN_ONLY) count: number;
   @Expose(FIN_ONLY) amount: string;
 }
@@ -96,6 +100,7 @@ export class ArAgingBucketResponseDto {
 /** Hasta bazlı açık taksit riski. */
 export class ArAgingPatientRiskResponseDto {
   @Expose(FIN_ONLY) patientId: string;
+  @Expose(FIN_ONLY) currency: string;
   @Expose(FIN_ONLY) outstanding: string;
   @Expose(FIN_ONLY) overdue: string;
 
@@ -105,6 +110,7 @@ export class ArAgingPatientRiskResponseDto {
 }
 
 export class ArAgingSummaryResponseDto {
+  @Expose(FIN_ONLY) currency: string;
   @Expose(FIN_ONLY) totalOutstanding: string;
   @Expose(FIN_ONLY) totalOverdue: string;
   @Expose(FIN_ONLY) totalCollected: string;
@@ -128,16 +134,23 @@ export class ArAgingReportResponseDto {
 
   @Expose(FIN_ONLY)
   @Type(() => ArAgingSummaryResponseDto)
-  summary: ArAgingSummaryResponseDto;
+  summaries: ArAgingSummaryResponseDto[];
 }
 
 // ─────────────────────── HEKİM BAZINDA CİRO ──────────────────────────
 
-/** Hekim bazında tahsil edilmiş ciro satırı. */
+/** Hekim bazında tahsil edilmiş ciro satırı (hekim + para birimi). */
 export class ProviderRevenueLineResponseDto {
   @Expose(FIN_ONLY) providerId: string | null;
+  @Expose(FIN_ONLY) currency: string;
   @Expose(FIN_ONLY) collected: string;
   @Expose(FIN_ONLY) count: number;
+}
+
+/** Para birimi başına genel toplam. */
+export class ProviderRevenueTotalResponseDto {
+  @Expose(FIN_ONLY) currency: string;
+  @Expose(FIN_ONLY) collected: string;
 }
 
 export class ProviderRevenueReportResponseDto {
@@ -155,5 +168,7 @@ export class ProviderRevenueReportResponseDto {
   @Type(() => ProviderRevenueLineResponseDto)
   lines: ProviderRevenueLineResponseDto[];
 
-  @Expose(FIN_ONLY) totalCollected: string;
+  @Expose(FIN_ONLY)
+  @Type(() => ProviderRevenueTotalResponseDto)
+  totals: ProviderRevenueTotalResponseDto[];
 }

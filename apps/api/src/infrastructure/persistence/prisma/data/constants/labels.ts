@@ -101,6 +101,7 @@ export const MODULE_LABELS = {
   bankaccount: 'Banka Hesabı',
   bankstatement: 'Banka Ekstresi',
   bankstatementline: 'Ekstre Satırı',
+  providersettlement: 'Sağlayıcı Hesap Kapaması',
 
   // --- Muhasebe ---
   account: 'Hesap Planı',
@@ -148,6 +149,7 @@ export const MODULE_LABELS = {
   subscription: 'Abonelik',
   subscriptionitem: 'Abonelik Kalemi',
   subscriptionpaymentmethod: 'Abonelik Ödeme Yöntemi',
+  subscriptioncharge: 'Abonelik Tahsilatı',
 
   // --- Sanal (tek tabloya karşılık gelmeyen) yetki alanları ---
   finance: 'Finansal Veri',

@@ -41,6 +41,7 @@ export const TreatmentChargeSchema = z.object({
   updatedAt: z.coerce.date(),
   voidedAt: z.coerce.date().nullable(),
   voidReason: z.string().nullable(),
+  voidedById: z.string().nullable(),
 })
 
 export type TreatmentCharge = z.infer<typeof TreatmentChargeSchema>

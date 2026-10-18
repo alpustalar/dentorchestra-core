@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentsBulkCancelledEvent } from '@modules/clinical/appointment/domain/events/appointments-bulk-cancelled.event';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Doktor-günü toplu iptalinin yan etkilerini işler (AppointmentsBulkCancelledEvent).
@@ -11,7 +11,7 @@ import { AppointmentsBulkCancelledEvent } from '@modules/clinical/appointment/do
 export class AppointmentsBulkCancelledListener {
   private readonly logger = new Logger(AppointmentsBulkCancelledListener.name);
 
-  @OnEvent(APPOINTMENT_EVENTS.BULK_CANCELLED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.BULK_CANCELLED)
   async handle(event: AppointmentsBulkCancelledEvent): Promise<void> {
     if (event.affectedCount === 0) return;
 

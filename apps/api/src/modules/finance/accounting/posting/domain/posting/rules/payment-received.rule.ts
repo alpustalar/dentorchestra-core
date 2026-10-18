@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { FinancialEvent } from '@shared';
-import {
-  DraftJournalEntry,
-  PostingContext,
-  PostingRule,
-} from '../posting-rule.interface';
+import { DraftJournalEntry, PostingRule } from '../posting-rule.interface';
 import { PaymentReceivedEventPayload } from '../event-payloads';
 import { FinancialEventTypeSchema } from '@shared';
+import { resolvePaymentFundsAccount } from '@modules/finance/shared/domain/constants/payment-method-ledger.constant';
+import { UnmappedPaymentMethodException } from '@modules/finance/accounting/posting/domain/exceptions/posting.exceptions';
 
 /**
  * Tahsilat — PAYMENT_RECEIVED
@@ -19,15 +17,22 @@ import { FinancialEventTypeSchema } from '@shared';
 export class PaymentReceivedRule implements PostingRule {
   readonly eventType = FinancialEventTypeSchema.enum.PAYMENT_RECEIVED;
 
-  build(event: FinancialEvent, _ctx: PostingContext): DraftJournalEntry {
+  build(event: FinancialEvent): DraftJournalEntry {
     const payload = event.payload as unknown as PaymentReceivedEventPayload;
 
-    const cashAccountCode =
-      payload.method === 'CASH'
-        ? '100'
-        : payload.method === 'POS_CARD'
-          ? '108'
-          : '102';
+    // Eşlemesi olmayan yöntem **sessizce bir hesaba yazılamaz**: eski kod
+    // `CASH`/`POS_CARD` dışındaki her şeyi 102 Bankalar'a düşürüyordu ve fiş
+    // dengeli olduğu için hata hiçbir kontrole yakalanmıyordu.
+    const cashAccountCode = resolvePaymentFundsAccount(
+      payload.method,
+      'INBOUND'
+    );
+    if (!cashAccountCode) {
+      throw new UnmappedPaymentMethodException({
+        method: payload.method,
+        direction: 'INBOUND',
+      });
+    }
 
     return {
       date: event.occurredAt,

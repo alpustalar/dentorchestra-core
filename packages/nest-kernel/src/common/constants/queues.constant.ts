@@ -13,4 +13,6 @@ export const QUEUES = {
   APPOINTMENT: 'appointment-queue',
   SUBSCRIPTION: 'subscription-queue',
   WORK_ORDER: 'work-order-queue',
+  ACCOUNTING: 'accounting-queue',
+  POSTING: 'posting-queue',
 } as const;

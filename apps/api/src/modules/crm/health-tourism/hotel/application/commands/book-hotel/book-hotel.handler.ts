@@ -1,5 +1,6 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
+import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { BookHotelCommand } from './book-hotel.command';
 import { BookHotelResponse } from './book-hotel.response';
 import {
@@ -33,7 +34,8 @@ export class BookHotelHandler
     private readonly tenantScopeResolver: ITenantScopeResolver,
     private readonly txManager: TransactionManager,
     @Inject(POLICY_FACTORY)
-    private readonly policyFactory: IPolicyFactory
+    private readonly policyFactory: IPolicyFactory,
+    private readonly criticalFailure: CriticalFailurePublisher
   ) {}
 
   async execute(command: BookHotelCommand): Promise<BookHotelResponse> {
@@ -56,35 +58,64 @@ export class BookHotelHandler
       remarks: data.remarks,
     });
 
-    const organizationId = await this.tenantScopeResolver.resolve(data);
+    // Bu satırdan sonrası GERİ ALINAMAZ bir yan etkinin ardındadır: oda
+    // HotelBeds'te tutulmuştur. Buradaki her yerel hata (fiyat/para birimi
+    // doğrulaması, kiracı çözümü, DB yazımı) yalnız KAYDI düşürür; rezervasyon
+    // sağlayıcıda açık kalır ve ödeme sahibine iade edilir — kimse haberdar
+    // olmadan oda bize fatura edilir. Bu yüzden hata sesli yükselir.
+    try {
+      const organizationId = await this.tenantScopeResolver.resolve(data);
 
-    const bookingHotel = HotelbedsBooking.create({
-      id: generatedBookingUUID.value,
-      reference: apiResult.reference,
-      clientReference: generatedBookingUUID.value,
-      hotelCode: data.hotelCode,
-      checkIn: data.checkIn,
-      checkOut: data.checkOut,
-      totalNet: apiResult.totalNet,
-      currency: apiResult.currency,
-      holderName: data.holderName,
-      holderSurname: data.holderSurname,
-      rooms: apiResult.rooms,
-      patientId: data.patientId,
-      leadId: data.leadId,
-      remarks: data.remarks,
-      serviceFee: data.serviceFee,
-      clinicId: data.clinicId,
-      status: HotelbedsBookingStatusSchema.enum.PENDING,
-      organizationId,
-      actorId: command.ctx.actor.userId,
-      logSource: command.ctx.actor.source,
-    });
+      const bookingHotel = HotelbedsBooking.create({
+        id: generatedBookingUUID.value,
+        reference: apiResult.reference,
+        clientReference: generatedBookingUUID.value,
+        hotelCode: data.hotelCode,
+        checkIn: data.checkIn,
+        checkOut: data.checkOut,
+        totalNet: apiResult.totalNet,
+        currency: apiResult.currency,
+        holderName: data.holderName,
+        holderSurname: data.holderSurname,
+        rooms: apiResult.rooms,
+        patientId: data.patientId,
+        leadId: data.leadId,
+        remarks: data.remarks,
+        serviceFee: data.serviceFee,
+        clinicId: data.clinicId,
+        status: HotelbedsBookingStatusSchema.enum.PENDING,
+        organizationId,
+        actorId: command.ctx.actor.userId,
+        logSource: command.ctx.actor.source,
+      });
 
-    await this.txManager.run(async () => {
-      return this.hotelbedsBookingRepo.create(bookingHotel);
-    });
+      const saved = await this.txManager.run(async () => {
+        return this.hotelbedsBookingRepo.create(bookingHotel);
+      });
 
-    return generatedBookingUUID.value;
+      // Tutar kayıttan okunur: çağırana giden değer satırda YAZILI olanla aynıdır
+      // (sağlayıcı yanıtını ikinci kez yorumlayıp üçüncü bir gerçek üretmeyiz).
+      return {
+        bookingId: saved.id.value,
+        supplierAmount: saved.totalNet.toApiFormat(),
+        supplierCurrency: saved.totalNet.currency,
+      };
+    } catch (err) {
+      this.criticalFailure.publish({
+        operation: 'health-tourism.hotel.booking-record',
+        severity: 'CRITICAL',
+        summary:
+          'HotelBeds rezervasyonu açıldı ama yerel kayıt yazılamadı — rezervasyon elle iptal edilmeli.',
+        errorMessage: err instanceof Error ? err.message : String(err),
+        context: {
+          providerReference: apiResult.reference,
+          clientReference: generatedBookingUUID.value,
+          hotelCode: data.hotelCode,
+        },
+        clinicId: data.clinicId,
+        dedupeKey: `hotel-booking-record-failed:${apiResult.reference}`,
+      });
+      throw err;
+    }
   }
 }

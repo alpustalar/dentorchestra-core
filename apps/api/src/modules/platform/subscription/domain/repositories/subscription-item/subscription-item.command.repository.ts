@@ -5,8 +5,7 @@ export const SUBSCRIPTION_ITEM_COMMAND_REPOSITORY = Symbol(
   'ISubscriptionItemCommandRepository'
 );
 
-export interface ISubscriptionItemCommandRepository
-  extends IBaseCommandRepository<SubscriptionItem> {
+export interface ISubscriptionItemCommandRepository extends IBaseCommandRepository<SubscriptionItem> {
   sync(subscriptionItem: SubscriptionItem): Promise<SubscriptionItem | null>;
   syncMany(subscriptionItems: SubscriptionItem[]): Promise<void>;
 }

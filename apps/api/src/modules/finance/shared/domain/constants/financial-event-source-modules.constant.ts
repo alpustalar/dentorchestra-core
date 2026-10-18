@@ -9,6 +9,10 @@ export const FINANCIAL_EVENT_SOURCE_MODULES = {
   BOOKING_PAYMENT: 'booking-payment',
   /** Satıcıya ödeme — 320'deki cari borcu kapatır. */
   SUPPLIER_PAYMENT: 'supplier-payment',
+  /** Stok hareketi — tüketim/zayi maliyeti (150 ↔ 740.01/689/679). */
+  INVENTORY: 'inventory',
+  /** Sağlayıcı hesap kapaması — 108'de bekleyen kart tahsilatlarının 102'ye geçişi. */
+  BANK: 'bank',
 } as const;
 
 export type FinancialEventSourceModule =

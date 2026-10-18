@@ -16,18 +16,25 @@ import { PayrollBreakdown } from '@modules/finance/shared/domain/value-objects/p
 import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
 import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
+import {
+  IPeriodGateService,
+  PERIOD_GATE_SERVICE,
+} from '@modules/finance/accounting/periods/domain/services/period-gate/period-gate.service.interface';
 
 @CommandHandler(RecordPayrollAccrualCommand)
-export class RecordPayrollAccrualHandler
-  implements ICommandHandler<RecordPayrollAccrualCommand, string>
-{
+export class RecordPayrollAccrualHandler implements ICommandHandler<
+  RecordPayrollAccrualCommand,
+  string
+> {
   constructor(
     private readonly txManager: TransactionManager,
     private readonly commandBus: TSCommandBus,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
     @Inject(TENANT_SCOPE_RESOLVER)
-    private readonly tenantScopeResolver: ITenantScopeResolver
+    private readonly tenantScopeResolver: ITenantScopeResolver,
+    @Inject(PERIOD_GATE_SERVICE)
+    private readonly periodGate: IPeriodGateService
   ) {}
 
   async execute(command: RecordPayrollAccrualCommand): Promise<string> {
@@ -41,6 +48,14 @@ export class RecordPayrollAccrualHandler
         p.actorCanAccessClinicOrOwnsOrganization(data.clinicId, organizationId)
       )
       .orThrow();
+
+    // Tahakkuk tarihi kullanıcıdan geliyor ve dönemi belirliyor: kapanmış bir
+    // döneme tahakkuk kabul edilse olay yazılır, fişi hiç üretilemez (335/360/361
+    // borçları defterde hiç doğmaz) ve append-only gövde düzeltilemez.
+    await this.periodGate.assertPeriodNotSealedAt({
+      clinicId: data.clinicId,
+      date: data.accrualDate,
+    });
 
     const payrollBreakDown = PayrollBreakdown.create({
       grossSalary: data.grossSalary,

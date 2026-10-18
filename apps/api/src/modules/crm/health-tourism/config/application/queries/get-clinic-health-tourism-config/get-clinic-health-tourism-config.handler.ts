@@ -39,6 +39,8 @@ export class GetClinicHealthTourismConfigHandler
       ctx.source
     );
 
+    // TODO: REDIS CACHE EKLENECEK
+
     evaluator
       .check(
         (p) => p.actorCanAccessTargetClinic(clinicId),

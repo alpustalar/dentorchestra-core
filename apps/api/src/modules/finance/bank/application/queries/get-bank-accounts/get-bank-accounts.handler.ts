@@ -13,9 +13,10 @@ import {
 } from '@modules/finance/bank/domain/repositories/bank-account/bank-account.query.repository';
 
 @QueryHandler(GetBankAccountsQuery)
-export class GetBankAccountsHandler
-  implements IQueryHandler<GetBankAccountsQuery, GetBankAccountsResponse>
-{
+export class GetBankAccountsHandler implements IQueryHandler<
+  GetBankAccountsQuery,
+  GetBankAccountsResponse
+> {
   constructor(
     @Inject(BANK_ACCOUNT_QUERY_REPOSITORY)
     private readonly bankAccountRepo: IBankAccountQueryRepository,

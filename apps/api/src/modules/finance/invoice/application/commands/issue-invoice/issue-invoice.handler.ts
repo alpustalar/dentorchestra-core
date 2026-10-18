@@ -28,8 +28,11 @@ import { PartyTypeType as PartyType } from '@input-type-schemas/PartyTypeSchema'
 import { InvoiceStatusSchema } from '@input-type-schemas/InvoiceStatusSchema';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Money } from '@src/domain/value-objects/money.vo';
-import { GetAppointmentChargeSummaryQuery } from '@modules/finance/treatment-charge/application/queries/get-appointment-charge-summary/get-appointment-charge-summary.query';
-import { Currency } from '@src/domain/value-objects/currency.vo';
+import {
+  CHARGE_TOTALS_SERVICE,
+  IChargeTotalsService,
+} from '@modules/finance/treatment-charge/domain/services/charge-totals';
+import { AppointmentChargeTotals } from '@modules/finance/treatment-charge/domain/value-objects/appointment-charge-totals.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
 import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
@@ -38,13 +41,19 @@ import {
   INVOICE_COMMAND_REPOSITORY,
 } from '@modules/finance/invoice/domain/repositories/invoice/invoice.command.repository';
 import { Invoice } from '@modules/finance/invoice/domain/entities/invoice.entity';
-import { InvoiceDuplicateException } from '@modules/finance/invoice/domain/exceptions/invoice.exceptions';
+import {
+  InvoiceCurrencyMismatchException,
+  InvoiceDuplicateException,
+} from '@modules/finance/invoice/domain/exceptions/invoice.exceptions';
+import { VatRate } from '@src/domain/value-objects/vat-rate.vo';
+import type { CurrencyType } from '@input-type-schemas/CurrencySchema';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 
 @CommandHandler(IssueInvoiceCommand)
-export class IssueInvoiceHandler
-  implements ICommandHandler<IssueInvoiceCommand, IssueInvoiceResponse>
-{
+export class IssueInvoiceHandler implements ICommandHandler<
+  IssueInvoiceCommand,
+  IssueInvoiceResponse
+> {
   private readonly logger = new Logger(IssueInvoiceHandler.name);
 
   constructor(
@@ -52,6 +61,8 @@ export class IssueInvoiceHandler
     private readonly invoiceRepo: IInvoiceCommandRepository,
     @Inject(TENANT_SCOPE_RESOLVER)
     private readonly tenantScopeResolver: ITenantScopeResolver,
+    @Inject(CHARGE_TOTALS_SERVICE)
+    private readonly chargeTotals: IChargeTotalsService,
     private readonly txManager: TransactionManager,
     private readonly commandBus: TSCommandBus,
     private readonly queryBus: TSQueryBus,
@@ -75,28 +86,14 @@ export class IssueInvoiceHandler
       clinicId: input.clinicId,
     });
 
-    // Randevunun fiyatlı işlem satırları varsa fatura ONLARDAN türer. Satırlar
-    // liste fiyatı/indirim/KDV'yi zaten donmuş halde taşır; brüt tutarı yeniden
-    // matraha bölmek (fromGrossAmount) kuruş sapması yaratır ve faturayı kendi
-    // satırlarıyla tutarsız kılar. Satır yoksa serbest tutarlı klasik yol işler
-    // (kapora, tedavi dışı tahsilat).
-    const charges = await this.resolveChargeSummary(input.appointmentId);
-
-    const vatRate =
-      charges?.vatRate ??
-      input.vatRate ??
-      (await this.resolveVatRate(input.clinicId));
-
-    const taxSpec = charges
-      ? TaxSpecification.create(
-          Money.create(charges.netTotal, input.totalAmount.currency).orThrow(),
-          vatRate,
-          Money.create(charges.vatTotal, input.totalAmount.currency).orThrow()
-        )
-      : TaxSpecification.fromGrossAmount(input.totalAmount, vatRate);
-
     // Fatura PENDING oluşturulur ve ekonomik olay (SALES_INVOICE_ISSUED) HER ZAMAN
     // yazılır — e-belge gönderiminden bağımsız. İkisi atomik (outboxRun).
+    //
+    // Satır toplamı da **bu transaction içinde ve kilit altında** okunur: tutar
+    // satırlardan türüyorsa okuma ile yazma arasındaki pencerede bir satır iptal
+    // edilebiliyor ya da indirimi değişebiliyordu. Fatura o zaman kendi
+    // satırlarıyla uyuşmayan bir tutarla kesiliyor, `assertAppointmentNotInvoiced`
+    // düzeltmeyi de engellediği için fark KALICI kalıyordu.
     //
     // Mükerrer faturaya karşı nihai güvence baştaki `resolveExisting` kontrolü
     // DEĞİL, DB'deki unique kısıttır: kontrol ile yazma arasındaki pencerede ikinci
@@ -104,6 +101,51 @@ export class IssueInvoiceHandler
     // okunup dönülür (kilitlenecek tek bir satır yok — fatura henüz yaratılmamış).
     try {
       await this.txManager.outboxRun(async () => {
+        // Randevunun fiyatlı işlem satırları varsa fatura ONLARDAN türer.
+        // Satırlar liste fiyatı/indirim/KDV'yi zaten donmuş halde taşır; brüt
+        // tutarı yeniden matraha bölmek (fromGrossAmount) kuruş sapması yaratır
+        // ve faturayı kendi satırlarıyla tutarsız kılar. Satır yoksa serbest
+        // tutarlı klasik yol işler (kapora, tedavi dışı tahsilat).
+        const charges = input.appointmentId
+          ? await this.chargeTotals.lockAndGetAppointmentTotals(
+              input.appointmentId
+            )
+          : null;
+
+        // Satırların para birimi ile tahsilatın para birimi ayrışıyorsa fatura
+        // sessizce yanlış birimde kesilmesin: satırlar tutarın kaynağıdır,
+        // uyuşmazlık veri tutarsızlığıdır ve kapıda durdurulur.
+        const currency = this.resolveCurrency(input, charges?.currency);
+
+        // KDV oranı yasal kümeden geçmek ZORUNDA: oranı kabul eden kapı (vergi
+        // parametresi tablosu) ile oranı kullanan yer aynı listeyi zorlamalı
+        // (CLAUDE.md finans kuralı 12). `TaxSpecification` jeneriktir (0–100;
+        // stopaj gibi KDV dışı oranları da taşır), KDV'ye özgü kümeyi `VatRate`
+        // zorlar.
+        const vatRate = VatRate.create(
+          charges?.vatRate ??
+            input.vatRate ??
+            (await this.resolveVatRate(input.clinicId))
+        )
+          .orThrow()
+          .value.toNumber();
+
+        const taxSpec = this.buildTaxSpec({
+          input,
+          charges,
+          currency,
+          vatRate,
+        });
+
+        // TEK zaman damgası: fatura kaydının `issuedAt`'i, defterdeki ekonomik
+        // olayın `occurredAt`'i ve e-belgenin `issueDate`'i aynı an olmak zorunda.
+        // Eskiden `issuedAt` NULL kaydediliyor ve ancak e-belge sonucu döndüğünde
+        // (finalize) `now` ile damgalanıyordu: kuyruk beklediğinde — ya da gönderim
+        // FAILED kalıp elle sonradan tamamlandığında — belge tarihi defter
+        // tarihinden kopuyordu (ay/dönem dönümünde KDV beyanı ile mizan ayrışır),
+        // FAILED kalırsa `issuedAt` sonsuza dek NULL kalıyordu.
+        const issuedAt = DateTimeManager.create();
+
         await this.invoiceRepo.create({
           id: invoiceId,
           organizationId,
@@ -113,14 +155,13 @@ export class IssueInvoiceHandler
           paymentId: input.paymentId,
           // Satırlardan türediyse genel toplam da satırların toplamıdır; çağıranın
           // gönderdiği tutar değil (ikisi ayrışırsa satır toplamı esastır).
-          amount: taxSpec.grossAmount.value.toNumber(),
-          currency:
-            input.totalAmount.currency ??
-            Currency.fromTrusted(Currency.enum.TRY),
+          amount: taxSpec.grossAmount.value,
+          currency,
           vatRate,
           netTotal: taxSpec.netAmount.value,
           vatTotal: taxSpec.taxAmount.value,
           status: InvoiceStatusSchema.enum.PENDING,
+          issuedAt,
         });
 
         await this.recordSalesInvoiceIssued({
@@ -130,7 +171,8 @@ export class IssueInvoiceHandler
           netTotal: taxSpec.netAmount.value.toString(),
           vatTotal: taxSpec.taxAmount.value.toString(),
           grandTotal: taxSpec.grossAmount.value.toString(),
-          issuedAt: DateTimeManager.create(),
+          currency,
+          issuedAt,
         });
       });
     } catch (error) {
@@ -142,7 +184,7 @@ export class IssueInvoiceHandler
     // e-Belge gönderimi async kuyruğa düşer (doc 07 §5); fatura/muhasebe zaten commit
     // edildiği için enqueue hatası akışı geri almaz — yalnız loglanır. Processor portu
     // çağırıp sonucu (Noop → INTERNAL) faturaya işler, fatura ISSUED'a finalize olur.
-    await this.enqueueEDocument(invoiceId);
+    await this.enqueueEDocument(invoiceId, input.clinicId);
 
     return {
       invoiceId,
@@ -182,7 +224,10 @@ export class IssueInvoiceHandler
   }
 
   /** e-Belge gönderimini kuyruğa alır; entegratör akışı faturayı bloklamaz. */
-  private async enqueueEDocument(invoiceId: string): Promise<void> {
+  private async enqueueEDocument(
+    invoiceId: string,
+    clinicId: string
+  ): Promise<void> {
     try {
       await this.commandBus.execute(new QueueEDocumentCommand(invoiceId));
     } catch (error) {
@@ -198,25 +243,63 @@ export class IssueInvoiceHandler
         severity: 'CRITICAL',
         summary: 'Fatura kesildi ancak e-belge gönderimi kuyruğa alınamadı.',
         errorMessage: error instanceof Error ? error.message : String(error),
-        context: { invoiceId },
-        clinicId: null,
+        context: { invoiceId, clinicId },
+        clinicId,
         dedupeKey: `edocument-enqueue-failed:${invoiceId}`,
       });
     }
   }
 
   /**
-   * Randevunun işlem satırı özeti. Satır yoksa `null` döner ve fatura serbest
-   * tutarlı klasik yoldan kesilir.
+   * Faturanın para birimi. Satır özeti varsa onun para birimi esastır (tutarın
+   * kaynağı o); tahsilatın para birimiyle ayrışıyorsa bu bir veri tutarsızlığıdır
+   * ve sessizce birini seçmek yerine kapıda durdurulur.
    */
-  private async resolveChargeSummary(appointmentId: string | null) {
-    if (!appointmentId) return null;
+  private resolveCurrency(
+    input: IssueInvoiceCommand['input'],
+    chargesCurrency?: CurrencyType
+  ): CurrencyType {
+    const paymentCurrency = input.totalAmount.currency;
 
-    const { data } = await this.queryBus.execute(
-      new GetAppointmentChargeSummaryQuery(appointmentId)
-    );
+    if (chargesCurrency && chargesCurrency !== paymentCurrency) {
+      throw new InvoiceCurrencyMismatchException({
+        chargesCurrency,
+        paymentCurrency,
+      });
+    }
 
-    return data;
+    return chargesCurrency ?? paymentCurrency;
+  }
+
+  /**
+   * Faturanın matrah/KDV ayrımı. Satır toplamı varsa ondan **birebir** taşınır
+   * (brüt tutarı yeniden bölmek kuruş sapması üretir); yoksa çağıranın
+   * gönderdiği brüt tutar orana göre ayrıştırılır.
+   */
+  private buildTaxSpec(input: BuildTaxSpecInput): TaxSpecification {
+    if (!input.charges) {
+      return TaxSpecification.fromGrossAmount(
+        input.input.totalAmount,
+        input.vatRate
+      );
+    }
+
+    // Satırlar otorite: KDV yasal olarak satır bazında yuvarlanır, bu yüzden
+    // satır toplamı `netTotal × oran`dan meşru biçimde ayrışır. İzin verilen pay
+    // satır sayısından türer (`lineCount × 0,005`) — sabit bir tolerans satır
+    // sayısından habersiz olduğu için çok satırlı faturayı reddediyordu.
+    return TaxSpecification.fromLineTotals({
+      netAmount: Money.fromTrusted(
+        input.charges.netTotal.value,
+        input.currency
+      ),
+      taxRate: input.vatRate,
+      taxAmount: Money.fromTrusted(
+        input.charges.vatTotal.value,
+        input.currency
+      ),
+      lineCount: input.charges.lineCount,
+    });
   }
 
   /** Şubenin bugün geçerli sağlık hizmeti KDV oranını parametrik tablodan çözer. */
@@ -287,6 +370,10 @@ export class IssueInvoiceHandler
             netTotal: input.netTotal,
             vatTotal: input.vatTotal,
             grandTotal: input.grandTotal,
+            // Para birimi olaya MUTLAKA geçer: posting `draft.currency ?? fonksiyonel`
+            // diyor, yani eksik bırakılırsa 1.000 EUR'luk fatura deftere 1.000 TRY
+            // olarak düşer ve kur çevrimi (Model A) hiç tetiklenmez.
+            currency: input.currency,
             ...(withholdingTotal ? { withholdingTotal } : {}),
           },
           sourceModule: FINANCIAL_EVENT_SOURCE_MODULES.INVOICE,
@@ -332,6 +419,7 @@ interface RecordSalesInvoiceIssuedInput {
   netTotal: string;
   vatTotal: string;
   grandTotal: string;
+  currency: CurrencyType;
   issuedAt: Date;
 }
 
@@ -340,4 +428,11 @@ interface ResolveSmmWithholdingInput {
   payerType: PartyType;
   netTotal: string;
   ctx: IGetContext;
+}
+
+interface BuildTaxSpecInput {
+  input: IssueInvoiceCommand['input'];
+  charges: AppointmentChargeTotals | null;
+  currency: CurrencyType;
+  vatRate: number;
 }

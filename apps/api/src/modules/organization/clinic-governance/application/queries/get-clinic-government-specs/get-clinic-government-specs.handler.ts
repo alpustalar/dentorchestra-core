@@ -50,7 +50,8 @@ export class GetClinicGovernmentSpecsHandler implements IQueryHandler<
       data: {
         clinicId: specs.clinicId,
         healthFacilityCode: specs.healthFacilityCode,
-        ussPassword: specs.ussPassword,
+        // Şifrenin kendisi değil, varlığı taşınır (bkz. okuma modeli).
+        ussPasswordConfigured: Boolean(specs.ussPassword),
         companyTaxNumber: specs.companyTaxNumber,
         legalType: specs.legalType,
         createdAt: specs.createdAt,

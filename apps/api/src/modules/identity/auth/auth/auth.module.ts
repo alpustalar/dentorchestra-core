@@ -12,6 +12,7 @@ import {
 } from '@src/auth';
 import { FirebaseTokenVerifier } from '@modules/identity/auth/auth/infrastructure/adapters/firebase-token-verifier.adapter';
 import { DbActorContextResolver } from '@modules/identity/auth/auth/infrastructure/adapters/db-actor-context.resolver';
+import { CleanAuthCacheOnUserUpdatedListener } from '@modules/identity/auth/auth/infrastructure/events/listeners/clean-auth-cache-on-user-updated.listener';
 
 /**
  * Çekirdeğin auth mantığını (`KernelAuthModule`) bu app'in kimlik kaynaklarına bağlar:
@@ -40,7 +41,15 @@ import { DbActorContextResolver } from '@modules/identity/auth/auth/infrastructu
       },
     }),
   ],
-  providers: [AuthService, AuthGuard, Logger, AuthCacheService],
+  providers: [
+    AuthService,
+    AuthGuard,
+    Logger,
+    AuthCacheService,
+    // Kullanıcı güncellenince/pasifleşince actor-context cache'i düşer. Kayıtlı
+    // olmazsa yetkisi alınmış kullanıcı TTL boyunca yetkili kalırdı.
+    CleanAuthCacheOnUserUpdatedListener,
+  ],
   // `TokenAuthGuard` doğrudan export edilemez (bu modülün sağlayıcısı değil);
   // onu sağlayan modül yeniden dışa açılır.
   exports: [AuthGuard, AuthService, KernelAuthModule],

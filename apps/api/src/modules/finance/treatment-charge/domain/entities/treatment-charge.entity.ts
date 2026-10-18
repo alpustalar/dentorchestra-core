@@ -11,9 +11,22 @@ import {
   VoidChargeProps,
 } from '@modules/finance/treatment-charge/domain/contracts/treatment-charge';
 import {
+  ChargeInvalidPrecisionException,
   DiscountLimitExceededException,
+  InvalidChargeQuantityException,
+  InvalidDiscountRateException,
   TreatmentChargeAlreadyVoidedException,
 } from '@modules/finance/treatment-charge/domain/exceptions/treatment-charge.exceptions';
+import {
+  TreatmentChargeAddedEvent,
+  TreatmentChargeDiscountUpdatedEvent,
+  TreatmentChargeVoidedEvent,
+} from '@modules/finance/treatment-charge/domain/events/treatment-charge.events';
+import {
+  LogAction,
+  LogSource,
+  LogType,
+} from '@src/domain/constants/log-action.constant';
 
 /**
  * Randevuda yapılan işlemin fiyatlı satırı.
@@ -69,6 +82,8 @@ export class TreatmentCharge extends AggregateRoot {
     this._updatedAt = data.updatedAt;
     this._voidedAt = data.voidedAt;
     this._voidReason = data.voidReason;
+    // Aktör kimliği ham string: `User.id` bir Firebase UID'dir (UUID değil).
+    this._voidedById = data.voidedById;
   }
 
   private _id: UUID;
@@ -181,6 +196,11 @@ export class TreatmentCharge extends AggregateRoot {
     return this._voidReason;
   }
 
+  private _voidedById: string | null;
+  get voidedById(): string | null {
+    return this._voidedById;
+  }
+
   /** İndirimsiz satır tutarı: liste fiyatı × adet. */
   /**
    * Satırın liste tutarı = birim fiyat × adet, **kuruşa yuvarlanmış**.
@@ -205,6 +225,14 @@ export class TreatmentCharge extends AggregateRoot {
    * doğar, önce KDV ekleyip sonra indirim uygulamak matrahı bozar.
    */
   public static create(props: CreateTreatmentChargeProps): TreatmentCharge {
+    // Varlığın KENDİ değişmez kuralları (politika değil): adet pozitif ve kuruş
+    // hassasiyetinde, indirim oranı 0–100, liste fiyatı iki ondalık. Kapıdaki
+    // zod şeması bunları zorluyordu ama entity'de karşılığı yoktu — ikinci bir
+    // çağıran (paket atama, içe aktarma) korumasız kalıyordu.
+    TreatmentCharge.assertValidQuantity(props.quantity);
+    TreatmentCharge.assertValidDiscountRate(props.discountRate);
+    TreatmentCharge.assertKurusPrecision(props.listPrice);
+
     TreatmentCharge.assertDiscountWithinLimit({
       requested: props.discountRate,
       max: props.maxDiscountPercent,
@@ -253,7 +281,33 @@ export class TreatmentCharge extends AggregateRoot {
       updatedAt: now,
       voidedAt: null,
       voidReason: null,
+      voidedById: null,
     });
+  }
+
+  /**
+   * Satırı oluşturur **ve** denetim olayını raise eder. Olay entity içinde
+   * doğar; handler onu tekrar publish etmez (repository `flushEvents` ile
+   * yayınlar).
+   */
+  public static add(props: CreateTreatmentChargeProps): TreatmentCharge {
+    const charge = TreatmentCharge.create(props);
+
+    charge.addDomainEvent(
+      new TreatmentChargeAddedEvent({
+        ...charge.auditTarget(),
+        grossAmount: charge._grossAmount.toApiFormat(),
+        currency: charge._grossAmount.currency,
+        discountRate: charge._discountRate.toFixed(2),
+        actorId: props.createdById ?? undefined,
+        source: props.logSource ?? LogSource.SYSTEM,
+        action: LogAction.TREATMENT_CHARGE_ADDED,
+        type: LogType.INFO,
+        details: props.discountReason ?? undefined,
+      })
+    );
+
+    return charge;
   }
 
   /**
@@ -262,6 +316,8 @@ export class TreatmentCharge extends AggregateRoot {
    */
   public applyDiscount(props: ApplyDiscountProps): void {
     this.assertNotVoided();
+
+    TreatmentCharge.assertValidDiscountRate(props.discountRate);
 
     TreatmentCharge.assertDiscountWithinLimit({
       requested: props.discountRate,
@@ -276,6 +332,7 @@ export class TreatmentCharge extends AggregateRoot {
       vatRate: this._vatRate,
     });
 
+    const previousDiscountRate = this._discountRate;
     this._discountRate = props.discountRate;
     this._discountAmount = amounts.discountAmount;
     this._discountReason = props.discountReason ?? null;
@@ -283,13 +340,31 @@ export class TreatmentCharge extends AggregateRoot {
     this._vatAmount = amounts.vatAmount;
     this._grossAmount = amounts.grossAmount;
 
-    this._discountApprovedById = props.discountRate.greaterThan(
+    const exceededLimit = props.discountRate.greaterThan(
       props.maxDiscountPercent
-    )
-      ? (props.actorId ?? null)
-      : null;
+    );
+
+    this._discountApprovedById = exceededLimit ? (props.actorId ?? null) : null;
 
     this._updatedAt = DateTimeManager.create();
+
+    // İndirim geçmişi satırda tutulmuyor (yalnız güncel oran): "kim ne zaman
+    // hangi orana çekti" izi bu olayla kalır.
+    this.addDomainEvent(
+      new TreatmentChargeDiscountUpdatedEvent({
+        ...this.auditTarget(),
+        previousDiscountRate: previousDiscountRate.toFixed(2),
+        discountRate: this._discountRate.toFixed(2),
+        grossAmount: this._grossAmount.toApiFormat(),
+        currency: this._grossAmount.currency,
+        exceededLimit,
+        actorId: props.actorId ?? undefined,
+        source: props.logSource ?? LogSource.SYSTEM,
+        action: LogAction.TREATMENT_CHARGE_DISCOUNT_UPDATED,
+        type: LogType.INFO,
+        details: props.discountReason ?? undefined,
+      })
+    );
   }
 
   /** Satırı iptal eder. Kayıt silinmez; toplamlara girmez hâle gelir. */
@@ -298,7 +373,24 @@ export class TreatmentCharge extends AggregateRoot {
 
     this._voidedAt = DateTimeManager.create();
     this._voidReason = props.reason;
+    // Kalıcı damga: iptali kimin yaptığı kayıtta durur (`voidedAt` tek başına
+    // "kim" sorusunu yanıtlamıyordu).
+    this._voidedById = props.actorId ?? null;
     this._updatedAt = this._voidedAt;
+
+    this.addDomainEvent(
+      new TreatmentChargeVoidedEvent({
+        ...this.auditTarget(),
+        reason: props.reason,
+        grossAmount: this._grossAmount.toApiFormat(),
+        currency: this._grossAmount.currency,
+        actorId: props.actorId ?? undefined,
+        source: props.logSource ?? LogSource.SYSTEM,
+        action: LogAction.TREATMENT_CHARGE_VOIDED,
+        type: LogType.INFO,
+        details: props.reason,
+      })
+    );
   }
 
   public toPersistence(): ITreatmentCharge {
@@ -329,6 +421,18 @@ export class TreatmentCharge extends AggregateRoot {
       updatedAt: this._updatedAt,
       voidedAt: this._voidedAt,
       voidReason: this._voidReason,
+      voidedById: this._voidedById,
+    };
+  }
+
+  /** Olay gövdelerinin ortak kimlik alanları. */
+  private auditTarget() {
+    return {
+      chargeId: this._id.value,
+      clinicId: this._clinicId.value,
+      appointmentId: this._appointmentId.value,
+      patientId: this._patientId.value,
+      treatmentId: this._treatmentId.value,
     };
   }
 
@@ -346,10 +450,9 @@ export class TreatmentCharge extends AggregateRoot {
     // hesaplanır ki saklanan değerlerle birebir tutsun.
     const listTotal = input.listPrice.multiply(input.quantity).round();
 
-    const discountValue = listTotal.value
-      .mul(input.discountRate)
-      .div(100)
-      .toDecimalPlaces(2);
+    const discountValue = Money.scale(
+      listTotal.value.mul(input.discountRate).div(100)
+    );
 
     const discountAmount = Money.fromTrusted(
       discountValue,
@@ -359,7 +462,7 @@ export class TreatmentCharge extends AggregateRoot {
     // Matrah = liste toplamı − indirim (KDV bu tutar üzerinden doğar)
     const netAmount = listTotal.subtract(discountAmount);
     const vatAmount = Money.fromTrusted(
-      netAmount.value.mul(input.vatRate.asMultiplier).toDecimalPlaces(2),
+      Money.scale(netAmount.value.mul(input.vatRate.asMultiplier)),
       input.listPrice.currency
     );
 
@@ -384,6 +487,35 @@ export class TreatmentCharge extends AggregateRoot {
       maxAllowedRate: input.max.toNumber(),
       overridableByManager: true,
     });
+  }
+
+  /** Adet pozitif ve en çok 3 ondalık (DB `Decimal(10,3)`). */
+  private static assertValidQuantity(quantity: Decimal): void {
+    if (
+      !quantity.isFinite() ||
+      quantity.lessThanOrEqualTo(0) ||
+      quantity.decimalPlaces() > 3
+    ) {
+      throw new InvalidChargeQuantityException(quantity.toString());
+    }
+  }
+
+  /**
+   * İndirim oranı 0–100. Tavan kontrolü politikadır (yönetici aşabilir), bu
+   * ise invariant: negatif oran matrahı liste tutarının ÜSTÜNE çıkarıyor
+   * (sessiz zam), %100 üstü oran ise `Money.subtract` içinde "yetersiz bakiye"
+   * hatasına dönüşüyordu.
+   */
+  private static assertValidDiscountRate(rate: Decimal): void {
+    if (!rate.isFinite() || rate.isNegative() || rate.greaterThan(100)) {
+      throw new InvalidDiscountRateException(rate.toString());
+    }
+  }
+
+  private static assertKurusPrecision(listPrice: Money): void {
+    if (listPrice.value.decimalPlaces() > Money.PRECISION) {
+      throw new ChargeInvalidPrecisionException(listPrice.value.toString());
+    }
   }
 
   private assertNotVoided(): void {

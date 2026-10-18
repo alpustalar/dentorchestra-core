@@ -7,9 +7,10 @@ import {
 } from '@modules/crm/health-tourism/hotel/domain/interfaces/hotel-cache.service.interface';
 
 @CommandHandler(CacheHotelRateOptionCommand)
-export class CacheHotelRateOptionHandler
-  implements ICommandHandler<CacheHotelRateOptionCommand, void>
-{
+export class CacheHotelRateOptionHandler implements ICommandHandler<
+  CacheHotelRateOptionCommand,
+  void
+> {
   constructor(
     @Inject(HOTEL_CACHE_SERVICE)
     private readonly cacheService: IHotelCacheService

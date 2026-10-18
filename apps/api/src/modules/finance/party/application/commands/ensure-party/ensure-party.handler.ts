@@ -4,16 +4,17 @@ import { TransactionManager } from '@src/infrastructure/persistence/prisma/trans
 import { Party } from '@modules/finance/party/domain/entities/party.entity';
 import { EnsurePartyCommand } from './ensure-party.command';
 import { normalizeArray } from '@common/utils/normalize-array';
-import { PartyAlreadyExistsError } from '@modules/finance/party/domain/exceptions/party.exceptions';
+import { PartyAlreadyExistsException } from '@modules/finance/party/domain/exceptions/party.exceptions';
 import {
   IPartyCommandRepository,
   PARTY_COMMAND_REPOSITORY,
 } from '@modules/finance/party/domain/repositories/party/party.command.repository';
 
 @CommandHandler(EnsurePartyCommand)
-export class EnsurePartyHandler
-  implements ICommandHandler<EnsurePartyCommand, string>
-{
+export class EnsurePartyHandler implements ICommandHandler<
+  EnsurePartyCommand,
+  string
+> {
   constructor(
     @Inject(PARTY_COMMAND_REPOSITORY)
     private readonly partyRepo: IPartyCommandRepository,
@@ -43,7 +44,7 @@ export class EnsurePartyHandler
     } catch (error) {
       // Eşzamanlı ensure çağrısı aynı origin için cari oluşturmuş olabilir
       // (clinicId+originType+originId unique). Bu durumda mevcut olanı döndür.
-      if (error instanceof PartyAlreadyExistsError) {
+      if (error instanceof PartyAlreadyExistsException) {
         const raced = await this.partyRepo.findByOrigin(
           input.clinicId,
           input.originType,

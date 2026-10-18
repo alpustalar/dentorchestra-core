@@ -4,8 +4,7 @@ import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/doma
 export const BOOKING_PAYMENT_COMMAND_REPOSITORY = Symbol(
   'IBookingPaymentCommandRepository'
 );
-export interface IBookingPaymentCommandRepository
-  extends IBaseCommandRepository<BookingPayment> {
+export interface IBookingPaymentCommandRepository extends IBaseCommandRepository<BookingPayment> {
   /**
    * Ödeme kaydını `FOR UPDATE` kilitleyerek yükler — yalnız aktif transaction içinde.
    *

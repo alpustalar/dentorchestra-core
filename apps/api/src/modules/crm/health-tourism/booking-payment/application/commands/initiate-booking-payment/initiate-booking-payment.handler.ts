@@ -21,26 +21,27 @@ import {
   BookingIntent,
   BookingPaymentLinks,
 } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
-import { BookingPaymentLinkGenerationException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
+import {
+  BookingPaymentInvalidNetAmountException,
+  BookingPaymentLinkGenerationException,
+} from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 import { InitiateBookingPaymentCommand } from './initiate-booking-payment.command';
 import {
   BookingPaymentLinkOption,
   InitiateBookingPaymentResponse,
 } from './initiate-booking-payment.response';
 import { Currency } from '@src/domain/value-objects';
+import { Money } from '@src/domain/value-objects/money.vo';
 import {
   BOOKING_PAYMENT_COMMAND_REPOSITORY,
   IBookingPaymentCommandRepository,
 } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.command.repository';
 
 @CommandHandler(InitiateBookingPaymentCommand)
-export class InitiateBookingPaymentHandler
-  implements
-    ICommandHandler<
-      InitiateBookingPaymentCommand,
-      InitiateBookingPaymentResponse
-    >
-{
+export class InitiateBookingPaymentHandler implements ICommandHandler<
+  InitiateBookingPaymentCommand,
+  InitiateBookingPaymentResponse
+> {
   private readonly logger = new Logger(InitiateBookingPaymentHandler.name);
 
   constructor(
@@ -63,17 +64,34 @@ export class InitiateBookingPaymentHandler
     const { input } = command;
 
     const saleCurrency = input.netCurrency;
+
+    // Tedarikçi fiyatı sağlayıcı yanıtından gelir ve o yanıtta eksik olabilir;
+    // `Money` kapısı NaN/Infinity/negatifi, `greaterThanZero` ise sıfırı keser.
+    // Sıfır özellikle sessizdi: transfer listesinde fiyatı okunamayan seçenek
+    // `?? 0` ile en başa sıralanıp hastaya "bedava transfer" olarak sunuluyordu.
+    const invalidNet = new BookingPaymentInvalidNetAmountException(
+      input.netAmount,
+      saleCurrency
+    );
+    const net = Money.create(input.netAmount, saleCurrency).orThrow(invalidNet);
+    if (!net.validate.greaterThanZero.isValid) throw invalidNet;
+
     // Komisyon platform geliridir → oran klinikten değil platform-global ayardan gelir.
-    const feePercent = this.serviceFee.getServiceFeePercent();
-    const fee = feePercent > 0 ? feePercent : 0;
-    const saleAmount = this.round2(input.netAmount * (1 + fee / 100));
+    // Oran Joi'de [0,100] aralığında doğrulanır ve tanımsızsa 5'e düşer.
+    const fee = this.serviceFee.getServiceFeePercent();
+    // Para aritmetiği `Money` üzerinden: ikili kayan nokta ile `net * (1 + fee/100)`
+    // çarpımı kuruş sınırında yanlış tarafa yuvarlanabiliyordu ve el yazımı `round2`
+    // projedeki tek yuvarlama kapısının (`Money.scale` + `Money.ROUNDING`) ikinci
+    // bir evi oluyordu (kural 12).
+    const sale = net.applyPercentage(fee).round();
+    const saleAmount = sale.value.toNumber();
 
     // FX → TRY (iyzico). Çözülemezse iyzico linki atlanır, Stripe yine üretilir.
     let fxRate: number | null = null;
     let tryAmount = saleAmount;
     try {
       fxRate = await this.fx.getRate(saleCurrency, Currency.enum.TRY);
-      tryAmount = this.round2(saleAmount * fxRate);
+      tryAmount = sale.multiply(fxRate).round().value.toNumber();
     } catch (err) {
       this.logger.warn(
         `FX kuru çözülemedi (${saleCurrency}→TRY): ${
@@ -192,9 +210,5 @@ export class InitiateBookingPaymentHandler
           'Ödeme açıklaması üretilemeyen rezervasyon türü.'
         );
     }
-  }
-
-  private round2(value: number): number {
-    return Math.round(value * 100) / 100;
   }
 }

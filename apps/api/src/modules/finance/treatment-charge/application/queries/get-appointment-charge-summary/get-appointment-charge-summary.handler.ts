@@ -10,13 +10,10 @@ import { TreatmentCharge } from '@modules/finance/treatment-charge/domain/entiti
 import { ChargeTotalsCalculator } from '@modules/finance/treatment-charge/domain/services/charge-totals.calculator';
 
 @QueryHandler(GetAppointmentChargeSummaryQuery)
-export class GetAppointmentChargeSummaryHandler
-  implements
-    IQueryHandler<
-      GetAppointmentChargeSummaryQuery,
-      GetAppointmentChargeSummaryResponse
-    >
-{
+export class GetAppointmentChargeSummaryHandler implements IQueryHandler<
+  GetAppointmentChargeSummaryQuery,
+  GetAppointmentChargeSummaryResponse
+> {
   constructor(
     @Inject(TREATMENT_CHARGE_QUERY_REPOSITORY)
     private readonly chargeRepo: ITreatmentChargeQueryRepository

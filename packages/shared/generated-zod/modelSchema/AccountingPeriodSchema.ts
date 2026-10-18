@@ -13,6 +13,13 @@ export const AccountingPeriodSchema = z.object({
   year: z.number().int(),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
+  lastEntryNo: z.bigint(),
+  lockedAt: z.coerce.date().nullable(),
+  lockedById: z.string().nullable(),
+  reopenedAt: z.coerce.date().nullable(),
+  reopenedById: z.string().nullable(),
+  closedAt: z.coerce.date().nullable(),
+  closedById: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })

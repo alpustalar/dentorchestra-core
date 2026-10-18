@@ -12,6 +12,7 @@ import { IyzicoTerminalRefundHandler } from './iyzico-terminal-refund/iyzico-ter
 import { IyzicoTerminalVoidHandler } from './iyzico-terminal-void/iyzico-terminal-void.handler';
 import { IyzicoTerminalEodHandler } from './iyzico-terminal-eod/iyzico-terminal-eod.handler';
 import { RegisterClinicIyzicoTerminalConfigHandler } from './register-clinic-iyzico-terminal-config/register-clinic-iyzico-terminal-config.handler';
+import { BackfillPosAccountingEventsHandler } from './backfill-pos-accounting-events/backfill-pos-accounting-events.handler';
 import { PosDeviceRepositoryModule } from '@modules/finance/pos/physical/infrastructure/persistence/prisma/repositories/pos-device/pos-device.repository.module';
 import { PosTransactionRepositoryModule } from '@modules/finance/pos/physical/infrastructure/persistence/prisma/repositories/pos-transaction/pos-transaction.repository.module';
 import { ClinicIyzicoTerminalConfigRepositoryModule } from '@modules/finance/pos/physical/infrastructure/persistence/prisma/repositories/clinic-iyzico-terminal-config/clinic-iyzico-terminal-config.repository.module';
@@ -20,8 +21,10 @@ import { IyzicoTerminalModule } from '@src/infrastructure/payment/pos/physical/p
 import { PaymentModule } from '@modules/finance/payment/payment.module';
 import { PolicyModule } from '@modules/platform/policy/policy.module';
 import { PosPaymentSyncService } from '@modules/finance/pos/physical/application/services/pos-payment-sync.service';
+import { PosAccountingBridgeService } from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import { ResolveIyzicoTerminalCredentialsService } from '@modules/finance/pos/physical/application/services/resolve-iyzico-terminal-credentials.service';
 import { PosInfrastructureModule } from '@src/infrastructure/payment/pos/pos.infrastructure.module';
+import { PhysicalPosQueryModule } from '@modules/finance/pos/physical/application/queries/query.module';
 
 export const POS_COMMAND_HANDLERS = [
   RegisterPosDeviceHandler,
@@ -37,6 +40,7 @@ export const POS_COMMAND_HANDLERS = [
   IyzicoTerminalVoidHandler,
   IyzicoTerminalEodHandler,
   RegisterClinicIyzicoTerminalConfigHandler,
+  BackfillPosAccountingEventsHandler,
 ];
 
 @Module({
@@ -49,10 +53,14 @@ export const POS_COMMAND_HANDLERS = [
     PaymentModule,
     PolicyModule,
     PosInfrastructureModule,
+    // Telafi komutu `FindUnbridgedPosTransactionsQuery`'yi bus ile çağırır;
+    // handler'ın kayıtlı olduğu modül burada da import edilir.
+    PhysicalPosQueryModule,
   ],
   providers: [
     ...POS_COMMAND_HANDLERS,
     PosPaymentSyncService,
+    PosAccountingBridgeService,
     ResolveIyzicoTerminalCredentialsService,
   ],
   exports: POS_COMMAND_HANDLERS,

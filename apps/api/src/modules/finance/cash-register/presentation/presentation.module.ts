@@ -4,5 +4,12 @@ import { CashRegisterCommandController } from '@modules/finance/cash-register/pr
 import { CashSessionQueryController } from '@modules/finance/cash-register/presentation/http/controllers/cash-session.query.controller';
 import { CashSessionCommandController } from '@modules/finance/cash-register/presentation/http/controllers/cash-session.command.controller';
 
-@Module({ controllers: [CashRegisterQueryController, CashRegisterCommandController, CashSessionQueryController, CashSessionCommandController] })
+@Module({
+  controllers: [
+    CashRegisterQueryController,
+    CashRegisterCommandController,
+    CashSessionQueryController,
+    CashSessionCommandController,
+  ],
+})
 export class CashRegisterPresentationModule {}

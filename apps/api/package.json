@@ -7,6 +7,8 @@
   "license": "UNLICENSED",
   "scripts": {
     "stats": "cloc . --exclude-dir=node_modules,dist,.git",
+    "finans:eksik": "node scripts/finans-eksik-liste.cjs",
+    "finans:degismezler": "node scripts/finance-invariants.cjs",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
@@ -24,6 +26,7 @@
     "zod:clean": "node scripts/clean-generated-zod.cjs",
     "gen:module": "node scripts/generate-module.mjs",
     "gen:cqrs": "node scripts/generate-cqrs.cjs",
+    "outbox:dead-letters": "node scripts/outbox-dead-letters.cjs",
     "migrate:messaging-mongo": "cross-env NODE_ENV=${NODE_ENV:-development} ts-node -r tsconfig-paths/register src/infrastructure/persistence/mongo/scripts/migrate-messaging-to-mongo.ts"
   },
   "prisma": {

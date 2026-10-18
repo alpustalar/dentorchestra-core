@@ -14,10 +14,10 @@ import {
 
 /** Klinik panosu: statü başına iş emri adedi + termini geçen adedi. */
 @QueryHandler(GetWorkOrderSummaryQuery)
-export class GetWorkOrderSummaryHandler
-  implements
-    IQueryHandler<GetWorkOrderSummaryQuery, GetWorkOrderSummaryResponse>
-{
+export class GetWorkOrderSummaryHandler implements IQueryHandler<
+  GetWorkOrderSummaryQuery,
+  GetWorkOrderSummaryResponse
+> {
   constructor(
     @Inject(EXTERNAL_WORK_ORDER_QUERY_REPOSITORY)
     private readonly workOrderRepo: IExternalWorkOrderQueryRepository,

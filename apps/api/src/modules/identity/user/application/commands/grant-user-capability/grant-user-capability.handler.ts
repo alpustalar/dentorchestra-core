@@ -23,7 +23,10 @@ import {
 import { UserCapabilityGrantedEvent } from '@modules/identity/user/domain/events/user-capability-changed.event';
 import { isPlatformCapability } from '@src/infrastructure/persistence/prisma/data/modules';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
-import { ContextService } from '@src/infrastructure/context/context.service';
+import {
+  CONTEXT_SERVICE,
+  IContextService,
+} from '@src/infrastructure/context/context.service.interface';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { USER_EVENTS } from '@src/domain/constants/events';
 
@@ -40,9 +43,10 @@ import { USER_EVENTS } from '@src/domain/constants/events';
  *    ondan düşük öncelikte olmalı.
  */
 @CommandHandler(GrantUserCapabilityCommand)
-export class GrantUserCapabilityHandler
-  implements ICommandHandler<GrantUserCapabilityCommand, void>
-{
+export class GrantUserCapabilityHandler implements ICommandHandler<
+  GrantUserCapabilityCommand,
+  void
+> {
   constructor(
     @Inject(USER_COMMAND_REPOSITORY)
     private readonly userRepo: IUserCommandRepository,
@@ -50,7 +54,8 @@ export class GrantUserCapabilityHandler
     private readonly capabilityRepo: IUserCapabilityCommandRepository,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
-    private readonly contextService: ContextService,
+    @Inject(CONTEXT_SERVICE)
+    private readonly contextService: IContextService,
     private readonly txManager: TransactionManager
   ) {}
 

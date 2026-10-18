@@ -15,9 +15,20 @@ import {
 } from '@modules/finance/accounting/posting/domain/exceptions/journal-entry.exceptions';
 import { JournalEntryStatusType as JournalEntryStatus } from '@input-type-schemas/JournalEntryStatusSchema';
 import {
+  JournalEntryKindSchema,
+  JournalEntryKindType as JournalEntryKind,
+} from '@input-type-schemas/JournalEntryKindSchema';
+import {
   BuildReversalDraftProps,
   CreateJournalEntryProps,
+  MarkReversedProps,
 } from '@modules/finance/accounting/posting/domain/contracts/journal-entry';
+import { JournalEntryReversedEvent } from '@modules/finance/accounting/posting/domain/events';
+import {
+  LogAction,
+  LogSource,
+  LogType,
+} from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
 
@@ -43,6 +54,7 @@ export class JournalEntry extends AggregateRoot {
     this._description = data.description;
 
     this._status = data.status;
+    this._kind = data.kind;
     this._eventId = data.eventId;
     this._reversedById = data.reversedById;
     this._performedById = data.performedById;
@@ -89,6 +101,11 @@ export class JournalEntry extends AggregateRoot {
   private _status: JournalEntryStatus;
   get status(): JournalEntryStatus {
     return this._status;
+  }
+
+  private _kind: JournalEntryKind;
+  get kind(): JournalEntryKind {
+    return this._kind;
   }
 
   private _eventId: string | null;
@@ -147,6 +164,7 @@ export class JournalEntry extends AggregateRoot {
         entryDate: props.entryDate,
         description: props.description ?? null, // Saf string mapping
         status: JournalEntryStatusSchema.enum.DRAFT,
+        kind: props.kind ?? JournalEntryKindSchema.enum.OPERATIONAL,
         eventId: props.eventId ?? null,
         reversedById: null,
         performedById: props.performedById ?? null,
@@ -181,6 +199,7 @@ export class JournalEntry extends AggregateRoot {
 
     this._entryNo = JournalEntrySequence.fromSequence(entryNo);
     this._status = JournalEntryStatusSchema.enum.POSTED;
+    this._updatedAt = DateTimeManager.create();
   }
 
   public isPosted(): boolean {
@@ -207,6 +226,10 @@ export class JournalEntry extends AggregateRoot {
       description:
         props.description ?? `Storno: ${this._description ?? this._id}`,
       eventId: null,
+      // Nitelik DEVRALINIR. Bir kapanış fişinin stornosu OPERATIONAL olsaydı gelir
+      // tablosuna ters işaretle girer ve kapanmış yılın cirosunu şişirirdi; ekonomik
+      // bir fişin stornosu ise ekonomiktir — götürdüğü etki gelir tablosuna aittir.
+      kind: this._kind,
       performedById: props.performedById ?? null,
       lines: this._lines.items.map((line) => ({
         accountId: line.accountId,
@@ -214,16 +237,51 @@ export class JournalEntry extends AggregateRoot {
         // Ters kayıt: borç ↔ alacak yer değiştirir.
         debit: line.credit,
         credit: line.debit,
+        // Para birimi orijinal satırdan taşınır. Geçilmezse `JournalLine.create`
+        // TRY'ye düşerdi: fonksiyonel parası TRY olmayan bir defterde storno
+        // satırları başka bir para biriminde damgalanır ve mizan iki farklı
+        // para birimini aynı kolonda toplardı.
+        currency: line.currency.value,
+        // Yabancı para izi de terslenerek taşınır (orijinal tutar + aynı kur):
+        // storno, orijinalin kur snapshot'ıyla kapatılmalıdır; bugünün kuruyla
+        // kapatmak defterde gerçek olmayan bir kur farkı yaratır.
+        originalDebit: line.originalCredit,
+        originalCredit: line.originalDebit,
+        originalCurrency: line.originalCurrency?.value ?? null,
+        fxRate: line.fxRate,
         lineDesc: line.lineDesc,
       })),
     });
   }
 
-  /** Orijinal fişi REVERSED işaretler ve onu üreten storno fişine bağlar. */
-  public markReversed(reversalId: string): void {
+  /**
+   * Orijinal fişi REVERSED işaretler ve onu üreten storno fişine bağlar.
+   *
+   * Storno, defter üzerindeki en yüksek etkili **elle** işlemdir: mühürlenmiş bir
+   * kaydın etkisini götürür. Bu yüzden "kim, ne zaman" iki yerde birden saklanır —
+   * storno fişinin `performedById` kolonunda ve buradan doğan denetim olayında.
+   */
+  public markReversed(props: MarkReversedProps): void {
     this.ensureReversible();
     this._status = JournalEntryStatusSchema.enum.REVERSED;
-    this._reversedById = reversalId;
+    this._reversedById = props.reversalId;
+    this._updatedAt = DateTimeManager.create();
+
+    this.addDomainEvent(
+      new JournalEntryReversedEvent({
+        entryId: this._id,
+        reversalId: props.reversalId,
+        clinicId: this._clinicId,
+        organizationId: this._organizationId,
+        periodId: this._periodId,
+        entryNo: this._entryNo?.value ?? null,
+        reason: props.reason ?? null,
+        actorId: props.actorId,
+        action: LogAction.JOURNAL_ENTRY_REVERSED,
+        source: props.source ?? LogSource.SYSTEM,
+        type: LogType.SECURITY,
+      })
+    );
   }
 
   public toPersistence(): IJournalEntry {
@@ -236,11 +294,15 @@ export class JournalEntry extends AggregateRoot {
       entryDate: this._entryDate,
       description: this._description,
       status: this._status,
+      kind: this._kind,
       eventId: this._eventId,
       reversedById: this._reversedById,
       performedById: this._performedById,
       createdAt: this._createdAt,
-      updatedAt: DateTimeManager.create(),
+      // Saf okuma: iki çağrı aynı sonucu vermeli. `DateTimeManager.create()`
+      // burada çağrılırsa entity'nin kendi `_updatedAt`'i hiç yazılmaz ve
+      // "fiş ne zaman mühürlendi / ne zaman storno edildi" izi kaybolur.
+      updatedAt: this._updatedAt,
     };
   }
 
@@ -249,11 +311,16 @@ export class JournalEntry extends AggregateRoot {
   }
 
   private ensureReversible(): void {
+    // Sıra önemli: storno edilen fişin durumu REVERSED olduğu için `isPosted()`
+    // kontrolü önce gelseydi ikinci storno denemesi "yalnızca POSTED fişler
+    // storno edilebilir" derdi — doğru statü (409) ama yanlış gerekçe. Eşzamanlı
+    // iki storno isteğinde ikinci istek tam buraya düşer; operatörün göreceği
+    // mesaj "fiş zaten storno edilmiş" olmalıdır.
+    if (this._reversedById || this.isReversed()) {
+      throw new JournalEntryAlreadyReversedException();
+    }
     if (!this.isPosted()) {
       throw new JournalEntryNotPostedException();
-    }
-    if (this._reversedById) {
-      throw new JournalEntryAlreadyReversedException();
     }
   }
 }

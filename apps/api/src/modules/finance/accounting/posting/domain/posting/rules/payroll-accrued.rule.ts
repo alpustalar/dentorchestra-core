@@ -1,11 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import { FinancialEvent } from '@shared';
-import {
-  DraftJournalEntry,
-  PostingContext,
-  PostingRule,
-} from '../posting-rule.interface';
+import { DraftJournalEntry, PostingRule } from '../posting-rule.interface';
 import { PayrollAccruedEventPayload } from '../event-payloads';
 import { FinancialEventTypeSchema } from '@shared';
 
@@ -27,7 +23,7 @@ import { FinancialEventTypeSchema } from '@shared';
 export class PayrollAccruedRule implements PostingRule {
   readonly eventType = FinancialEventTypeSchema.enum.PAYROLL_ACCRUED;
 
-  build(event: FinancialEvent, _ctx: PostingContext): DraftJournalEntry {
+  build(event: FinancialEvent): DraftJournalEntry {
     const payload = event.payload as unknown as PayrollAccruedEventPayload;
 
     const sgkPayable = new Decimal(payload.employeeSgk)

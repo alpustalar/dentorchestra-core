@@ -1,9 +1,9 @@
-import { OnEvent } from '@nestjs/event-emitter';
 import { Injectable, Logger } from '@nestjs/common';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { MessageReceivedEvent } from '@modules/conversation/domain/events/message-received.event';
 import { GetAiAgentRuntimeConfigQuery } from '@modules/ai-agent/application/queries/get-ai-agent-runtime-config/get-ai-agent-runtime-config.query';
 import { AiReplyProducer } from '../../queue/producers/ai-reply.producer';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Gelen (inbound) mesaj event'ine abone olur ve kliniğin AI asistanı etkinse yanıt üretimini
@@ -20,7 +20,7 @@ export class AiReplyListener {
     private readonly aiReplyProducer: AiReplyProducer
   ) {}
 
-  @OnEvent(MessageReceivedEvent.NAME, { async: true })
+  @OnDomainEvent(MessageReceivedEvent.NAME)
   async handle(event: MessageReceivedEvent): Promise<void> {
     try {
       const { data: config } = await this.queryBus.execute(

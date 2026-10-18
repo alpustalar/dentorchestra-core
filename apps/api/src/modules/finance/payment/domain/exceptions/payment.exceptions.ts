@@ -21,6 +21,100 @@ export class InstallmentNotFoundException extends DomainException {
   }
 }
 
+/**
+ * Taksit tahsil edilebilir durumda değil (iptal edilmiş veya iade edilmiş).
+ *
+ * Bu bir **invariant**'tır, politika değil: iade edilmiş bir taksiti yeniden
+ * "tahsil edildi" yapmak aynı parayı ikinci kez gelir yazar. Bu yüzden entity
+ * içinde zorlanır ve `systemOverride` ile atlanamaz.
+ */
+export class InstallmentNotCollectibleException extends DomainException<{
+  installmentId: string;
+  status: string;
+}> {
+  public readonly errorCode = ERROR_CODES.PAYMENT.INSTALLMENT_NOT_COLLECTIBLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { installmentId: string; status: string }) {
+    super(
+      `Taksit tahsil edilebilir durumda değil (durum: ${meta.status}).`,
+      meta
+    );
+  }
+}
+
+/**
+ * Tahsil edilmemiş bir taksit iade edilemez: olmayan parayı geri vermek, defterde
+ * karşılığı olmayan bir ters kayıt (gelir eksiği) üretir.
+ */
+export class InstallmentNotRefundableException extends DomainException<{
+  installmentId: string;
+  status: string;
+}> {
+  public readonly errorCode = ERROR_CODES.PAYMENT.INSTALLMENT_NOT_REFUNDABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { installmentId: string; status: string }) {
+    super(
+      `Yalnız tahsil edilmiş (COMPLETED) taksit iade edilebilir (durum: ${meta.status}).`,
+      meta
+    );
+  }
+}
+
+/** Tahsil edilmiş/iade edilmiş taksit iptal edilemez — iade yolu kullanılır. */
+export class InstallmentNotCancellableException extends DomainException<{
+  installmentId: string;
+  status: string;
+}> {
+  public readonly errorCode = ERROR_CODES.PAYMENT.INSTALLMENT_NOT_CANCELLABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { installmentId: string; status: string }) {
+    super(
+      `Tahsil edilmiş veya iade edilmiş taksit iptal edilemez (durum: ${meta.status}). İade yolunu kullanın.`,
+      meta
+    );
+  }
+}
+
+/**
+ * Tahsil edilmiş bir taksit "başarısız" işaretlenemez: durum PENDING'e çekilince
+ * taksit açık alacak sayılır ama tahsilatın cari/defter kaydı yerinde kalır —
+ * rapor ile defter kalıcı olarak çelişir.
+ */
+export class InstallmentNotFailableException extends DomainException<{
+  installmentId: string;
+  status: string;
+}> {
+  public readonly errorCode = ERROR_CODES.PAYMENT.INSTALLMENT_NOT_FAILABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { installmentId: string; status: string }) {
+    super(
+      `Tahsil edilmiş veya iade edilmiş taksit başarısız olarak işaretlenemez (durum: ${meta.status}).`,
+      meta
+    );
+  }
+}
+
+/**
+ * Taksit tutarı kuruştan (2 hane) daha ince: DB kolonu `Decimal(10,2)` olduğu
+ * için fazla hane **sessizce** yuvarlanır ve taksitler toplamı ana tutarla
+ * eşleşmez (bellekte tutan invariant diskte bozulur).
+ */
+export class PaymentInvalidPrecisionException extends DomainException<{
+  amount: string;
+}> {
+  public readonly errorCode = ERROR_CODES.PAYMENT.INVALID_PRECISION;
+
+  constructor(amount: string) {
+    super(`Tutar en fazla 2 ondalık basamak taşıyabilir (gelen: ${amount}).`, {
+      amount,
+    });
+  }
+}
+
 export class CompletedInstallmentNotFoundException extends DomainException {
   public readonly errorCode =
     ERROR_CODES.PAYMENT.COMPLETED_INSTALLMENT_NOT_FOUND;
@@ -106,6 +200,29 @@ export class PaymentAmountUnresolvableException extends DomainException {
       appointmentId
         ? `Tahsilat tutarı çözülemedi: randevunun ücretlendirilmiş işlem satırı yok (${appointmentId}). Tutarı açıkça gönderin ya da işlem satırı ekleyin.`
         : 'Tahsilat tutarı çözülemedi: tutar veya tutarın türetileceği randevu gönderilmelidir.'
+    );
+  }
+}
+
+/**
+ * Tahsilat tutarı işlem satırlarından türetilirken para birimi uyuşmazlığı.
+ *
+ * Tutar satırlardan, para birimi ise istemciden alınıyordu: satırlar EUR iken
+ * istemci TRY gönderdiğinde EUR tutar TRY olarak kaydediliyor, cari defter ve
+ * muhasebe bu yanlış birimi devralıyor, fatura ise (kendi uyuşmazlık kontrolü
+ * sayesinde) hiç kesilemiyordu. Tutar ve para birimi **aynı kaynaktan** gelir.
+ */
+export class PaymentChargeCurrencyMismatchException extends DomainException<{
+  chargesCurrency: string;
+  requestedCurrency: string;
+}> {
+  public readonly errorCode = ERROR_CODES.PAYMENT.CURRENCY_MISMATCH;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { chargesCurrency: string; requestedCurrency: string }) {
+    super(
+      `İşlem satırları ${meta.chargesCurrency} para biriminde; tahsilat ${meta.requestedCurrency} olarak oluşturulamaz.`,
+      meta
     );
   }
 }

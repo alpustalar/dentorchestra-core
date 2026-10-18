@@ -24,6 +24,9 @@ export class PaymentPaidEvent extends BaseEvent {
       metadata: payload.metadata,
       details: payload.details,
       type: payload.type,
+      // actorId super'e geçmiyordu: tahsilat denetim kaydı "kim/hangi kanal"
+      // bilgisi olmadan yazılıyordu.
+      actorId: payload.actorId,
     });
     this.installmentId = payload.installmentId;
     this.paymentId = payload.paymentId;

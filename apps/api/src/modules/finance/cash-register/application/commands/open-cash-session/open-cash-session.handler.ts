@@ -24,9 +24,10 @@ import {
 } from '@modules/finance/cash-register/domain/repositories/cash-session/cash-session.command.repository';
 
 @CommandHandler(OpenCashSessionCommand)
-export class OpenCashSessionHandler
-  implements ICommandHandler<OpenCashSessionCommand, string>
-{
+export class OpenCashSessionHandler implements ICommandHandler<
+  OpenCashSessionCommand,
+  string
+> {
   constructor(
     @Inject(CASH_REGISTER_COMMAND_REPOSITORY)
     private readonly cashRegisterRepo: ICashRegisterCommandRepository,

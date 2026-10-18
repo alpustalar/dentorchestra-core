@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { SubscriptionActivatedEvent } from '@modules/platform/subscription/domain/events/subscription-activated.event';
 import { SubscriptionRenewedEvent } from '@modules/platform/subscription/domain/events/subscription-renewed.event';
 import { ModuleAddedEvent } from '@modules/platform/subscription/domain/events/module-added.event';
-import { SubscriptionCacheService } from '@modules/platform/subscription/infrastructure/cache/subscription-cache.service';
+import {
+  ISubscriptionCacheService,
+  SUBSCRIPTION_CACHE_SERVICE,
+} from '@modules/platform/subscription/domain/interfaces/subscription-cache.service.interface';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Abonelik değiştiğinde (aktivasyon / yenileme / modül ekleme) kiracının entitlement cache'ini
@@ -16,16 +19,16 @@ export class EntitlementCacheInvalidationListener {
     EntitlementCacheInvalidationListener.name
   );
 
-  constructor(private readonly cacheService: SubscriptionCacheService) {}
+  constructor(
+    @Inject(SUBSCRIPTION_CACHE_SERVICE)
+    private readonly cacheService: ISubscriptionCacheService
+  ) {}
 
-  @OnEvent(
-    [
-      SubscriptionActivatedEvent.NAME,
-      SubscriptionRenewedEvent.NAME,
-      ModuleAddedEvent.NAME,
-    ],
-    { async: true }
-  )
+  @OnDomainEvent([
+    SubscriptionActivatedEvent.NAME,
+    SubscriptionRenewedEvent.NAME,
+    ModuleAddedEvent.NAME,
+  ])
   async handle(payload: { organizationId?: string }): Promise<void> {
     if (!payload?.organizationId) return;
     try {

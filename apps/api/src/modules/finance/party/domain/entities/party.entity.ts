@@ -12,6 +12,7 @@ import { Email } from '@src/domain/value-objects/email.vo';
 import { Phone } from '@src/domain/value-objects/phone.vo';
 import { TckNo } from '@src/domain/value-objects/tck-no.vo';
 import { Guard } from '@common/domain/guards';
+import { PartyRoleMissingException } from '@modules/finance/party/domain/exceptions/party.exceptions';
 
 export class Party extends AggregateRoot {
   constructor(data: IParty) {
@@ -183,31 +184,47 @@ export class Party extends AggregateRoot {
     });
   }
 
-  public ensure(input: {
-    role: PartyRole;
-    name: string;
-    taxNumber?: string | null;
-    nationalId?: string | null;
-    taxOffice?: string | null;
-    email?: string | null;
-    phone?: string | null;
-    address?: string | null;
-  }) {
+  public ensure(input: EnsurePartySnapshot) {
     this.addRole(input.role);
+
+    // Pasif cari YENİDEN AKTİFLEŞTİRİLİR. `isActive` hiçbir yerde okunmuyordu
+    // (ne çözümleme ne fişleme noktasında) — yani bir güvence değil süstü.
+    // Kural: varlığın değişmez koşulu çözümlendiği yerde zorlanır
+    // (CLAUDE.md finans kuralı 10). Burada doğru davranış engellemek DEĞİL
+    // aktifleştirmektir: cari için yeni bir mali hareket geldiyse o cari
+    // fiilen aktiftir; yazmayı durdurmak parayı defterin dışında bırakırdı.
+    // Pasif kalsaydı `?isActive=true` süzgeçli cari mutabakatı bakiyesi olan
+    // bir cariyi hiç göstermezdi.
+    if (!this._isActive) this.activate();
+
+    // Kimlik/iletişim alanlarında `null` "bilinmiyor" demektir, "yok" değil:
+    // kaynak kayıtta TCKN boşsa bilinen TCKN SİLİNMEZ. Silinirse e-fatura
+    // kesimi (gerçek kişide TCKN zorunlu) sessizce durur ve değer geri
+    // getirilemez. Değer temizlemek bilinçli bir düzenleme işidir; otomatik
+    // köprünün işi değildir.
     this.updateSnapshot({
       name: input.name,
-      taxNumber: input.taxNumber,
-      nationalId: input.nationalId,
-      taxOffice: input.taxOffice,
-      email: input.email,
-      phone: input.phone,
-      address: input.address,
+      taxNumber: input.taxNumber ?? undefined,
+      nationalId: input.nationalId ?? undefined,
+      taxOffice: input.taxOffice ?? undefined,
+      email: input.email ?? undefined,
+      phone: input.phone ?? undefined,
+      address: input.address ?? undefined,
     });
   }
 
-  /** Rolü ekler (idempotent). Eklendiyse true döner. */
+  /**
+   * Rolü ekler (idempotent). Eklendiyse true döner.
+   *
+   * `hasRole` bir `Guard` **nesnesi** döndürüyor ve koşul doğrudan nesne
+   * üzerinde çalışıyordu: nesne daima truthy olduğu için `addRole` HİÇ rol
+   * eklemiyordu, her zaman `false` dönüyordu. Derleyici görmez (nesne de
+   * geçerli bir koşul ifadesidir); sonucu, aynı kaynağın ikinci rolünü
+   * (hastanın aynı zamanda müşteri, personelin aynı zamanda tedarikçi olması)
+   * hiç kazanmaması ve rol süzgeçli cari listelerinin eksik çalışmasıydı.
+   */
   public addRole(role: PartyRole): boolean {
-    if (this.hasRole(role)) return false;
+    if (this.hasRole(role).value) return false;
     this._roles = [...this._roles, role];
     return true;
   }
@@ -298,6 +315,18 @@ export class Party extends AggregateRoot {
 
   private hasRole(role: PartyRole): Guard<boolean> {
     const has = this._roles.includes(role);
-    return Guard.monitor(has, has, () => new Error('Parti bu rolü içermiyor'));
+    return Guard.monitor(has, has, () => new PartyRoleMissingException(role));
   }
+}
+
+/** Kaynak kayıttan taşınan kimlik/iletişim anlık görüntüsü. */
+export interface EnsurePartySnapshot {
+  role: PartyRole;
+  name: string;
+  taxNumber?: string | null;
+  nationalId?: string | null;
+  taxOffice?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
 }

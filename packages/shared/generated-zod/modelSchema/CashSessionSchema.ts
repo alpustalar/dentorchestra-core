@@ -18,6 +18,7 @@ export const CashSessionSchema = z.object({
   expectedAmount: decimalSchema("Field 'expectedAmount' must be a Decimal. Location: ['Models', 'CashSession']").nullable(),
   countedAmount: decimalSchema("Field 'countedAmount' must be a Decimal. Location: ['Models', 'CashSession']").nullable(),
   difference: decimalSchema("Field 'difference' must be a Decimal. Location: ['Models', 'CashSession']").nullable(),
+  activeRegisterId: z.string().nullable(),
   openedById: z.string(),
   closedById: z.string().nullable(),
   openedAt: z.coerce.date(),

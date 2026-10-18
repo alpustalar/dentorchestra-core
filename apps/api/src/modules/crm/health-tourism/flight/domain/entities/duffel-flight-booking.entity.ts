@@ -222,6 +222,13 @@ export class DuffelFlightBooking extends AggregateRoot {
         ? Money.create(props.totalAmount, currency.value).orThrow()
         : props.totalAmount;
 
+    // Sipariş tutarı pozitif olmak ZORUNDA: tutar aynı zamanda ödeme
+    // TALİMATIDIR (`pay-held-flight` Duffel'a bunu gönderir); sıfır/eksik bir
+    // tutarla kaydedilen bir sipariş sessizce ödenemez hâle gelir.
+    amount.validate.greaterThanZero.orThrow(
+      'Sipariş tutarı pozitif olmalıdır.'
+    );
+
     const now = DateTimeManager.create();
     const isHold = props.mode === DuffelFlightBookingModeSchema.enum.HOLD;
 

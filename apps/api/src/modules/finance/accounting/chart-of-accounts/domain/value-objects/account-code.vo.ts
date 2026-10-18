@@ -1,4 +1,7 @@
-import { BadRequestException } from '@nestjs/common';
+import { InvalidAccountCodeException } from '@modules/finance/accounting/chart-of-accounts/domain/exceptions/chart-of-accounts.exceptions';
+
+/** Hesap kodu biçimi: nokta ile ayrılmış rakam grupları (120, 600.04, 120.01.0001). */
+const ACCOUNT_CODE_PATTERN = /^\d+(?:\.\d+)*$/;
 
 export class AccountCode {
   private readonly _value: string;
@@ -24,21 +27,24 @@ export class AccountCode {
     return segments.join('.');
   }
 
+  /** Kullanıcı/şablon girdisi — doğrulanır. */
   public static create(codeStr: string): AccountCode {
-    if (!codeStr) {
-      throw new BadRequestException('Hesap kodu boş olamaz.');
-    }
+    const cleanedCode = (codeStr ?? '').trim().replace(/\s+/g, '');
 
-    const cleanedCode = codeStr.trim().replace(/\s+/g, '');
-
-    const accountCodeRegex = /^\d+(?:\.\d+)*$/;
-    if (!accountCodeRegex.test(cleanedCode)) {
-      throw new BadRequestException(
-        `Geçersiz hesap kodu formatı: "${codeStr}". Sadece rakam ve '.' içerebilir.`
-      );
+    if (!cleanedCode || !ACCOUNT_CODE_PATTERN.test(cleanedCode)) {
+      throw new InvalidAccountCodeException(codeStr);
     }
 
     return new AccountCode(cleanedCode);
+  }
+
+  /**
+   * DB'den okunan değer — doğrulama atlanır. Hidrasyon yolunda `create` çağırmak,
+   * geçmişte yazılmış bir satır bugünkü biçimi tutmuyorsa okumayı tamamen
+   * imkânsız kılardı (ve hatayı istek doğrulama hatası gibi gösterirdi).
+   */
+  public static fromTrusted(value: string): AccountCode {
+    return new AccountCode(value);
   }
 
   public isMainAccount(): boolean {

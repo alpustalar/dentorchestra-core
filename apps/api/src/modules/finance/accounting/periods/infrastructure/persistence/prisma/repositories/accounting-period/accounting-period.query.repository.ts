@@ -3,6 +3,7 @@ import { AccountingPeriod as IAccountingPeriod } from '@shared';
 import { BaseRepository } from '@src/infrastructure/persistence/prisma/base.repository';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { IAccountingPeriodQueryRepository } from '@modules/finance/accounting/periods/domain/repositories/accounting-period/accounting-period.query.repository';
+import { periodCoveringDateWhere } from './accounting-period-date.query';
 
 @Injectable()
 export class AccountingPeriodQueryRepository
@@ -15,11 +16,7 @@ export class AccountingPeriodQueryRepository
 
   findByDate(clinicId: string, date: Date): Promise<IAccountingPeriod | null> {
     return this.db.accountingPeriod.findFirst({
-      where: {
-        clinicId,
-        startsAt: { lte: date },
-        endsAt: { gte: date },
-      },
+      where: periodCoveringDateWhere(clinicId, date),
     });
   }
 

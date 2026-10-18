@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { APPOINTMENT_JOBS, QUEUES } from '@common/constants';
 import { APPOINTMENT_EVENTS } from '@src/domain/constants/events';
 import { AppointmentsBulkSoftDeletedEvent } from '@modules/clinical/appointment/domain/events/appointments-bulk-soft-deleted.event';
+import { OnDomainEvent } from '@common/decorators';
 
 /**
  * Toplu randevu soft-delete event'ini kuyruğa devreder. Bildirim + Redis
@@ -19,7 +19,7 @@ export class AppointmentsBulkSoftDeletedListener {
 
   constructor(@InjectQueue(QUEUES.APPOINTMENT) private readonly queue: Queue) {}
 
-  @OnEvent(APPOINTMENT_EVENTS.BULK_SOFT_DELETED, { async: true })
+  @OnDomainEvent(APPOINTMENT_EVENTS.BULK_SOFT_DELETED)
   async handle(event: AppointmentsBulkSoftDeletedEvent): Promise<void> {
     if (event.affectedCount === 0) return;
 

@@ -1,5 +1,6 @@
 import { ConfirmBookingPaymentHandler } from './confirm-booking-payment.handler';
 import { ConfirmBookingPaymentCommand } from './confirm-booking-payment.command';
+import { BookingPlatformLedgerService } from '@modules/crm/health-tourism/booking-payment/application/services/booking-platform-ledger.service';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { IPaymentLinkProvider } from '@src/infrastructure/payment/links/payment-link.port';
 import { IBookingPaymentCommandRepository } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.command.repository';
@@ -47,6 +48,12 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     rooms: [{ rateKey: 'RK-1', paxes: [] }],
   };
 
+  type BookedSupplierResultLike = {
+    bookingId: string;
+    supplierAmount: string;
+    supplierCurrency: string;
+  };
+
   const props: CreateBookingPaymentProps = {
     bookingType: 'HOTEL',
     saleCurrency: 'EUR',
@@ -63,7 +70,7 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
   };
 
   const makeBp = (
-    state: 'PENDING' | 'BOOKED',
+    state: 'PENDING' | 'BOOKED' | 'REFUNDED',
     patientId: string | null = null
   ): BookingPayment => {
     const bp = BookingPayment.create({ ...props, patientId });
@@ -77,10 +84,35 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
       bp.markPaid('STRIPE', 'pi_first');
       bp.markBooked('BK-prev', 'BK-prev');
     }
+    if (state === 'REFUNDED') {
+      // Ödeme alındı, rezervasyon açılamadı, iade edildi: terminal ama
+      // "settled" olmayan durum.
+      bp.markPaid('STRIPE', 'pi_first');
+      bp.markFailed('rate expired');
+      bp.markRefunded({ reason: 'iade edildi', retained: null });
+    }
     return bp;
   };
 
-  const build = (bp: BookingPayment | null, bookThrows = false) => {
+  /**
+   * Sağlayıcının rezervasyonu açarken bildirdiği FİİLÎ maliyet. Varsayılan,
+   * teklifle (netAmount=100 EUR) birebir aynı: yani "sapma yok" hâli. Sapmayı
+   * ölçen testler bunu bilerek değiştirir.
+   */
+  const supplierCost = (
+    amount = '100.00',
+    currency = 'EUR'
+  ): BookedSupplierResultLike => ({
+    bookingId: 'BK-1',
+    supplierAmount: amount,
+    supplierCurrency: currency,
+  });
+
+  const build = (
+    bp: BookingPayment | null,
+    bookThrows = false,
+    booked: BookedSupplierResultLike = supplierCost()
+  ) => {
     // Dış çağrıların kilit (tx) içinde mi dışında mı yapıldığını ölçer: HotelBeds ve
     // iade çağrıları saniyeler sürer, satır kilidini o kadar tutmak kabul edilemez.
     let txDepth = 0;
@@ -94,7 +126,9 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         // book komutları + onay bildirimi
         if (cmd instanceof BookHotelCommand) recordDepth('book');
         if (bookThrows) throw new Error('rate expired');
-        return 'BK-1';
+        // book komutları artık id + FİİLÎ maliyet döner; diğer komutların
+        // (RecordFinancialEvent) dönüşü kullanılmıyor, aynı nesne zararsız.
+        return booked;
       }),
     } as unknown as TSCommandBus;
 
@@ -169,7 +203,14 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         commandRepo,
         policyFactory,
         natsClient,
-        platformTenant,
+        // Gerçek köprü servisi, mock bus/kiracı/alarm ile kurulur: böylece
+        // olay gövdesi, platform defteri hedefi ve tedarikçi carisi zinciri
+        // bu testlerin kapsamında kalır (servis ayrıca kendi spec'inde).
+        new BookingPlatformLedgerService(
+          commandBus,
+          platformTenant,
+          criticalFailure as never
+        ),
         txManager,
         criticalFailure as never
       ),
@@ -277,6 +318,127 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     );
   });
 
+  describe('teklif ↔ fiilî tedarikçi maliyeti', () => {
+    const settledPayload = (commandBus: TSCommandBus) =>
+      (
+        (commandBus.execute as jest.Mock).mock.calls
+          .map((c) => c[0])
+          .find(
+            (c) =>
+              (c as object).constructor.name === 'RecordFinancialEventCommand'
+          ) as { data: { payload: Record<string, string> } }
+      ).data.payload;
+
+    const confirm = async (
+      handler: ConfirmBookingPaymentHandler,
+      bp: BookingPayment
+    ) =>
+      handler.execute(
+        new ConfirmBookingPaymentCommand({
+          bookingPaymentId: bp.id.value,
+          provider: 'STRIPE',
+          providerRef: 'pi_1',
+          ctx,
+        })
+      );
+
+    it('defter sağlayıcının FİİLEN ücretlendirdiği tutardan yazılır (teklifi değil)', async () => {
+      // Teklif 100, satış 120 (komisyon 20). HotelBeds rezervasyonu 105'e açtı:
+      // tedarikçiye borç 105, komisyon 15. Eskiden teklif yazıldığı için 320
+      // sağlayıcının faturalayacağı tutarı göstermiyor, komisyon 5 fazla
+      // görünüyordu.
+      const bp = makeBp('PENDING');
+      const { handler, commandBus } = build(bp, false, supplierCost('105.00'));
+
+      await confirm(handler, bp);
+
+      const payload = settledPayload(commandBus);
+      expect(payload.supplierAmount).toBe('105.00');
+      expect(payload.commission).toBe('15.00');
+      expect(payload.saleAmount).toBe('120.00');
+      // Fiilî maliyet kayda da damgalanır (mutabakat + iade için).
+      expect(bp.supplierAmount?.toApiFormat()).toBe('105.00');
+    });
+
+    it('sapma WARNING ile duyurulur; rezervasyon bozulmaz', async () => {
+      const bp = makeBp('PENDING');
+      const { handler, criticalFailure } = build(
+        bp,
+        false,
+        supplierCost('105.00')
+      );
+
+      await confirm(handler, bp);
+
+      const alert = criticalFailure.publish.mock.calls
+        .map((c) => c[0] as Record<string, unknown>)
+        .find(
+          (a) => a.operation === 'health-tourism.booking-payment.supplier-cost'
+        );
+      expect(alert).toMatchObject({ severity: 'WARNING' });
+      expect(alert?.context).toMatchObject({
+        quotedAmount: '100.00',
+        supplierAmount: '105.00',
+        postedSupplierAmount: '105.00',
+      });
+      expect(bp.status).toBe('BOOKED');
+    });
+
+    it('sapma yoksa alarm YAYINLANMAZ', async () => {
+      const bp = makeBp('PENDING');
+      const { handler, criticalFailure } = build(bp);
+
+      await confirm(handler, bp);
+
+      expect(
+        criticalFailure.publish.mock.calls.filter(
+          (c) =>
+            (c[0] as { operation: string }).operation ===
+            'health-tourism.booking-payment.supplier-cost'
+        )
+      ).toHaveLength(0);
+    });
+
+    it('maliyet satışı aşarsa CRITICAL yayınlanır (maliyetin altında satış)', async () => {
+      // Komisyon negatif olurdu; posting kuralı fişi reddeder ve olay
+      // postlanmamış kalır. Alarm olmasa bu hiç görünmezdi.
+      const bp = makeBp('PENDING');
+      const { handler, criticalFailure } = build(
+        bp,
+        false,
+        supplierCost('130.00')
+      );
+
+      await confirm(handler, bp);
+
+      const alert = criticalFailure.publish.mock.calls
+        .map((c) => c[0] as Record<string, unknown>)
+        .find(
+          (a) => a.operation === 'health-tourism.booking-payment.supplier-cost'
+        );
+      expect(alert).toMatchObject({ severity: 'CRITICAL' });
+    });
+
+    it('fiilî maliyet başka para birimindeyse CRITICAL + defter teklife düşer', async () => {
+      const bp = makeBp('PENDING');
+      const { handler, commandBus, criticalFailure } = build(
+        bp,
+        false,
+        supplierCost('98.00', 'USD')
+      );
+
+      await confirm(handler, bp);
+
+      expect(settledPayload(commandBus).supplierAmount).toBe('100.00');
+      const alert = criticalFailure.publish.mock.calls
+        .map((c) => c[0] as Record<string, unknown>)
+        .find(
+          (a) => a.operation === 'health-tourism.booking-payment.supplier-cost'
+        );
+      expect(alert).toMatchObject({ severity: 'CRITICAL' });
+    });
+  });
+
   it('muhasebe kaydı düşse bile rezervasyon bozulmaz (tahsilat alınmış, otel açılmış)', async () => {
     const bp = makeBp('PENDING', PATIENT_ID);
     const { handler, platformTenant } = build(bp);
@@ -319,6 +481,81 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     );
     expect(commandBus.execute).not.toHaveBeenCalled();
     expect(bp.status).toBe('BOOKED');
+  });
+
+  it('AYNI referansla tekrar bildirim → iade YOK (idempotent)', async () => {
+    // Stripe teslimatı at-least-once'tır ve iyzico callback'i kullanıcı sayfayı
+    // yenilediğinde tekrar çalışır; ikisi de AYNI providerRef ile gelir. Karar
+    // yerel duruma (`isSettled`) göre verildiğinde bu dal MEŞRU ödemeyi iade
+    // ettiriyordu: hizmet verilmiş, para geri ödenmiş, kayıt hâlâ BOOKED.
+    const bp = makeBp('BOOKED');
+    const { handler, stripeLink, iyzicoLink, commandBus, criticalFailure } =
+      build(bp);
+
+    await handler.execute(
+      new ConfirmBookingPaymentCommand({
+        bookingPaymentId: bp.id.value,
+        provider: 'STRIPE',
+        providerRef: 'pi_first',
+        ctx,
+      })
+    );
+
+    expect(stripeLink.refund).not.toHaveBeenCalled();
+    expect(iyzicoLink.refund).not.toHaveBeenCalled();
+    expect(commandBus.execute).not.toHaveBeenCalled();
+    expect(criticalFailure.publish).not.toHaveBeenCalled();
+    expect(bp.status).toBe('BOOKED');
+  });
+
+  it('iade EDİLMİŞ kayda gelen yeni çekim de iade edilir (sessizce tutulmaz)', async () => {
+    // Karar `isSettled` (PAID|BOOKED) üzerinden verildiğinde FAILED/REFUNDED/
+    // EXPIRED kayıtta ne iade ne alarm vardı: para sessizce bizde kalıyordu.
+    // Ulaşılabilir: iyzico'nun expire API'si yok, yani Stripe ödenip iade
+    // edildikten sonra bile iyzico linki canlı kalıyor.
+    const bp = makeBp('REFUNDED');
+    const { handler, iyzicoLink, criticalFailure } = build(bp);
+
+    await handler.execute(
+      new ConfirmBookingPaymentCommand({
+        bookingPaymentId: bp.id.value,
+        provider: 'IYZICO',
+        providerRef: 'tx_late',
+        ctx,
+      })
+    );
+
+    expect(iyzicoLink.refund).toHaveBeenCalledWith(
+      expect.objectContaining({ providerRef: 'tx_late', currency: 'TRY' })
+    );
+    expect(criticalFailure.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'health-tourism.booking-payment.second-charge',
+        severity: 'WARNING',
+      })
+    );
+  });
+
+  it('ikinci çekimin iadesi başarısızsa KRİTİK alarm üretilir', async () => {
+    const bp = makeBp('BOOKED');
+    const { handler, iyzicoLink, criticalFailure } = build(bp);
+    (iyzicoLink.refund as jest.Mock).mockRejectedValue(new Error('iyzico 500'));
+
+    await handler.execute(
+      new ConfirmBookingPaymentCommand({
+        bookingPaymentId: bp.id.value,
+        provider: 'IYZICO',
+        providerRef: 'tx_2',
+        ctx,
+      })
+    );
+
+    expect(criticalFailure.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'health-tourism.booking-payment.second-charge',
+        severity: 'CRITICAL',
+      })
+    );
   });
 
   it('book başarısız → FAILED → ödeme iade → REFUNDED', async () => {

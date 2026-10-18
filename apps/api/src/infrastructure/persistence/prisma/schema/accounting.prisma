@@ -65,6 +65,21 @@ model AccountingPeriod {
   startsAt DateTime               @map("starts_at")
   endsAt   DateTime               @map("ends_at")
 
+  // Yevmiye numarası sayacı. Numara DAİMA buradan, fişin yazıldığı transaction
+  // içinde `UPDATE ... SET last_entry_no = last_entry_no + 1 ... RETURNING` ile
+  // alınır: satır kilidi numarayı serileştirir (mükerrer imkânsız) ve aynı kilit
+  // dönem kapanışıyla çakışarak kapalı döneme fiş atılmasını da engeller.
+  // MAX(entry_no)+1 YASAK — kilitsiz okuma iki fişe aynı numarayı verir.
+  lastEntryNo BigInt @default(0) @map("last_entry_no")
+
+  // Denetim damgaları: mali yılı kim/ne zaman kapattı, kilitli dönemi kim açtı.
+  lockedAt     DateTime? @map("locked_at")
+  lockedById   String?   @map("locked_by_id")
+  reopenedAt   DateTime? @map("reopened_at")
+  reopenedById String?   @map("reopened_by_id")
+  closedAt     DateTime? @map("closed_at")
+  closedById   String?   @map("closed_by_id")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

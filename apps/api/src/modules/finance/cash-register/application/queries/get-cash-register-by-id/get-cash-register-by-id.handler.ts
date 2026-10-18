@@ -10,12 +10,13 @@ import {
   CASH_REGISTER_QUERY_REPOSITORY,
   ICashRegisterQueryRepository,
 } from '@modules/finance/cash-register/domain/repositories/cash-register/cash-register.query.repository';
+import { CASH_REGISTER_EVENTS } from '@src/domain/constants/events/cash-register.constant';
 
 @QueryHandler(GetCashRegisterByIdQuery)
-export class GetCashRegisterByIdHandler
-  implements
-    IQueryHandler<GetCashRegisterByIdQuery, GetCashRegisterByIdResponse>
-{
+export class GetCashRegisterByIdHandler implements IQueryHandler<
+  GetCashRegisterByIdQuery,
+  GetCashRegisterByIdResponse
+> {
   constructor(
     @Inject(CASH_REGISTER_QUERY_REPOSITORY)
     private readonly cashRegisterRepo: ICashRegisterQueryRepository,
@@ -47,7 +48,7 @@ export class GetCashRegisterByIdHandler
 
     evaluator
       .check((p) => p.canAccessClinicFinances(data.clinicId))
-      .orThrow('cash-register.detail');
+      .orThrow(CASH_REGISTER_EVENTS.DETAIL);
 
     return {
       data,

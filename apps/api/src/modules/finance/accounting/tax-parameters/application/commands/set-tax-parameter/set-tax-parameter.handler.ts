@@ -1,5 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { BadRequestException, Inject } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { TaxParameter } from '@modules/finance/accounting/tax-parameters/domain/entities/tax-parameter.entity';
 import { SetTaxParameterCommand } from './set-tax-parameter.command';
@@ -12,11 +12,14 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
+import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
+import { InvalidTaxValidityRangeException } from '@modules/finance/accounting/tax-parameters/domain/exceptions';
 
 @CommandHandler(SetTaxParameterCommand)
-export class SetTaxParameterHandler
-  implements ICommandHandler<SetTaxParameterCommand, string>
-{
+export class SetTaxParameterHandler implements ICommandHandler<
+  SetTaxParameterCommand,
+  string
+> {
   constructor(
     @Inject(TAX_PARAMETER_COMMAND_REPOSITORY)
     private readonly taxParameterRepo: ITaxParameterCommandRepository,
@@ -32,7 +35,7 @@ export class SetTaxParameterHandler
     this.policyFactory
       .finance(command.ctx.actor, command.ctx.source)
       .evaluator.check((p) => p.actorCanManageTargetClinic(input.clinicId))
-      .orThrow('accounting.tax-parameter.set');
+      .orThrow(ACCOUNTING_EVENTS.TAX_PARAMETER_SET);
     const validFrom = input.validFrom ?? DateTimeManager.create();
 
     return this.txManager.run(async () => {
@@ -45,10 +48,12 @@ export class SetTaxParameterHandler
       );
       if (open) {
         if (validFrom <= open.validFrom) {
-          throw new BadRequestException(
-            'Yeni oranın geçerlilik tarihi mevcut açık sürümden sonra olmalıdır.'
-          );
+          throw new InvalidTaxValidityRangeException(open.validFrom, validFrom);
         }
+        // `close()` zaten kapatılmış bir sürümde sesli hata verir: kilit alındıktan
+        // sonra satırı kapalı görmek, araya eşzamanlı bir güncelleme girdiği
+        // anlamına gelir (409). Sessiz geri dönüş, yeni sürümü yine açıp aynı
+        // anahtar için iki açık sürüm bırakıyordu.
         open.close(validFrom);
         await this.taxParameterRepo.update(open);
       }

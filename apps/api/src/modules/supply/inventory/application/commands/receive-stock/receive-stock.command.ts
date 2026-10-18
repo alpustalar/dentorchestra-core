@@ -7,6 +7,6 @@ export class ReceiveStockCommand implements ICommand {
   constructor(
     public readonly clinicId: string,
     public readonly dto: ReceiveStockDto,
-    public readonly ctx: IGetContext,
+    public readonly ctx: IGetContext
   ) {}
 }

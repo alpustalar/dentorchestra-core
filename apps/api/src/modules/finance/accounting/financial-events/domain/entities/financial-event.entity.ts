@@ -6,6 +6,11 @@ import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema'
 import { RecordFinancialEventProps } from '@modules/finance/accounting/financial-events/domain/contracts/financial-event';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { validateFinancialEventPayload } from '@modules/finance/shared/domain/contracts/financial-event-payload.schemas';
+import {
+  FinancialEventFutureDateException,
+  FinancialEventPayloadInvalidException,
+} from '@modules/finance/accounting/financial-events/domain/exceptions';
 
 /**
  * Değişmez (append-only) ekonomik olay. Bir kez yazılır, asla güncellenmez.
@@ -90,13 +95,29 @@ export class FinancialEvent extends AggregateRoot {
     const clinicId = UUID.create(props.clinicId).orThrow();
 
     const now = DateTimeManager.create();
+    const occurredAt = props.occurredAt ?? now;
+
+    // Olay defteri append-only: yanlış gövde bir kez yazılınca düzeltilemez ve
+    // fiş ya hiç üretilemez ya da yanlış üretilir. Doğrulama bu yüzden kapıda.
+    const issues = validateFinancialEventPayload(props.type, props.payload);
+    if (issues.length > 0) {
+      throw new FinancialEventPayloadInvalidException(props.type, issues);
+    }
+
+    // İleri tarihli ekonomik olay yazılamaz: henüz gerçekleşmemiş bir işlemi
+    // deftere işlemek (ve gelecekteki bir döneme kayıt düşürmek) denetimde
+    // doğrudan kırmızı bayraktır. Sınır **günün sonu**: saat kaymasını ve
+    // saat dilimi farkını yutar ama "gelecek aya tarihli" kaydı durdurur.
+    if (DateTimeManager.isAfter(occurredAt, DateTimeManager.endOfDay(now))) {
+      throw new FinancialEventFutureDateException(occurredAt);
+    }
 
     const event = new FinancialEvent({
       id: UUID.createOrGenerate(props.id).value,
       organizationId: organizationId.value,
       clinicId: clinicId.value,
       type: props.type,
-      occurredAt: props.occurredAt ?? now,
+      occurredAt,
       payload: props.payload as JsonValue,
       sourceModule: props.sourceModule,
       sourceRefId: props.sourceRefId ?? null,
@@ -109,6 +130,7 @@ export class FinancialEvent extends AggregateRoot {
     event.addDomainEvent(
       new FinancialEventRecordedEvent({
         financialEventId: event.id.value,
+        clinicId: event.clinicId.value,
         organizationId: event.organizationId.value,
         type: event.type,
       })

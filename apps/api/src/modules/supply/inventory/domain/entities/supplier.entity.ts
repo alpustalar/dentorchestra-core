@@ -14,7 +14,7 @@ import { DateTimeManager } from '@common/infrastructure/date-time/date-time.mana
 export class Supplier extends AggregateRoot {
   constructor(data: ISupplier) {
     super();
-    
+
     this._id = UUID.fromTrusted(data.id);
     this._name = Name.fromTrusted(data.name);
 

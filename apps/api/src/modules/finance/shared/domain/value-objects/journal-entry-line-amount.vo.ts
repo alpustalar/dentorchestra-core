@@ -1,8 +1,9 @@
-import { BadRequestException } from '@nestjs/common'; // Eğer domain dışı hata kullanıyorsan kalsın, yoksa saf Error'a çekersin
 import { z } from 'zod';
+import { InvalidJournalLineAmountException } from '@modules/finance/shared/domain/exceptions';
 import { Decimal } from 'decimal.js';
 import { Currency } from '@src/domain/value-objects/currency.vo';
 import { CurrencySchema } from '@input-type-schemas/CurrencySchema';
+import { Money } from '@src/domain/value-objects/money.vo';
 
 export class JournalEntryLineAmount {
   private static readonly schema = z
@@ -21,7 +22,22 @@ export class JournalEntryLineAmount {
     .refine((data) => !data.debit.isZero() || !data.credit.isZero(), {
       message:
         'Yevmiye satırında borç veya alacak alanlarından en az biri sıfırdan büyük olmalıdır.',
-    });
+    })
+    // Kuruş ölçeği — defterin **kendi** kapısı. Üstteki üç kapı (olay gövdesi
+    // regex'i, kuralların `toFixed(2)`'si, çevrimin `Money.scale`'i) bugün bunu
+    // zaten sağlıyor; ama hiçbiri yevmiyenin kendi kuralı değil. Kapı burada
+    // olmadığında üçüncü basamak taşıyan bir satır `Decimal(14,2)` kolonunda
+    // sessizce yuvarlanır ve DENGE KONTROLÜNDEN SONRA bozulur: uygulama
+    // Σborç = Σalacak görür, veritabanı bir kuruş şaşmış fiş saklar. Mizan
+    // yine "dengeli" görünür çünkü fark fişin içinde kalır.
+    .refine(
+      (data) =>
+        Money.isKurusScaled(data.debit) && Money.isKurusScaled(data.credit),
+      {
+        message:
+          'Yevmiye satırı tutarı en çok iki ondalık hane taşıyabilir (kuruş ölçeği).',
+      }
+    );
 
   private readonly _debit: Decimal;
   private readonly _credit: Decimal;
@@ -55,7 +71,9 @@ export class JournalEntryLineAmount {
     });
 
     if (!result.success) {
-      throw new BadRequestException(result.error.message);
+      throw new InvalidJournalLineAmountException(
+        result.error.issues.map((issue) => issue.message).join(' ')
+      );
     }
 
     return new JournalEntryLineAmount(

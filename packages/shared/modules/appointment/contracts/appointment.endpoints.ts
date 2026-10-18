@@ -2,16 +2,14 @@ import { defineEndpoint } from '@shared/common/contracts/endpoint';
 import type { Appointment } from '@shared/generated-zod/modelSchema/AppointmentSchema';
 import {
   CancelAppointmentSchema,
-  ScheduleAppointmentSchema,
-  StaffRescheduleSchema,
-  UpdateAppointmentDetailsSchema,
-} from '../schemas/command';
-import {
   GetClinicAppointmentsSchema,
   GetClinicCalendarSchema,
   GetClinicDailySummarySchema,
   GetWaitingRoomSchema,
-} from '../schemas/queries';
+  ScheduleAppointmentSchema,
+  StaffRescheduleSchema,
+  UpdateAppointmentDetailsSchema,
+} from '@shared/modules';
 import type {
   ClinicCalendarDay,
   ClinicDailySummary,

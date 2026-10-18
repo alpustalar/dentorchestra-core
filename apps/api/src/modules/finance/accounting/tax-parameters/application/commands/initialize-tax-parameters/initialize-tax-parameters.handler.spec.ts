@@ -34,9 +34,9 @@ describe('InitializeTaxParametersHandler', () => {
     expect(commandRepo.createMany).toHaveBeenCalledTimes(1);
     const seeded = commandRepo.createMany.mock.calls[0][0];
     expect(seeded).toHaveLength(TAX_PARAMETER_DEFAULTS.length);
-    expect(seeded.every((p: { validTo: Date | null }) => p.validTo === null)).toBe(
-      true
-    );
+    expect(
+      seeded.every((p: { validTo: Date | null }) => p.validTo === null)
+    ).toBe(true);
   });
 
   it('idempotent: parametre zaten varsa hiçbir şey yapmaz', async () => {
