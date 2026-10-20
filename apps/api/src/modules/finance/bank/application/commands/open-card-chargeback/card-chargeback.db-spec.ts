@@ -6,12 +6,12 @@ import {
   ledgerBalance,
   LocalCommandBus,
   makeCtx,
-  recordAndPost,
+  seedCollectedInstallment as seedCollectedInstallmentFor,
   seedLedger,
+  seedPatient,
 } from '@src/testing/finance-db/finance-db.harness';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { PostFinancialEventCommand } from '@modules/finance/accounting/posting/application/commands/post-financial-event/post-financial-event.command';
-import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 import { CardChargebackCommandRepository } from '@modules/finance/bank/infrastructure/persistence/prisma/repositories/card-chargeback/card-chargeback.command.repository';
 import { BankAccountCommandRepository } from '@modules/finance/bank/infrastructure/persistence/prisma/repositories/bank-account/bank-account.command.repository';
 import { PaymentCommandRepository } from '@modules/finance/payment/infrastructure/persistence/prisma/repositories/payment/payment.command.repository';
@@ -53,15 +53,7 @@ describe('Kart itirazı — gerçek DB (ONLINE_PAYMENT kaynağı)', () => {
     harness = await createFinanceDbHarness();
     ledger = await seedLedger(harness);
 
-    patientId = UUID.generate().value;
-    await harness.prisma.patient.create({
-      data: {
-        id: patientId,
-        organizationId: ledger.organizationId,
-        clinicId: ledger.clinicId,
-        firstName: 'Test',
-      },
-    });
+    patientId = await seedPatient(harness, ledger);
 
     const prisma = harness.prisma;
     const chargebackRepo = new CardChargebackCommandRepository(prisma);
@@ -142,37 +134,8 @@ describe('Kart itirazı — gerçek DB (ONLINE_PAYMENT kaynağı)', () => {
     await harness.close();
   });
 
-  /** Tamamlanmış kart taksidi + defterde yazılı `PAYMENT_RECEIVED` (108 dolar). */
-  async function seedCollectedInstallment(amount: string) {
-    const paymentId = UUID.generate().value;
-    const installmentId = UUID.generate().value;
-    await harness.prisma.payment.create({
-      data: {
-        id: paymentId,
-        clinicId: ledger.clinicId,
-        patientId,
-        totalAmount: amount,
-        status: 'COMPLETED',
-        installments: {
-          create: {
-            id: installmentId,
-            installmentNo: 1,
-            amount,
-            method: 'CREDIT_CARD',
-            status: 'COMPLETED',
-            paidAt: new Date(),
-          },
-        },
-      },
-    });
-    await recordAndPost(harness, {
-      ledger,
-      type: 'PAYMENT_RECEIVED',
-      payload: { method: 'POS_CARD', amount, partyId: ledger.partyId },
-      dedupeKey: FinancialEventDedupeKeys.payment_received(installmentId),
-    });
-    return { paymentId, installmentId };
-  }
+  const seedCollectedInstallment = (amount: string) =>
+    seedCollectedInstallmentFor(harness, { ledger, patientId, amount });
 
   const open = (
     installmentId: string,

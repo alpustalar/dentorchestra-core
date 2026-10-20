@@ -42,6 +42,8 @@ import { GetChartOfAccountsQuery } from '@modules/finance/accounting/chart-of-ac
 import { GetClinicCurrencyQuery } from '@modules/organization/clinic/application/queries/get-clinic-currency/get-clinic-currency.query';
 import { RecordFinancialEventHandler } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.handler';
 import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
+import { DefaultValidateOptions } from '@common/domain/constants/default-options.constant';
+import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 import { FinancialEventTypeType as FinancialEventType } from '@input-type-schemas/FinancialEventTypeSchema';
 import { InputJsonValueType as InputJsonValue } from '@input-type-schemas/InputJsonValueSchema';
 
@@ -64,6 +66,10 @@ const FAKE_CTX = { actor: {}, source: 'SYSTEM' } as any;
 const ALLOW_CHAIN: any = { check: () => ALLOW_CHAIN, orThrow: () => undefined };
 export const allowAllPolicyFactory: any = {
   finance: () => ({ evaluator: ALLOW_CHAIN, policy: {} }),
+  entity: () => ({
+    evaluator: ALLOW_CHAIN,
+    policy: { getValidateOptions: () => DefaultValidateOptions },
+  }),
 };
 
 export function makeCtx(userId: string): any {
@@ -365,4 +371,68 @@ export async function ledgerBalance(
     0
   );
   return kurus / 100;
+}
+
+export async function seedPatient(
+  harness: FinanceDbHarness,
+  ledger: LedgerFixture
+): Promise<string> {
+  const id = UUID.generate().value;
+  await harness.prisma.patient.create({
+    data: {
+      id,
+      organizationId: ledger.organizationId,
+      clinicId: ledger.clinicId,
+      firstName: 'Test',
+    },
+  });
+  return id;
+}
+
+/**
+ * Tamamlanmış kart taksidi + iyzico işlem kaydı + defterde yazılı `PAYMENT_RECEIVED`
+ * (108 dolar). İtiraz ve iade akışlarının ortak başlangıç durumu.
+ */
+export async function seedCollectedInstallment(
+  harness: FinanceDbHarness,
+  params: { ledger: LedgerFixture; patientId: string; amount: string }
+): Promise<{ paymentId: string; installmentId: string }> {
+  const { ledger, patientId, amount } = params;
+  const paymentId = UUID.generate().value;
+  const installmentId = UUID.generate().value;
+  await harness.prisma.payment.create({
+    data: {
+      id: paymentId,
+      clinicId: ledger.clinicId,
+      patientId,
+      totalAmount: amount,
+      status: 'COMPLETED',
+      installments: {
+        create: {
+          id: installmentId,
+          installmentNo: 1,
+          amount,
+          method: 'CREDIT_CARD',
+          status: 'COMPLETED',
+          paidAt: new Date(),
+        },
+      },
+    },
+  });
+  await harness.prisma.iyzicoTransaction.create({
+    data: {
+      id: UUID.generate().value,
+      installmentId,
+      conversationId: UUID.generate().value,
+      iyzicoPaymentTransactionId: `pt-${installmentId}`,
+      status: 'SUCCESS',
+    },
+  });
+  await recordAndPost(harness, {
+    ledger,
+    type: 'PAYMENT_RECEIVED',
+    payload: { method: 'POS_CARD', amount, partyId: ledger.partyId },
+    dedupeKey: FinancialEventDedupeKeys.payment_received(installmentId),
+  });
+  return { paymentId, installmentId };
 }

@@ -6801,3 +6801,19 @@ sınanmıştı. Bu tur o düzeneği **kalıcı** yaptı ve akışların büyük 
 **Devredilen kural (CLAUDE.md kural 22).** *Bir kapı, beslendiği veriyi yazan akışın gecikmesini hesaba katar (fişlenmemiş
 talepler düşülür); ham SQL'de `void` dönen fonksiyon `$executeRaw` ile çağrılır. İkisi de mock'ta görünmez, gerçek DB'de
 ilk çalıştırmada görünür.*
+
+## 96. Gerçek-DB turu devamı — sanal POS iadesi (tur 34b, 2026-10-21)
+
+Kural 17'nin iade ↔ itiraz ortak tavanı §95'te yalnız itiraz tarafından sınanmıştı. `refund-payment.db-spec.ts` iade tarafını
+gerçek DB'de çalıştırdı (SDK taklit, geri kalan gerçek): başarılı iade (taksit + iyzico kaydı `REFUNDED`, `PAYMENT_REFUNDED`
+olayı fişlenir, 108 geri alınır), sağlayıcı reddi (yerel durum/olay değişmez), ikinci iade sağlayıcıya gitmez, **açık itiraz
+varken iade sağlayıcıya gitmeden reddedilir**, iade edilmiş takside itiraz açılamaz. Ortak başlangıç durumu için
+`seedPatient`/`seedCollectedInstallment` harness'e taşındı.
+
+| # | Önem | Bulgu | Durum |
+| --- | --- | --- | --- |
+| 1 | **P2** (açık, §88 ertelemesi kanıtlandı) | İade yolu SDK çağrısından önce taksidi kilitlemiyor ve işaretlemiyor. İade uçuştayken (80 ms sonra) açılan itiraz iadeyi engellemiyor: **ikisi de başarılı olur**, para kart sahibine iki kez gider (bir kez sağlayıcı kesintisi, bir kez iade). Gerçek DB'de yarış ölçüldü | `it.failing` testi olarak duruyor — açık kapanınca "beklenmedik geçti" ile kırılıp normal teste çevrilir. Düzeltme tasarım ister (iade öncesi `REFUND_PENDING` işareti + kilit; kural 18(d) deseni), bu turda yapılmadı. Olasılık düşük: itirazın elle girilmesi gerekir |
+| 2 | gözlem | SDK çağrısı **fırlatırsa** (zaman aşımı) yerel durum değişmiyor, girişim kaydı da yok: iade sağlayıcıda başarılı olmuş olabilir ama sistemde iz yok (kural 18: `UNKNOWN` üç durumlu sonuç bu yolda yok). Tekrar denemede iyzico "zaten iade" diyeceği için çift iade olmaz, ama taksit `COMPLETED` kalır | Kapsam dışı (yeni durum modeli ister); `10` paket 3 altında izlenir |
+
+Kalan (paket 23): fiziksel POS iade/iptal (pax, iyzico terminal), sanal POS iptal, booking-payment iade claim'leri,
+`POS_TRANSACTION`/`BOOKING_PAYMENT` itirazı. Doğrulama: `pnpm test:db` 6 suite / **58** test (biri `it.failing`).
