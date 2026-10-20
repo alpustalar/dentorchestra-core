@@ -1,4 +1,10 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import CardChargebackSourceSchema from '@input-type-schemas/CardChargebackSourceSchema';
+import {
+  CARD_CHARGEBACK_EXPOSURE_GUARD,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
+import { Decimal } from 'decimal.js';
 import { CancelPaymentCommand } from './cancel-payment.command';
 import { CancelPaymentCommandResponse } from './cancel-payment.response';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
@@ -52,7 +58,9 @@ export class CancelPaymentHandler implements ICommandHandler<
     private readonly commandBus: TSCommandBus,
     private readonly queryBus: TSQueryBus,
     @Inject(POLICY_FACTORY)
-    private readonly policyFactory: IPolicyFactory
+    private readonly policyFactory: IPolicyFactory,
+    @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
+    private readonly chargebackExposureGuard: ICardChargebackExposureGuard
   ) {}
 
   async execute(
@@ -82,6 +90,22 @@ export class CancelPaymentHandler implements ICommandHandler<
 
     if (!completedInstallment)
       throw new CompletedInstallmentNotFoundException();
+
+    // Kart itirazı da aynı taksidin aynı tutarına dokunur: açık ya da kaybedilmiş
+    // bir itiraz varken iade/iptal parayı kart sahibine İKİ KEZ götürürdü (bir kez
+    // sağlayıcı kesintisi, bir kez bizim iademiz). Kontrol dış SDK çağrısından
+    // ÖNCE — sonra olsaydı para çoktan hareket etmişti.
+    // Not: bu yolda taksit satırı kilitlenmiyor ve PENDING işareti yok; SDK
+    // uçuştayken kaydedilen bir itiraz yakalanmaz (§88 ertelemesi).
+    const completedAmount = new Decimal(completedInstallment.amount.toString());
+    await this.chargebackExposureGuard.assertReversalWithinCollection({
+      sourceType: CardChargebackSourceSchema.enum.ONLINE_PAYMENT,
+      sourceId: completedInstallment.id,
+      collectedAmount: completedAmount,
+      // COMPLETED taksit henüz iade edilmemiştir (iade → REFUNDED durumuna geçer).
+      alreadyReversedAmount: new Decimal(0),
+      requestedAmount: completedAmount,
+    });
 
     // İptal çağrısı için dış referans (iyzicoPaymentId). Kayıt az önce yazılmış
     // olabileceğinden okuma command repo'dan (ana bağlantı) yapılır; bu akış iyzico

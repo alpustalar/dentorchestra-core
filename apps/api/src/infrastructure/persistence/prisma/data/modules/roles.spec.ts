@@ -90,6 +90,33 @@ describe('rol seed matrisi — yetki sınırları', () => {
     );
   });
 
+  it('ADMIN rezervasyon iadesini elle doğrulayabilir (tek sahip)', () => {
+    expect(capabilityKeys(ROLE_SLUGS.ADMIN)).toEqual(
+      expect.arrayContaining([
+        'bookingpaymentrefund:read',
+        'bookingpaymentrefund:update',
+      ])
+    );
+  });
+
+  it('rezervasyon iadesinin elle doğrulanması (para kararı) ADMIN dışında hiçbir rol demetinde yoktur', () => {
+    // Kural 7: sonucu doğrulanmamış bir iadeyi kapatmak kalıcı damgalı bir para kararıdır.
+    // `bookingpayment:update` klinik sahibi/şube müdürü/resepsiyonda var; bu yüzden ayrı bir
+    // aile açıldı ve YALNIZ ADMIN'e (tüm yetkiler) kalır — bir role eklenirse bu test düşer ve
+    // karar görünür olur.
+    const nonAdminRoles = rolesCreateManyInputs.filter(
+      (role) => role.slug !== ROLE_SLUGS.ADMIN
+    );
+
+    for (const role of nonAdminRoles) {
+      const held = role.caps
+        .map(keyOf)
+        .filter((key) => key.startsWith('bookingpaymentrefund:'));
+
+      expect({ role: role.slug, held }).toEqual({ role: role.slug, held: [] });
+    }
+  });
+
   it('hekim ticari/finansal alana giremez', () => {
     const keys = capabilityKeys(ROLE_SLUGS.PROVIDER);
 

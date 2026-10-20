@@ -1,4 +1,9 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import CardChargebackSourceSchema from '@input-type-schemas/CardChargebackSourceSchema';
+import {
+  CARD_CHARGEBACK_EXPOSURE_GUARD,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
 import { Inject, Logger } from '@nestjs/common';
 import {
   OriginalPosTransactionNotFoundException,
@@ -51,7 +56,9 @@ export class PaxVoidHandler implements ICommandHandler<
     private readonly posPaymentSync: PosPaymentSyncService,
     private readonly accountingBridge: PosAccountingBridgeService,
     @Inject(POLICY_FACTORY)
-    private readonly policyFactory: IPolicyFactory
+    private readonly policyFactory: IPolicyFactory,
+    @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
+    private readonly chargebackExposureGuard: ICardChargebackExposureGuard
   ) {}
 
   async execute(command: PaxVoidCommand): Promise<PaxVoidResponse> {
@@ -108,6 +115,16 @@ export class PaxVoidHandler implements ICommandHandler<
         if (reversal.hasActiveVoid || reversal.refundedAmount.greaterThan(0)) {
           throw new PosTransactionAlreadyReversedException();
         }
+
+        // İptal satışın TAMAMINI geri götürür: açık ya da kaybedilmiş bir kart
+        // itirazı varsa aynı para iki kez (iptal + sağlayıcı kesintisi) gider.
+        await this.chargebackExposureGuard.assertReversalWithinCollection({
+          sourceType: CardChargebackSourceSchema.enum.POS_TRANSACTION,
+          sourceId: originalTx.id.value,
+          collectedAmount: originalTx.amount.value,
+          alreadyReversedAmount: reversal.refundedAmount,
+          requestedAmount: originalTx.amount.value,
+        });
 
         const device = await this.posDeviceRepo.findById(
           originalTx.posDeviceId

@@ -7,6 +7,8 @@ import {
   INBOUND_PAYMENT_METHODS,
   OUTBOUND_PAYMENT_METHODS,
 } from '@shared/common/constants';
+import { RETURNABLE_CHARGE_REASONS } from '@modules/finance/shared/domain/constants/returnable-charge.constant';
+import { CHARGEBACK_FUNDS_CHANNELS } from '@modules/finance/shared/domain/constants/chargeback-funds.constant';
 
 /**
  * Ekonomik olay gövdelerinin (payload) yazma-anı sözleşmesi.
@@ -182,6 +184,51 @@ const providerSettlementReceived = z
     'Brüt tutar net + komisyona eşit olmalı (fişin dengesi bu eşitliktir).'
   );
 
+/**
+ * Kart itirazı gövdeleri. Kanal kabul kümesi **tek sabitten** gelir
+ * (`CHARGEBACK_FUNDS_CHANNELS`): kapı (burası), kullanım yeri (posting kuralı
+ * hesap eşlemesi) ve DB enum'u aynı kümeyi okur — kural 12.
+ *
+ * Para birimi **zorunlu** (hesap kapamasındaki gibi): itiraz fişi sağlayıcının
+ * kestiği paranın cinsinden yazılır, varsayılana düşmez.
+ */
+const chargebackFundsChannel = z.enum(CHARGEBACK_FUNDS_CHANNELS);
+
+/**
+ * Açılış: `B 127 tutar / A 108|102 tutar` (+ ücret > 0 ise `B 653 ücret / A 108|102 ücret`).
+ * Ücret sıfır olabilir (ücretsiz itiraz) — o zaman 653 satırı yazılmaz.
+ */
+const cardChargebackOpened = z.object({
+  amount: positiveAmount,
+  feeAmount: amount,
+  fundsChannel: chargebackFundsChannel,
+  currency: CurrencySchema,
+  provider: z.string().min(1),
+  caseReference: z.string().min(1),
+});
+
+/** Kazanıldı: `B 108|102 tutar / A 127 tutar`. */
+const cardChargebackWon = z.object({
+  amount: positiveAmount,
+  fundsChannel: chargebackFundsChannel,
+  currency: CurrencySchema,
+  provider: z.string().min(1),
+  caseReference: z.string().min(1),
+});
+
+/**
+ * Kaybedildi: `B 120 (hasta) tutar / A 127 tutar`. 120 `requiresParty` taşıdığı
+ * için cari **zorunlu**: gövde append-only olduğundan eksik cari, postlanamayan
+ * ölümsüz bir olay bırakırdı (bkz. `platformBookingSettled` gerekçesi).
+ */
+const cardChargebackLost = z.object({
+  amount: positiveAmount,
+  partyId,
+  currency: CurrencySchema,
+  provider: z.string().min(1),
+  caseReference: z.string().min(1),
+});
+
 const platformBookingSettled = z
   .object({
     saleAmount: positiveAmount,
@@ -246,6 +293,21 @@ const platformBookingRefunded = z
     );
   }, 'Yabancı para temeli eksiksiz olmak zorunda: originalCurrency + fxRate + orijinal tutarlar ya birlikte gelir ya hiç gelmez');
 
+/**
+ * Müşteriye iade edilecek tahsilat (çift çekim / başarısız rezervasyon). İki olay tipi (alındı /
+ * iade doğrulandı) aynı gövdeyi taşır. `currency` v1'de yalnız TRY: iyzico TRY çeker ve iade
+ * eder; yabancı para (Stripe) bu akışa bilinçli alınmadı (Stripe kapalı, kur farkı tanınmıyor).
+ */
+const platformReturnableCharge = z.object({
+  amount: positiveAmount,
+  currency: z.literal(CurrencySchema.enum.TRY),
+  provider: z.string().min(1),
+  chargeReference: z.string().min(1),
+  reason: z.enum(RETURNABLE_CHARGE_REASONS),
+  bookingPaymentId: z.uuid('Ödeme kaydı kimliği UUID olmalı'),
+  refundId: z.uuid('İade kaydı kimliği UUID olmalı'),
+});
+
 /** Miktar: stok kolonlarının ölçeği (3 ondalık) — tutar değil, adet. */
 const quantity = z
   .string()
@@ -284,8 +346,13 @@ export const FINANCIAL_EVENT_PAYLOAD_SCHEMAS: Partial<
   [T.PAYROLL_ACCRUED]: payrollAccrued,
   [T.CASH_SESSION_CLOSED]: cashSessionClosed,
   [T.PROVIDER_SETTLEMENT_RECEIVED]: providerSettlementReceived,
+  [T.CARD_CHARGEBACK_OPENED]: cardChargebackOpened,
+  [T.CARD_CHARGEBACK_WON]: cardChargebackWon,
+  [T.CARD_CHARGEBACK_LOST]: cardChargebackLost,
   [T.PLATFORM_BOOKING_SETTLED]: platformBookingSettled,
   [T.PLATFORM_BOOKING_REFUNDED]: platformBookingRefunded,
+  [T.PLATFORM_RETURNABLE_CHARGE_RECEIVED]: platformReturnableCharge,
+  [T.PLATFORM_RETURNABLE_CHARGE_REFUNDED]: platformReturnableCharge,
   [T.STOCK_OUT]: stockMovementPosted,
   [T.STOCK_IN]: stockMovementPosted,
 };

@@ -19,6 +19,13 @@ export const PaymentInstallmentSchema = z.object({
   dueDate: z.coerce.date().nullable(),
   paidAt: z.coerce.date().nullable(),
   note: z.string().nullable(),
+  /**
+   * Bu taksit, ters ibrazla (chargeback) geri alınan hangi taksidin YERİNE açıldı.
+   * Telafi taksiti hastadan yeniden tahsil edilecek aynı tutardır; `@unique` bir
+   * taksidin yalnız bir telafisi olabileceğini DB'de sabitler (aynı itirazın
+   * yeniden işlenmesi ikinci bir alacak doğurmasın).
+   */
+  recoversInstallmentId: z.string().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })

@@ -47,10 +47,10 @@ export class BookingPaymentQueryRepository
           // çalışmadıysa (PAID → FAILED → REFUNDED) hiçbir fiş borçlu değildir.
           bookingReference: { not: null },
           ...(filter.clinicId ? { clinicId: filter.clinicId } : {}),
-          // İki yön iki ayrı tarihte yaşar: tahsilat `paidAt`, iade `refundedAt`.
-          // Tek tarihe bakmak, geçen dönem tahsil edilip bu dönem iade edilen bir
-          // rezervasyonun eksik fişini görünmez yapardı.
-          OR: [{ paidAt: window }, { refundedAt: window }],
+          // Yalnız tahsilat yönü: pencere `paidAt`'e uygulanır. İade yönü iade
+          // SATIRLARINDAN gelir (`BookingPaymentRefundQueryRepository.findBridgeable`) —
+          // `refundedAt` burada "iade talep edildi" demekti ve reddedilen iadede de dolardı.
+          paidAt: window,
         },
         select: {
           id: true,
@@ -59,7 +59,6 @@ export class BookingPaymentQueryRepository
           status: true,
           paidProvider: true,
           paidAt: true,
-          refundedAt: true,
         },
         orderBy: { paidAt: 'asc' },
       })
@@ -71,7 +70,6 @@ export class BookingPaymentQueryRepository
           status: row.status,
           paidProvider: row.paidProvider,
           paidAt: row.paidAt,
-          refundedAt: row.refundedAt,
         }))
       );
   }

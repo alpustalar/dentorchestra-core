@@ -1,4 +1,9 @@
 import { ForbiddenException } from '@nestjs/common';
+import {
+  AssertReversalWithinCollectionParams,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
+import { CollectionUnderChargebackException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 import { PaxVoidHandler } from './pax-void.handler';
 import { PaxVoidCommand } from './pax-void.command';
 import { PosTransaction } from '@modules/finance/pos/physical/domain/entities/pos-transaction.entity';
@@ -16,7 +21,7 @@ import { PosPaymentSyncService } from '@modules/finance/pos/physical/application
 import { PosAccountingBridgeService } from '@modules/finance/pos/physical/application/services/pos-accounting-bridge.service';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import PosTransactionKindSchema from '@input-type-schemas/PosTransactionKindSchema';
 import CurrencySchema from '@input-type-schemas/CurrencySchema';
 import { Decimal } from 'decimal.js';
@@ -146,6 +151,19 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
       }),
     } as never;
 
+    // Kart itirazı kapısı: varsayılan olarak geçirir. Çağrı, iade/iptal kararını
+    // besleyen kilitli okumalarla AYNI transaction derinliğinde olmak zorundadır.
+    const assertReversal = jest.fn<
+      Promise<void>,
+      [AssertReversalWithinCollectionParams]
+    >(() => {
+      depthAtCall.chargebackGuard = txDepth;
+      return Promise.resolve();
+    });
+    const chargebackGuard = {
+      assertReversalWithinCollection: assertReversal,
+    } as unknown as ICardChargebackExposureGuard;
+
     return {
       handler: new PaxVoidHandler(
         posDeviceRepo,
@@ -154,7 +172,8 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
         txManager,
         posPaymentSync,
         accountingBridge,
-        policyFactory
+        policyFactory,
+        chargebackGuard
       ),
       posTransactionRepo,
       findByIdForUpdate,
@@ -164,6 +183,7 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
       voidCall,
       bridgeRecord,
       depthAtCall,
+      assertReversal,
     };
   };
 
@@ -312,5 +332,47 @@ describe('PaxVoidHandler — iptal (kilit + ters kayıt bağı)', () => {
     expect(created).toHaveLength(1);
     expect(created[0].initiatedById).toBe(ctx.actor.userId);
     expect(created[0].initiatedById).not.toBe(sale.initiatedById);
+  });
+
+  it('kart itirazı kapısı kümülatif tutarlarla ve kilit altında çağrılır', async () => {
+    // Para geri götüren her yol (iade, iptal, ters ibraz) aynı kümülatif tavana
+    // bakar; biri diğerini bilmiyorsa kart sahibine para İKİ KEZ gider.
+    const sale = makeSuccessfulSale();
+    const { handler, assertReversal, depthAtCall } = build(sale);
+
+    await handler.execute(commandFor(sale));
+
+    expect(assertReversal).toHaveBeenCalledTimes(1);
+    const params = assertReversal.mock.calls[0][0];
+    expect(params.sourceType).toBe('POS_TRANSACTION');
+    expect(params.sourceId).toBe(sale.id.value);
+    expect(params.collectedAmount.toFixed(2)).toBe(
+      sale.amount.value.toFixed(2)
+    );
+    expect(params.alreadyReversedAmount.toFixed(2)).toBe('0.00');
+    expect(params.requestedAmount.toFixed(2)).toBe(
+      sale.amount.value.toFixed(2)
+    );
+    // Karar besleyen okumalarla aynı transaction'da (kilit kapsamında).
+    expect(depthAtCall.chargebackGuard).toBe(1);
+  });
+
+  it('açık/kaybedilmiş kart itirazı varken iptal reddedilir — cihaza gidilmez, kayıt açılmaz', async () => {
+    const sale = makeSuccessfulSale();
+    const { handler, assertReversal, created } = build(sale);
+    assertReversal.mockRejectedValueOnce(
+      new CollectionUnderChargebackException({
+        collected: sale.amount.value.toFixed(2),
+        alreadyReversed: '0.00',
+        activeChargebacks: sale.amount.value.toFixed(2),
+        requested: sale.amount.value.toFixed(2),
+      })
+    );
+
+    await expect(handler.execute(commandFor(sale))).rejects.toBeInstanceOf(
+      CollectionUnderChargebackException
+    );
+
+    expect(created).toHaveLength(0);
   });
 });

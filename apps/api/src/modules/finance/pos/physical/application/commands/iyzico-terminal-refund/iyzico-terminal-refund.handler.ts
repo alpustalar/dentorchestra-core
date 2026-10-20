@@ -1,4 +1,9 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import CardChargebackSourceSchema from '@input-type-schemas/CardChargebackSourceSchema';
+import {
+  CARD_CHARGEBACK_EXPOSURE_GUARD,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
 import { Inject, Logger } from '@nestjs/common';
 import {
   OriginalPosTransactionNotFoundException,
@@ -59,7 +64,9 @@ export class IyzicoTerminalRefundHandler implements ICommandHandler<
     private readonly posPaymentSync: PosPaymentSyncService,
     private readonly accountingBridge: PosAccountingBridgeService,
     @Inject(POLICY_FACTORY)
-    private readonly policyFactory: IPolicyFactory
+    private readonly policyFactory: IPolicyFactory,
+    @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
+    private readonly chargebackExposureGuard: ICardChargebackExposureGuard
   ) {}
 
   async execute(
@@ -132,6 +139,17 @@ export class IyzicoTerminalRefundHandler implements ICommandHandler<
       ) {
         throw new RefundAmountExceedsOriginalException();
       }
+
+      // Kart itirazı da aynı satışın aynı tutarına dokunur: iade + aktif
+      // itirazlar satışı aşarsa kart sahibine para İKİ KEZ gider (bir kez
+      // sağlayıcı kesintisi, bir kez bizim iademiz).
+      await this.chargebackExposureGuard.assertReversalWithinCollection({
+        sourceType: CardChargebackSourceSchema.enum.POS_TRANSACTION,
+        sourceId: originalTx.id.value,
+        collectedAmount: originalAmount,
+        alreadyReversedAmount: reversal.refundedAmount,
+        requestedAmount: refundAmount,
+      });
 
       const device = await this.posDeviceRepo.findById(originalTx.posDeviceId);
       if (!device) {

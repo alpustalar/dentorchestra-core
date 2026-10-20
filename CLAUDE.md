@@ -2616,7 +2616,7 @@ listener'da `try/catch` ile yutuluyorsa, outbox'ın at-least-once garantisi ipta
 
 **5. Takvime bağlı ön koşullar otomasyona bağlanır.** Muhasebe dönemi, vergi parametresi gibi
 yıl/ay dönümünde yenilenmesi gereken kayıtlar yalnız kurulum akışında açılıyorsa, dönüm gününde
-tüm yazma yolu sessizce durur. Bu kayıtlar idempotent bir zamanlanmış işle önceden açılır.
+tüm yazma yolu sessizce durur. Bu kayıtlar idempotent bir zamanlanmış işle önceden açılır. **Zamanlanmış işin kapsamı "zaten kaydı olan kiracılar"dan türetilmez**: kaydı hiç olmayan (ör. normal kayıt akışından geçmeyen platform kiracısı) sonsuza dek dışarıda kalır; kapsam kaynak listeden (kiracı tablosu) ya da açıkça sayılan istisnalarla kurulur.
 
 **6. Dönem kapanışı ön koşulsuz çalıştırılmaz.** Kapanış öncesi "fişlenmemiş ekonomik olay var mı"
 kontrolü zorunludur (bkz. `documents/finans/04-muhasebe-defterler.md` §5 adım 1): dönem
@@ -2745,6 +2745,40 @@ tanımlanır; kapatma akışı erteleniyorsa hangi hesabın hangi koşulda kapan
 hazır değer hesabı alacak bakiyesine düşer — imkânsız bir durum — ve karşılığında gelmemiş para
 102'ye girer. Bakiye binlerce satırın toplamı olduğu için kilitlenecek bir satırı yoktur: isme
 danışma kilidi (`lockConcept` + `lockAndGetAccountBalance`) tek atomik metotta tutulur.
+
+**17. Parayı kart sahibine geri götüren her yol aynı kümülatif tavanı paylaşır ve aynı kaynak
+satırını kilitler.** Üç yol vardır: iade, iptal ve ters ibraz (kart itirazı — kart sahibi bankasına
+itiraz eder, sağlayıcı parayı geri keser). Üçü de aynı satışın aynı tutarına dokunur. Tavanı her yol
+kendi kayıtlarından hesaplarsa (iade yalnız iadeleri, itiraz yalnız itirazları sayarsa) **her kontrol
+tek başına doğrudur ve para yine de iki kez geri gider** (bir kez sağlayıcı kesintisi, bir kez bizim
+iademiz): iade ≤ satış tutar, itiraz ≤ satış tutar, ama toplamları satışı aşıyor. Bu hata hiçbir
+yerde görünmez — fişler kendi içinde dengeli, hiçbir alan negatife düşmüyor; kasa/banka tarafında
+gerçek para kaybı olarak ortaya çıkar. Bu yüzden: tavan kapısı (`CARD_CHARGEBACK_EXPOSURE_GUARD`:
+`iade/iptal + aktif itiraz + istenen ≤ tahsilat`) her geri götüren yolda **kilit altında** çağrılır ve
+iki yol aynı satış satırını `FOR UPDATE` ile kilitler (`lockAndGet*` — kilit ile okuma tek metotta).
+"Aktif itiraz" = açık (`OPEN`) + kaybedilmiş (`LOST`); kazanılan itirazın parası geri geldiği için
+düşülmez. Yeni bir geri götüren yol (ör. başka bir ödeme sağlayıcısının iade türü) eklenirken ilk iş
+bu kapıya bağlamaktır. İtiraz süresince para **doğrudan 120'ye** değil, sonuç belli olana kadar bir
+ara hesapta (127) bekler; kaybedilen itiraz `REFUNDED` değil kendi durumunu (`CHARGED_BACK`) taşır —
+iade geri verilen, ters ibraz geri **alınan** paradır ve hasta borcu yerinde durur.
+
+**18. Sağlayıcı çağrısının sonucu üç durumludur: oldu / olmadı / bilinmiyor.** Dış sağlayıcıya para
+geri götüren (iade) ya da para hareketi başlatan her çağrı üç sonuçtan birini verir ve ikisi
+birbirine karıştırılamaz. (a) **Adaptör ham SDK sonucunu değil tipli sonucu döner**
+(`SUCCEEDED | REJECTED | UNKNOWN`): iyzico iş hatasında **fırlatmaz** (`status:'failure'` ile
+çözülür), sonucu okumayan kod "iade tamamlandı" yazıp ters fişi atar ve para dönmemiştir —
+hata ne `catch`'e düşer ne bir kontrole yakalanır, çünkü fiş kendi içinde dengelidir.
+Taşıma hatası (zaman aşımı, bağlantı kopması) sağlayıcıda **başarı olabilir**: `UNKNOWN`'dur,
+"olmadı" değil. (b) **`UNKNOWN` yalnız elle doğrulamayla kapanır ve otomatik yeniden denenmez**:
+yeniden denemek parayı iki kez geri götürür. Ters fiş yalnız `SUCCEEDED`'da yazılır; "iade edildi"
+demek yanlış beyandır, yazmamak **bilinen** bir eksikliktir ve alarmla insana gider. Doğrulanmamış
+satır "eksik kalanlar" sorgusunda görünür (kural 4) ve operatörün sağlayıcı panelinde arayacağı
+tekrar-güvenli anahtarı (`${id}:${attempt}`) taşır. (c) **İdempotent olay dedupe'u sahiplenme
+değildir**: `dedupeKey` mevcut kimliği sessizce döner ("zaten vardı" bilgisini vermez) ve okuma-sonra-
+yazma kilitsizdir; ikinci iade çağrısını engelleyen şey iade SATIRININ unique kısıtıdır. (d) Para
+hareketi başlatan satır sağlayıcı çağrısından ÖNCE kalıcı yazılır (kısa tx), çağrı tx DIŞINDA yapılır,
+sonuç ayrı kısa tx'te `PENDING && girişim eşleşiyor` koşuluyla yazılır (kural 3): araya giren akışın
+sonucu ezilmez.
 
 ## Important Notes
 

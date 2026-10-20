@@ -5,6 +5,7 @@ import { GetBankStatementsHandler } from './get-bank-statements/get-bank-stateme
 import { GetBankStatementByIdHandler } from './get-bank-statement-by-id/get-bank-statement-by-id.handler';
 import { GetReconciliationSummaryHandler } from './get-reconciliation-summary/get-reconciliation-summary.handler';
 import { GetLineMatchSuggestionsHandler } from './get-line-match-suggestions/get-line-match-suggestions.handler';
+import { GetCardChargebacksHandler } from './get-card-chargebacks/get-card-chargebacks.handler';
 import { BankRepositoriesModule } from '@modules/finance/bank/infrastructure/persistence/prisma/repositories/repositories.module';
 
 export const BANK_QUERY_HANDLERS = [
@@ -14,6 +15,7 @@ export const BANK_QUERY_HANDLERS = [
   GetBankStatementByIdHandler,
   GetReconciliationSummaryHandler,
   GetLineMatchSuggestionsHandler,
+  GetCardChargebacksHandler,
 ];
 
 @Module({

@@ -45,6 +45,9 @@ export const MODULE_LABELS = {
   appointment: 'Randevu',
   appointmentdiagnosis: 'Randevu Tanısı',
   appointmentprocedure: 'Randevu İşlemi',
+  // pgvector modeli (AI arama indeksi): şemada var, etiketi yoktu — `prisma
+  // generate` istemciyi tazeleyince roles.spec'in etiket kapsamı kırmızıya düştü.
+  appointmentembedding: 'Randevu Vektör İndeksi (AI)',
   enabizsync: 'e-Nabız Senkronizasyonu',
   consentformtemplate: 'Onam Formu Şablonu',
   consentformsubmission: 'Onam Formu Kaydı',
@@ -79,6 +82,7 @@ export const MODULE_LABELS = {
   duffelflightbooking: 'Uçuş Rezervasyonu',
   clinichealthtourismconfig: 'Sağlık Turizmi Ayarları',
   bookingpayment: 'Rezervasyon Ödemesi',
+  bookingpaymentrefund: 'Rezervasyon İadesi (Elle Doğrulama)',
 
   // --- Faturalama & tahsilat ---
   invoice: 'Satış Faturası',
@@ -102,6 +106,7 @@ export const MODULE_LABELS = {
   bankstatement: 'Banka Ekstresi',
   bankstatementline: 'Ekstre Satırı',
   providersettlement: 'Sağlayıcı Hesap Kapaması',
+  cardchargeback: 'Kart İtirazı (Ters İbraz)',
 
   // --- Muhasebe ---
   account: 'Hesap Planı',

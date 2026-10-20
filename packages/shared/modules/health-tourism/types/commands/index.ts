@@ -6,3 +6,4 @@ export type { ConfigureHealthTourismConfig } from './configure-health-tourism-co
 export type { BookFlight, FlightPassenger } from './book-flight.type';
 export type { CancelFlightBooking } from './cancel-flight-booking.type';
 export type { BackfillBookingLedgerEntries } from './backfill-booking-ledger-entries.type';
+export type { ResolveBookingPaymentRefund } from './resolve-booking-payment-refund.type';

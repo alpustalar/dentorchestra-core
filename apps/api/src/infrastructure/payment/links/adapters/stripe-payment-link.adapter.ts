@@ -3,10 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { ENV } from '@common/constants/env.constant';
 import {
   CreatePaymentLinkInput,
+  ExpirePaymentLinkResult,
   IPaymentLinkProvider,
   PaymentLinkProviderName,
   PaymentLinkResult,
   RefundPaymentLinkInput,
+  RefundPaymentLinkResult,
 } from '../payment-link.port';
 import { StripeClientFactory } from './stripe-client.factory';
 
@@ -61,16 +63,40 @@ export class StripePaymentLinkAdapter implements IPaymentLinkProvider {
     return { provider: this.provider, sessionId: session.id, url: session.url };
   }
 
-  async expireLink(sessionId: string): Promise<void> {
+  async expireLink(sessionId: string): Promise<ExpirePaymentLinkResult> {
     await this.stripe.get().checkout.sessions.expire(sessionId);
+    return 'EXPIRED';
   }
 
-  async refund(input: RefundPaymentLinkInput): Promise<void> {
-    await this.stripe.get().refunds.create({
-      payment_intent: input.providerRef,
-      amount: this.toMinor(input.amount),
-      reason: 'requested_by_customer',
-    });
+  async refund(
+    input: RefundPaymentLinkInput
+  ): Promise<RefundPaymentLinkResult> {
+    const refund = await this.stripe.get().refunds.create(
+      {
+        payment_intent: input.providerRef,
+        amount: this.toMinor(input.amount),
+        reason: 'requested_by_customer',
+      },
+      { idempotencyKey: input.idempotencyKey }
+    );
+
+    switch (refund.status) {
+      case 'succeeded':
+        return { outcome: 'SUCCEEDED', providerRefundRef: refund.id };
+      case 'failed':
+      case 'canceled':
+        return {
+          outcome: 'REJECTED',
+          errorCode: refund.failure_reason ?? null,
+          errorMessage: `Stripe iadesi ${refund.status}.`,
+        };
+      default:
+        // pending / requires_action: sonuç sonradan belli olur → doğrulanmamış.
+        return {
+          outcome: 'UNKNOWN',
+          detail: `Stripe iade durumu: ${refund.status ?? 'bilinmiyor'} (${refund.id})`,
+        };
+    }
   }
 
   /** 2 ondalıklı para birimleri (EUR/USD/GBP/TRY) için minor birime çevirir. */

@@ -4,7 +4,7 @@ import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { IGetContext } from '@common/decorators';
 import { ActorContext } from '@common/interfaces';
 import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import {
   IPaymentLinkProvider,
   IYZICO_PAYMENT_LINK,
@@ -19,6 +19,13 @@ import {
   TransferBookingIntent,
 } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
 import { BookingPaymentNotFoundException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
+import { BookingPaymentRefund } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment-refund.entity';
+import { BookingPaymentRefundAlreadyClaimedException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment-refund.exceptions';
+import {
+  BOOKING_PAYMENT_REFUND_COMMAND_REPOSITORY,
+  IBookingPaymentRefundCommandRepository,
+} from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment-refund/booking-payment-refund.command.repository';
+import { BookingPaymentRefundExecutor } from '@modules/crm/health-tourism/booking-payment/application/services/booking-payment-refund.executor';
 import { BookHotelCommand } from '@modules/crm/health-tourism/hotel/application/commands/book-hotel/book-hotel.command';
 import { BookTransferCommand } from '@modules/crm/health-tourism/transfer/application/commands/book-transfer/book-transfer.command';
 import { BookFlightCommand } from '@modules/crm/health-tourism/flight/application/commands/book-flight/book-flight.command';
@@ -38,7 +45,7 @@ import {
 import { ConfirmBookingPaymentCommand } from './confirm-booking-payment.command';
 import { PaymentProviders } from '@common/constants';
 import { BookingPaymentTypeSchema } from '@shared';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   IPolicyFactory,
   POLICY_FACTORY,
@@ -87,6 +94,9 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
     private readonly policyFactory: IPolicyFactory,
     @Inject(NATS_CLIENT)
     private readonly natsClient: ClientProxy,
+    @Inject(BOOKING_PAYMENT_REFUND_COMMAND_REPOSITORY)
+    private readonly refundRepo: IBookingPaymentRefundCommandRepository,
+    private readonly refundExecutor: BookingPaymentRefundExecutor,
     private readonly platformLedger: BookingPlatformLedgerService,
     private readonly txManager: TransactionManager,
     private readonly criticalFailure: CriticalFailurePublisher
@@ -159,45 +169,90 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
       this.logger.error(
         `HotelBeds rezervasyonu başarısız (bp=${bookingPaymentId}): ${reason}`
       );
-      const failed = await this.mutateInTx(bookingPaymentId, (bp) =>
-        bp.markFailed(reason)
-      );
-      // Tahsil edildi ama rezervasyon açılamadı → ödemeyi iade et (kilit dışında).
+      // Tahsil edildi ama rezervasyon açılamadı → ödemeyi iade et. FAILED damgası ile PENDING
+      // iade satırı AYNI transaction'da yazılır: ayırmak, araya düşen bir çökmede "FAILED ama
+      // iadesi hiç talep edilmemiş" satırı bırakır. Sağlayıcı çağrısı kilit dışında.
+      const refund = await this.failAndClaimRefund({
+        bookingPaymentId,
+        provider,
+        providerRef,
+        reason,
+      });
+      if (!refund) return;
+
+      // Executor fırlatmaz: sağlayıcı reddederse FAILED, sonuç bilinmezse UNCONFIRMED olur
+      // (ikisi de CRITICAL basar) ve ters fiş YAZILMAZ. `retained: null` — iptal diye bir şey
+      // olmadı: rezervasyon hiç açılmadı, sağlayıcının alıkoyacağı bir tutar yok. Platform
+      // defterine `REFUNDED` fişi de yazılmaz çünkü ileri fiş (`PLATFORM_BOOKING_SETTLED`)
+      // hiç yazılmamıştı; yalnız tahsilat 336'da açılıp iade onaylanınca kapanır.
       try {
-        await this.refundCharge(provider, providerRef, failed);
-        // `retained: null` — iptal diye bir şey olmadı: rezervasyon hiç
-        // açılmadı, sağlayıcının alıkoyacağı bir tutar yok. Platform defterine
-        // de ters kayıt YAZILMAZ çünkü ileri fiş (`PLATFORM_BOOKING_SETTLED`)
-        // hiç yazılmamıştı — `markBooked` çalışmadı.
-        await this.mutateInTx(bookingPaymentId, (bp) =>
-          bp.markRefunded({ reason, retained: null })
-        );
+        await this.refundExecutor.execute(refund);
       } catch (refundErr) {
         this.logger.error(
-          `İade de başarısız (bp=${bookingPaymentId}); manuel müdahale gerekli: ${
+          `İade yürütülemedi (bp=${bookingPaymentId}); satır PENDING kaldı, takılınca "bekleyen iadeler"de görünür: ${
             refundErr instanceof Error ? refundErr.message : refundErr
           }`
         );
-        // Akışın EN KÖTÜ hali: para tahsil edildi, rezervasyon açılamadı ve iade
-        // de geçmedi. Müşterinin parası bizde, karşılığında hiçbir şey yok ve
-        // otomatik telafi yolu kalmadı — elle iade şart.
         this.criticalFailure.publish({
           operation: 'health-tourism.booking-payment.refund',
           severity: 'CRITICAL',
           summary:
-            'Tahsilat alındı, rezervasyon açılamadı ve iade de başarısız — elle iade gerekiyor.',
+            'Tahsilat alındı, rezervasyon açılamadı ve iade yürütülürken beklenmeyen hata oluştu — iade satırı PENDING kaldı, elle takip gerekiyor.',
           errorMessage:
             refundErr instanceof Error ? refundErr.message : String(refundErr),
           context: {
             bookingPaymentId,
             provider,
             providerRef,
+            refundId: refund.id.value,
             bookingFailureReason: reason,
           },
-          clinicId: failed.clinicId.value,
+          clinicId: refund.clinicId.value,
           dedupeKey: `booking-refund-failed:${bookingPaymentId}`,
         });
       }
+    }
+  }
+
+  /**
+   * Rezervasyonu FAILED yapar ve aynı tx'te `BOOKING_FAILED` iade satırını PENDING açar.
+   * Aynı tahsilat için iade zaten talep edilmişse (tekrar teslim) `null` döner.
+   */
+  private async failAndClaimRefund(input: {
+    bookingPaymentId: string;
+    provider: BookingPaymentProviderValue;
+    providerRef: string;
+    reason: string;
+  }): Promise<BookingPaymentRefund | null> {
+    const { bookingPaymentId, provider, providerRef, reason } = input;
+
+    try {
+      return await this.txManager.run(async () => {
+        const bp = await this.loadForUpdate(bookingPaymentId);
+        bp.markFailed(reason);
+        const failed = await this.bookingPaymentRepo.update(bp);
+
+        return this.refundRepo.create(
+          BookingPaymentRefund.request({
+            bookingPaymentId: failed.id.value,
+            clinicId: failed.clinicId.value,
+            organizationId: failed.organizationId.value,
+            kind: 'BOOKING_FAILED',
+            provider,
+            chargeProviderRef: providerRef,
+            amount: failed.amountChargedBy(provider),
+            reason,
+          })
+        );
+      });
+    } catch (err) {
+      if (err instanceof BookingPaymentRefundAlreadyClaimedException) {
+        this.logger.warn(
+          `İade zaten talep edilmiş (bp=${bookingPaymentId}): ${err.message}`
+        );
+        return null;
+      }
+      throw err;
     }
   }
 
@@ -474,13 +529,26 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
     bp: BookingPayment
   ): Promise<void> {
     try {
-      if (paidProvider === PaymentProviders.IYZICO && bp.stripeSessionId) {
-        await this.stripeLink.expireLink(bp.stripeSessionId);
-      } else if (
-        paidProvider === PaymentProviders.STRIPE &&
-        bp.iyzicoConversationId
-      ) {
-        await this.iyzicoLink.expireLink(bp.iyzicoConversationId);
+      const result =
+        paidProvider === PaymentProviders.IYZICO && bp.stripeSessionId
+          ? await this.stripeLink.expireLink(bp.stripeSessionId)
+          : paidProvider === PaymentProviders.STRIPE && bp.iyzicoConversationId
+            ? await this.iyzicoLink.expireLink(bp.iyzicoConversationId)
+            : null;
+
+      // iyzico CheckoutForm'un expire API'si yok: link canlı kalır ve sonradan ödenebilir.
+      // Ödenirse çift çekim akışı (336 + iade) devreye girer; yine de sessiz kalmayız.
+      if (result === 'NOT_SUPPORTED') {
+        this.criticalFailure.publish({
+          operation: 'health-tourism.booking-payment.expire-link',
+          severity: 'WARNING',
+          summary:
+            'Ödenmeyen ikinci ödeme linki sağlayıcıda kapatılamaz (expire desteklenmiyor); sonradan ödenirse çift çekim olarak iade edilir.',
+          errorMessage: null,
+          context: { bookingPaymentId: bp.id.value, paidProvider },
+          clinicId: bp.clinicId.value,
+          dedupeKey: `booking-expire-link-unsupported:${bp.id.value}`,
+        });
       }
     } catch (err) {
       this.logger.warn(
@@ -504,7 +572,6 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
     }
   }
 
-  /** Belirtilen sağlayıcı ödemesini iade eder (durum değiştirmez — çağıran karar verir). */
   /**
    * Sahiplenilemeyen bir ödeme bildirimi geldi: ya **aynı ödemenin tekrarı** ya da
    * **ikinci bir çekim**. Ayırt edici ödeme referansıdır — yerel durum değil.
@@ -544,12 +611,31 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
     }
 
     // (b) Farklı bir çekim: bu paranın karşılığı verilemez.
+    //
+    // SAHİPLENME olay defterinin dedupe'u değil iade SATIRININ unique'idir: dedupe mevcut
+    // kimliği sessizce döner ("zaten vardı" bilgisini vermez) ve okuma-sonra-yazma kilitsizdir.
+    // Aynı çekimin webhook'u tekrar gelirse satır zaten var → ikinci iade çağrısı YAPILMAZ.
+    const refund = await this.claimUnclaimedChargeRefund({
+      bookingPaymentId,
+      provider,
+      providerRef,
+    });
+    if (!refund) {
+      this.logger.log(
+        `İkinci tahsilatın iadesi zaten talep edilmiş, yok sayıldı (bp=${bookingPaymentId}, ref=${providerRef}).`
+      );
+      return;
+    }
+
     this.logger.warn(
       `İkinci tahsilat tespit edildi (bp=${bookingPaymentId}, provider=${provider}, durum=${bp.status}). İade ediliyor.`
     );
 
-    try {
-      await this.refundCharge(provider, providerRef, bp);
+    // Executor 336 açılışını (B 108 / A 336) iade çağrısından önce yazar ve fırlatmaz; REJECTED /
+    // UNCONFIRMED CRITICAL'ı kendisi basar. Burada yalnız başarının izini bırakırız.
+    const execution = await this.refundExecutor.execute(refund);
+
+    if (execution.status === 'CONFIRMED') {
       // Başarılı iade de iz bırakır: çift çekim akışta bir sorunun belirtisidir
       // (ör. ödenmiş kaydın diğer linki hâlâ canlı).
       this.criticalFailure.publish({
@@ -562,46 +648,55 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
           provider,
           providerRef,
           status: bp.status,
+          refundId: refund.id.value,
         },
         clinicId: bp.clinicId.value,
         dedupeKey: `booking-second-charge:${providerRef}`,
       });
-    } catch (err) {
-      // Para bizde ve otomatik telafi yolu kalmadı.
-      this.criticalFailure.publish({
-        operation: 'health-tourism.booking-payment.second-charge',
-        severity: 'CRITICAL',
-        summary:
-          'İkinci bir tahsilat alındı ama iade başarısız — elle iade gerekiyor.',
-        errorMessage: err instanceof Error ? err.message : String(err),
-        context: {
-          bookingPaymentId,
-          provider,
-          providerRef,
-          status: bp.status,
-        },
-        clinicId: bp.clinicId.value,
-        dedupeKey: `booking-second-charge-failed:${providerRef}`,
-      });
     }
   }
 
-  private async refundCharge(
-    provider: BookingPaymentProviderValue,
-    providerRef: string,
-    bp: BookingPayment
-  ): Promise<void> {
-    const adapter =
-      provider === PaymentProviders.IYZICO ? this.iyzicoLink : this.stripeLink;
-    // Hangi kanalın ne cinsten çektiği entity'de tek yerde durur; burada
-    // `provider` **iade edilen** kanaldır (çift-çekimde sahiplenilmiş kanal
-    // değil), bu yüzden parametreli biçim kullanılır.
-    const charged = bp.amountChargedBy(provider);
-    await adapter.refund({
-      providerRef,
-      amount: charged.value.toNumber(),
-      currency: charged.currency,
-    });
+  /**
+   * İkinci çekim için PENDING iade satırını açar. Satır zaten varsa (tekrar teslim) `null`.
+   * Kilit sırası: önce `booking_payments`, sonra iade satırı.
+   */
+  private async claimUnclaimedChargeRefund(input: {
+    bookingPaymentId: string;
+    provider: BookingPaymentProviderValue;
+    providerRef: string;
+  }): Promise<BookingPaymentRefund | null> {
+    const { bookingPaymentId, provider, providerRef } = input;
+
+    try {
+      return await this.txManager.run(async () => {
+        const bp = await this.loadForUpdate(bookingPaymentId);
+
+        const existing = await this.refundRepo.findByCharge({
+          provider,
+          chargeProviderRef: providerRef,
+        });
+        if (existing) return null;
+
+        return this.refundRepo.create(
+          BookingPaymentRefund.request({
+            bookingPaymentId: bp.id.value,
+            clinicId: bp.clinicId.value,
+            organizationId: bp.organizationId.value,
+            kind: 'UNCLAIMED_CHARGE',
+            provider,
+            chargeProviderRef: providerRef,
+            // `provider` **iade edilen** kanaldır (sahiplenilmiş kanal değil): hangi kanalın ne
+            // cinsten çektiği entity'de tek yerde durur.
+            amount: bp.amountChargedBy(provider),
+            reason: 'Aynı rezervasyon için ikinci tahsilat (çift çekim).',
+          })
+        );
+      });
+    } catch (err) {
+      if (err instanceof BookingPaymentRefundAlreadyClaimedException)
+        return null;
+      throw err;
+    }
   }
 
   /** Webhook'ta actor yok → klinik-kapsamlı sistem context'i kurar (bus dispatch için). */

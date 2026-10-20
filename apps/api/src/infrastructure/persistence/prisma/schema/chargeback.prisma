@@ -1,0 +1,106 @@
+/// Kart itirazı (chargeback / ters ibraz).
+///
+/// Kart sahibi bankasına itiraz ettiğinde sağlayıcı (iyzico, banka POS) parayı
+/// üye işyerinden geri keser. Kesinti, itirazın sonucu belli olmadan yapılır:
+///   - sağlayıcı bekleyen bakiyeden düşer (108) ya da doğrudan bankadan çeker (102),
+///   - üye işyeri delil sunar; sonuç haftalar sonra gelir.
+///
+/// Defter üç aşamalıdır ve itiraz sürerken para 127 ara hesabında durur:
+///   açıldı     B 127 / A 108|102      (+ ücret varsa B 653 / A 108|102)
+///   kazanıldı  B 108|102 / A 127      (para geri geldi)
+///   kaybedildi B 120 (hasta) / A 127  (kesinleşti, hasta borcu yeniden doğar)
+///
+/// Bu kayıt olmadığı sürece: tahsilat defterde kalır (108'de olmayan para, 120'de
+/// kapanmış görünen borç), payout'taki itiraz kesintisi 108'de takılı kalır ve
+/// itiraz edilmiş satış ayrıca iade edilirse kart sahibine para iki kez gider.
+///
+/// Kayıt **sağlayıcının itiraz bildiriminden elle** girilir: ne iyzico ne banka POS
+/// için itiraz API'si bağlı. `caseReference` sağlayıcının vaka numarasıdır ve
+/// idempotency anahtarının yarısıdır.
+enum CardChargebackStatus {
+  OPEN /// sağlayıcı parayı kesti/bloke etti; sonuç belli değil
+  WON /// itiraz kazanıldı — para geri geldi
+  LOST /// itiraz kaybedildi — kesinleşti
+}
+
+enum CardChargebackSource {
+  POS_TRANSACTION /// fiziksel POS satışı (PAX / iyzico Terminal) — sourceId = posTransactionId
+  ONLINE_PAYMENT /// sanal POS (iyzico) taksit tahsilatı — sourceId = installmentId
+}
+
+/// Paranın itiraz sırasında hangi hesaptan kesildiği / hangisine döndüğü.
+enum ChargebackFundsChannel {
+  FUNDS_IN_TRANSIT /// sağlayıcıdaki bekleyen bakiye (108)
+  BANK /// doğrudan banka hesabı (102)
+}
+
+/// Kaybedilen itirazın ödeme planına yansıma sonucu.
+enum CardChargebackPlanSync {
+  SYNCED /// taksit CHARGED_BACK yapıldı, telafi taksiti açıldı
+  NOT_LINKED /// kaynak bir ödeme planına bağlı değil (hastasız / plansız kart çekimi)
+  NO_MATCHING_INSTALLMENT /// plan var ama tutara eşit tamamlanmış taksit yok — elle eşleştirilmeli
+}
+
+model CardChargeback {
+  id             String @id
+  organizationId String @map("organization_id")
+  clinicId       String @map("clinic_id") // defter sahibi şube
+
+  provider      SettlementProvider
+  /// Sağlayıcının vaka numarası — kiracı+sağlayıcı içinde tekil (idempotency).
+  caseReference String             @map("case_reference")
+
+  sourceType CardChargebackSource @map("source_type")
+  /// POS_TRANSACTION → PosTransaction.id; ONLINE_PAYMENT → PaymentInstallment.id.
+  sourceId   String               @map("source_id")
+  paymentId  String?              @map("payment_id")
+  /// Telafi taksidinin geri aldığı taksit. ONLINE'da açılışta (= sourceId);
+  /// POS'ta kaybedilince tutar eşleşmesiyle bulunduğunda dolar.
+  installmentId String?           @map("installment_id")
+  patientId  String               @map("patient_id")
+  /// Hasta carisi — kaybedilince `B 120` bu cariye yazılır; açılışta garanti edilir.
+  partyId    String               @map("party_id")
+
+  /// İtiraz edilen (sağlayıcının kestiği) tutar — kısmi itiraz mümkündür.
+  amount    Decimal  @db.Decimal(14, 2)
+  /// Sağlayıcının itiraz başına kestiği ücret → 653. İtirazın sonucundan bağımsızdır.
+  feeAmount Decimal  @default(0) @map("fee_amount") @db.Decimal(14, 2)
+  currency  Currency @default(TRY)
+
+  status CardChargebackStatus @default(OPEN)
+
+  /// Paranın kesildiği gün — açılış fişinin belge tarihi (dönem kapısı buna bakar).
+  openedAt            DateTime               @map("opened_at")
+  openedFundsChannel  ChargebackFundsChannel @map("opened_funds_channel")
+  openedBankAccountId String?                @map("opened_bank_account_id")
+  /// Delil sunma son günü. Yalnız saklanır; delil iş akışı bu modülün işi değil.
+  evidenceDueAt       DateTime?              @map("evidence_due_at")
+  note                String?
+
+  /// Sonucun belli olduğu gün — çözüm fişinin belge tarihi.
+  resolvedAt            DateTime?               @map("resolved_at")
+  /// Yalnız WON'da dolu: kazanılan para nereye döndü.
+  resolvedFundsChannel  ChargebackFundsChannel? @map("resolved_funds_channel")
+  resolvedBankAccountId String?                 @map("resolved_bank_account_id")
+  resolutionNote        String?                 @map("resolution_note")
+
+  /// Muhasebe köprüsü izi — mükerrer fiş ve yarıda kalma koruması.
+  openedEventId   String? @map("opened_event_id")
+  resolvedEventId String? @map("resolved_event_id")
+
+  /// Yalnız LOST'ta dolar: ödeme planına yansıma sonucu ve açılan telafi taksidi.
+  planSyncStatus        CardChargebackPlanSync? @map("plan_sync_status")
+  recoveryInstallmentId String?                 @map("recovery_installment_id")
+
+  /// Yüksek etkili finansal işlem: kalıcı damga (kim kaydetti / kim sonuçlandırdı).
+  recordedById String  @map("recorded_by_id")
+  resolvedById String? @map("resolved_by_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([clinicId, provider, caseReference])
+  @@index([clinicId, status])
+  @@index([sourceType, sourceId])
+  @@map("card_chargebacks")
+}

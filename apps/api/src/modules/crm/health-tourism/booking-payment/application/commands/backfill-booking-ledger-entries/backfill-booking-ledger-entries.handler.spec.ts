@@ -2,6 +2,9 @@ import { BackfillBookingLedgerEntriesHandler } from './backfill-booking-ledger-e
 import { BackfillBookingLedgerEntriesCommand } from './backfill-booking-ledger-entries.command';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { IBookingPaymentCommandRepository } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.command.repository';
+import { BookingPaymentRefund } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment-refund.entity';
+import { IBookingPaymentRefundCommandRepository } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment-refund/booking-payment-refund.command.repository';
+import { Money } from '@src/domain/value-objects/money.vo';
 import { IPlatformTenantProvider } from '@modules/finance/accounting/posting/domain/interfaces/platform-tenant.provider.interface';
 import { IPolicyFactory } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import {
@@ -16,7 +19,7 @@ import {
 import { BookingLedgerNotPostableException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 import { UnbridgedBookingLedgerView } from '@modules/crm/health-tourism/booking-payment/application/queries/find-unbridged-booking-ledger-entries/find-unbridged-booking-ledger-entries.response';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 
 const PLATFORM_CLINIC = '99999999-9999-4999-8999-999999999999';
@@ -75,14 +78,38 @@ const view = (
   kind: 'SETTLED',
   dedupeKey: 'platform-booking-settled:bp-1',
   occurredAt: new Date('2026-09-01T10:00:00Z'),
+  refundId: null,
   ...overrides,
 });
+
+/** İade satırı: durumu parametre; CONFIRMED ise sağlayıcıda gerçekleşmiş sayılır. */
+const refundIn = (
+  status: 'CONFIRMED' | 'UNCONFIRMED',
+  kind: 'CANCELLATION' | 'UNCLAIMED_CHARGE' | 'BOOKING_FAILED' = 'CANCELLATION'
+): BookingPaymentRefund => {
+  const refund = BookingPaymentRefund.request({
+    bookingPaymentId: '33333333-3333-4333-8333-333333333333',
+    clinicId: CLINIC_ID,
+    organizationId: '22222222-2222-4222-8222-222222222222',
+    kind,
+    provider: 'IYZICO',
+    chargeProviderRef: 'ptx-1',
+    amount: Money.fromTrusted('4200.00', 'TRY'),
+  });
+  if (status === 'CONFIRMED') {
+    refund.markConfirmedByProvider({ attempt: 1, providerRefundRef: 'h-1' });
+  } else {
+    refund.markUnconfirmed({ attempt: 1, failureReason: 'ETIMEDOUT' });
+  }
+  return refund;
+};
 
 type FinanceRule = { canAccessClinicFinances: (clinicId: string) => boolean };
 
 const build = (
   missing: UnbridgedBookingLedgerView[],
-  entities: Record<string, BookingPayment | null> = {}
+  entities: Record<string, BookingPayment | null> = {},
+  refund: BookingPaymentRefund | null = null
 ) => {
   const findById = jest.fn<Promise<BookingPayment | null>, [string]>((id) =>
     Promise.resolve(id in entities ? entities[id] : booked())
@@ -106,11 +133,24 @@ const build = (
     finance: jest.fn(() => ({ evaluator: { check } })),
   } as unknown as IPolicyFactory;
 
+  const findRefundById = jest.fn<
+    Promise<BookingPaymentRefund | null>,
+    [string]
+  >(() => Promise.resolve(refund));
+  const refundRepo = {
+    findById: findRefundById,
+  } as unknown as IBookingPaymentRefundCommandRepository;
+
   const record = jest.fn<Promise<void>, [BookingLedgerInput]>(() =>
     Promise.resolve()
   );
+  const recordReturnable = jest.fn<
+    Promise<void>,
+    [{ kind: string; refund: BookingPaymentRefund }]
+  >(() => Promise.resolve());
   const platformLedger = {
     record,
+    recordReturnable,
   } as unknown as BookingPlatformLedgerService;
 
   const queryBus = {
@@ -120,13 +160,16 @@ const build = (
   return {
     handler: new BackfillBookingLedgerEntriesHandler(
       repo,
+      refundRepo,
       platformTenant,
       policyFactory,
       platformLedger,
       queryBus
     ),
     record,
+    recordReturnable,
     findById,
+    findRefundById,
     check,
   };
 };
@@ -154,18 +197,92 @@ describe('BackfillBookingLedgerEntriesHandler', () => {
     );
   });
 
-  it('yön SATIRDAN okunur — iade, tahsilat olarak yazılmaz', async () => {
-    // §65'in dersi: tek tür varsayan telafi kodu ikinci türü sessizce birinciye
-    // çevirir ve iade edilen parayı deftere ikinci kez gelir gibi geçirir.
-    const { handler, record } = build([
-      view({ kind: 'REFUNDED', dedupeKey: 'platform-booking-refunded:bp-1' }),
-    ]);
+  it('yön SATIRDAN okunur — iade, tahsilat olarak yazılmaz; tarih ve kanal İADE satırından gelir', async () => {
+    // §65'in dersi: tek tür varsayan telafi kodu ikinci türü sessizce birinciye çevirir ve
+    // iade edilen parayı deftere ikinci kez gelir gibi geçirir.
+    const refund = refundIn('CONFIRMED');
+    const { handler, record } = build(
+      [
+        view({
+          kind: 'REFUNDED',
+          dedupeKey: 'platform-booking-refunded:bp-1',
+          refundId: refund.id.value,
+        }),
+      ],
+      {},
+      refund
+    );
 
     await run(handler);
 
     expect(record).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'REFUNDED' })
+      expect.objectContaining({
+        kind: 'REFUNDED',
+        provider: 'IYZICO',
+        occurredAt: refund.refundedAt,
+      })
     );
+  });
+
+  // P0-3: doğrulanmamış iade için ters fiş yazılamaz — liste de borçlu saymaz, ama liste
+  // ile telafi arasında geçen sürede durum değişmiş olabilir; son söz yürütme anındaki satırdadır.
+  it('DOĞRULANMAMIŞ iade için ters kayıt yazılmaz (liste bayatlasa bile)', async () => {
+    const refund = refundIn('UNCONFIRMED');
+    const { handler, record } = build(
+      [view({ kind: 'REFUNDED', refundId: refund.id.value })],
+      {},
+      refund
+    );
+
+    const result = await run(handler);
+
+    expect(record).not.toHaveBeenCalled();
+    expect(result.recorded).toBe(0);
+    expect(result.failed[0].reason).toContain('doğrulanmadı');
+  });
+
+  it('İade satırı bulunamazsa köprüye gidilmez', async () => {
+    const { handler, record } = build(
+      [view({ kind: 'REFUNDED', refundId: 'r-1' })],
+      {},
+      null
+    );
+
+    const result = await run(handler);
+
+    expect(record).not.toHaveBeenCalled();
+    expect(result.failed[0].reason).toContain('İade kaydı bulunamadı');
+  });
+
+  it('336 açılışı iade satırından yazılır (onaylanmasa da: para platform hesabına girdi)', async () => {
+    const refund = refundIn('UNCONFIRMED', 'UNCLAIMED_CHARGE');
+    const { handler, recordReturnable, record } = build(
+      [view({ kind: 'RETURNABLE_RECEIVED', refundId: refund.id.value })],
+      {},
+      refund
+    );
+
+    const result = await run(handler);
+
+    expect(result.recorded).toBe(1);
+    expect(record).not.toHaveBeenCalled();
+    expect(recordReturnable).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'RETURNABLE_RECEIVED', refund })
+    );
+  });
+
+  it('336 kapanışı yalnız ONAYLANMIŞ iade için yazılır', async () => {
+    const refund = refundIn('UNCONFIRMED', 'UNCLAIMED_CHARGE');
+    const { handler, recordReturnable } = build(
+      [view({ kind: 'RETURNABLE_REFUNDED', refundId: refund.id.value })],
+      {},
+      refund
+    );
+
+    const result = await run(handler);
+
+    expect(recordReturnable).not.toHaveBeenCalled();
+    expect(result.failed[0].reason).toContain('doğrulanmadı');
   });
 
   it('bir hareket patlasa tur DURMAZ, kalanlar yazılır', async () => {
@@ -187,7 +304,12 @@ describe('BackfillBookingLedgerEntriesHandler', () => {
   it('yazılamayan fiş (muhasebe kararı bekleyen) gerekçesiyle döner', async () => {
     // Yeniden denemeyle çözülmeyen hâl: operatör "tekrar dene" ile "karar ver"i
     // ayırt edebilsin diye gerekçe metni taşınıyor.
-    const { handler, record } = build([view({ kind: 'REFUNDED' })]);
+    const refund = refundIn('CONFIRMED');
+    const { handler, record } = build(
+      [view({ kind: 'REFUNDED', refundId: refund.id.value })],
+      {},
+      refund
+    );
     record.mockImplementationOnce(() =>
       Promise.reject(
         new BookingLedgerNotPostableException({

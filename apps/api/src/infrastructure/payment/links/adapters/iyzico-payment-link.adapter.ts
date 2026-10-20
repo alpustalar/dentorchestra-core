@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'crypto';
 import { getGlobalPrefix, ROUTE_PATHS } from '@common/constants';
 import { ENV } from '@common/constants/env.constant';
 import {
@@ -8,12 +7,15 @@ import {
   IYZICO_PROVIDER,
 } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/interfaces/iyzico.provider.interface';
 import { PaymentInitializeRequest } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/types/payment-initialize.request';
+import { IyzicoResultGuard } from '@src/domain/value-objects/iyzico-result-guard.vo';
 import {
   CreatePaymentLinkInput,
+  ExpirePaymentLinkResult,
   IPaymentLinkProvider,
   PaymentLinkProviderName,
   PaymentLinkResult,
   RefundPaymentLinkInput,
+  RefundPaymentLinkResult,
 } from '../payment-link.port';
 
 /**
@@ -81,6 +83,8 @@ export class IyzicoPaymentLinkAdapter implements IPaymentLinkProvider {
     };
 
     const result = await this.iyzico.paymentInitialize(request);
+    // iyzico iş hatasında fırlatmaz (`status: 'failure'`); sonucu açıkça denetle.
+    IyzicoResultGuard.create(result).isSuccess().orThrow();
     if (!result.paymentPageUrl) {
       throw new Error(
         result.errorMessage ?? 'iyzico ödeme sayfası URL üretmedi.'
@@ -96,19 +100,37 @@ export class IyzicoPaymentLinkAdapter implements IPaymentLinkProvider {
   }
 
   /** iyzico CheckoutForm'un explicit expire API'si yok; ödenmezse kullanılmaz. */
-  async expireLink(): Promise<void> {
-    return;
+  async expireLink(): Promise<ExpirePaymentLinkResult> {
+    return 'NOT_SUPPORTED';
   }
 
-  async refund(input: RefundPaymentLinkInput): Promise<void> {
-    await this.iyzico.refund({
+  /**
+   * iyzico iade başarısızlığında **fırlatmaz**, `status: 'failure'` ile çözülür. Sonuç
+   * okunmazsa para dönmemişken "iade tamamlandı" denir ve ters fiş atılır (P0-1).
+   */
+  async refund(
+    input: RefundPaymentLinkInput
+  ): Promise<RefundPaymentLinkResult> {
+    const result = await this.iyzico.refund({
       locale: 'TR',
-      conversationId: randomUUID(),
+      conversationId: input.idempotencyKey,
       paymentTransactionId: input.providerRef,
       price: String(input.amount),
       ip: input.ip ?? '127.0.0.1',
       currency: 'TRY',
     });
+
+    if (IyzicoResultGuard.create(result).isSuccess().isValid) {
+      return {
+        outcome: 'SUCCEEDED',
+        providerRefundRef: result.hostReference ?? null,
+      };
+    }
+    return {
+      outcome: 'REJECTED',
+      errorCode: result.errorCode ?? null,
+      errorMessage: result.errorMessage ?? 'iyzico iadeyi reddetti.',
+    };
   }
 
   private bookingCallbackUrl(): string {

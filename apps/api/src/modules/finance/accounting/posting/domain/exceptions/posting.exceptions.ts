@@ -1,11 +1,9 @@
 import { HttpStatus } from '@nestjs/common';
 import { DomainException } from '@src/domain/exceptions';
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../../../../../packages/shared/common/constants/error-codes.constant';
 
-export interface PlatformBookingAmountsMismatchMeta extends Record<
-  string,
-  unknown
-> {
+export interface PlatformBookingAmountsMismatchMeta
+  extends Record<string, unknown> {
   saleAmount: string;
   supplierAmount: string;
   commission: string;
@@ -48,10 +46,8 @@ export class PlatformBookingBelowCostException extends DomainException<PlatformB
   }
 }
 
-export interface PlatformBookingRefundMismatchMeta extends Record<
-  string,
-  unknown
-> {
+export interface PlatformBookingRefundMismatchMeta
+  extends Record<string, unknown> {
   refundAmount: string;
   commission: string;
   supplierReleased: string;
@@ -302,6 +298,25 @@ export class UnmappedPaymentMethodException extends DomainException<{
       `Ödeme yönteminin hazır değer hesabı eşlemesi yok: ${meta.method} (${meta.direction})`,
       meta
     );
+  }
+}
+
+/**
+ * Kart itirazı kanalının (108 / 102) defter karşılığı yok.
+ *
+ * Kabul kümesi tek sabitten gelir (`CHARGEBACK_FUNDS_CHANNELS`) ve eşleme tam
+ * kaplamalıdır; bu hata normalde oluşmaz. Oluştuysa gövde şeması ile kural
+ * ayrışmıştır — varsayılan bir hesaba yazmak yerine sesli patlar (yanlış hesaba
+ * yazılan kesinti dengeli fiş üretir, hiçbir kontrole yakalanmaz).
+ */
+export class UnmappedChargebackChannelException extends DomainException<{
+  channel: string;
+}> {
+  public readonly errorCode = ERROR_CODES.POSTING.UNMAPPED_CHARGEBACK_CHANNEL;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { channel: string }) {
+    super(`Kart itirazı kanalının hesap eşlemesi yok: ${meta.channel}`, meta);
   }
 }
 

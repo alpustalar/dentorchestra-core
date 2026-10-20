@@ -220,14 +220,13 @@ export interface BridgeableBookingLedgerRow {
   /** Tahsilatın geçtiği kanal; rezervasyon açıldıysa dolu olmak zorunda. */
   paidProvider: BookingPaymentProviderValue | null;
   paidAt: Date | null;
-  /** Doluysa iade de gerçekleşti → geri yön fişi de borçlu. */
-  refundedAt: Date | null;
 }
 
 /**
- * Pencere `paidAt` **veya** `refundedAt`'e uygulanır: iki yön iki ayrı tarihte
- * yaşıyor ve tek tarihe bakmak, geçen dönemde tahsil edilip bu dönemde iade
- * edilen bir rezervasyonun eksik fişini görünmez yapardı.
+ * Pencere tahsilat için `paidAt`'e uygulanır. İade yönü artık `booking_payments`'tan değil
+ * iade satırlarından türetilir (`FindBridgeableBookingPaymentRefunds`): `refundedAt` bir
+ * rezervasyon satırında "iade TALEP edildi" demekti ve sağlayıcı iadeyi reddetse bile dolardı —
+ * ters fiş bu damgaya bakarak yazılırsa para dönmemişken defter "döndü" derdi (P0-3).
  */
 export interface FindBridgeableBookingPaymentsFilter {
   from: Date;

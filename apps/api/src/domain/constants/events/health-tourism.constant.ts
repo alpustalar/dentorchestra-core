@@ -23,3 +23,13 @@ export const FLIGHT_BOOKING_EVENTS = {
 
 export type FlightBookingEvent =
   (typeof FLIGHT_BOOKING_EVENTS)[keyof typeof FLIGHT_BOOKING_EVENTS];
+
+export const BOOKING_PAYMENT_REFUND_EVENTS = {
+  /** Operatör doğrulanmamış iadeyi elle kapattı (CONFIRMED / NOT_REFUNDED). */
+  RESOLVED: 'booking-payment-refund.resolved',
+  /** Operatör reddedilmiş iadeyi yeniden denemeye açtı. */
+  RETRIED: 'booking-payment-refund.retried',
+} as const;
+
+export type BookingPaymentRefundEvent =
+  (typeof BOOKING_PAYMENT_REFUND_EVENTS)[keyof typeof BOOKING_PAYMENT_REFUND_EVENTS];

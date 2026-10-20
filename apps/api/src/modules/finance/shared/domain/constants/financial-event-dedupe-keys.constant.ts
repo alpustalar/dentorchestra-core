@@ -26,6 +26,19 @@ export const FinancialEventDedupeKeys = {
    */
   provider_settlement: (settlementId: string) =>
     `provider-settlement:${settlementId}`,
+  /**
+   * Kart itirazı: üç aşama, üç ayrı anahtar. Hepsi itirazın kendi id'sinden
+   * türer — vaka numarasından değil (o kiracı+sağlayıcı içinde tekildir ama
+   * `dedupeKey` global tekildir). Aşamalar ayrı anahtar taşır çünkü bir itirazın
+   * açılış ve çözüm olayı aynı kaynak kaydı gösterir; tek anahtar ikisini de
+   * "zaten var" sayıp çözüm fişini sessizce yazdırmazdı.
+   */
+  card_chargeback_opened: (chargebackId: string) =>
+    `card-chargeback-opened:${chargebackId}`,
+  card_chargeback_won: (chargebackId: string) =>
+    `card-chargeback-won:${chargebackId}`,
+  card_chargeback_lost: (chargebackId: string) =>
+    `card-chargeback-lost:${chargebackId}`,
   platform_booking_settled: (bookingPaymentId: string) =>
     `platform-booking-settled:${bookingPaymentId}`,
   /**
@@ -37,6 +50,15 @@ export const FinancialEventDedupeKeys = {
    */
   platform_booking_refunded: (bookingPaymentId: string) =>
     `platform-booking-refunded:${bookingPaymentId}`,
+  /**
+   * Müşteriye iade edilecek tahsilat. Anahtar TAHSİLATIN kimliğidir (provider + sağlayıcı
+   * referansı), iade kaydının id'si değil: aynı tahsilat için iki olay yazılamaz, yeniden
+   * deneme / elle doğrulama aynı anahtara düşer.
+   */
+  platform_returnable_charge_received: (provider: string, chargeRef: string) =>
+    `platform-returnable-charge-received:${provider}:${chargeRef}`,
+  platform_returnable_charge_refunded: (provider: string, chargeRef: string) =>
+    `platform-returnable-charge-refunded:${provider}:${chargeRef}`,
   // Dekont numarası klinik içinde tekil kabul edilir; farklı kliniklerin aynı
   // referansı kullanması meşru olduğu için anahtar clinicId ile daraltılır.
   supplier_payment: (clinicId: string, reference: string) =>

@@ -5,6 +5,13 @@ import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { IPaymentLinkProvider } from '@src/infrastructure/payment/links/payment-link.port';
 import { IBookingPaymentCommandRepository } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.command.repository';
 import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment.entity';
+import { BookingPaymentRefund } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment-refund.entity';
+import { BookingPaymentRefundAlreadyClaimedException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment-refund.exceptions';
+import { IBookingPaymentRefundCommandRepository } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment-refund/booking-payment-refund.command.repository';
+import {
+  BookingPaymentRefundExecution,
+  BookingPaymentRefundExecutor,
+} from '@modules/crm/health-tourism/booking-payment/application/services/booking-payment-refund.executor';
 import { BookingPaymentNotFoundException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 import {
   CreateBookingPaymentProps,
@@ -17,7 +24,7 @@ import { BookFlightCommand } from '@modules/crm/health-tourism/flight/applicatio
 import { PayHeldFlightCommand } from '@modules/crm/health-tourism/flight/application/commands/pay-held-flight/pay-held-flight.command';
 import { NATS_SUBJECTS } from '@src/transport';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 
 describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
@@ -135,15 +142,33 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     const iyzicoLink = {
       provider: 'IYZICO',
       createLink: jest.fn(),
-      expireLink: jest.fn(() => recordDepth('iyzicoExpire')),
-      refund: jest.fn(() => recordDepth('iyzicoRefund')),
+      expireLink: jest.fn(() => {
+        recordDepth('iyzicoExpire');
+        return Promise.resolve('NOT_SUPPORTED');
+      }),
+      refund: jest.fn(() => {
+        recordDepth('iyzicoRefund');
+        return Promise.resolve({
+          outcome: 'SUCCEEDED',
+          providerRefundRef: null,
+        });
+      }),
     } as unknown as IPaymentLinkProvider;
 
     const stripeLink = {
       provider: 'STRIPE',
       createLink: jest.fn(),
-      expireLink: jest.fn(() => recordDepth('stripeExpire')),
-      refund: jest.fn(() => recordDepth('stripeRefund')),
+      expireLink: jest.fn(() => {
+        recordDepth('stripeExpire');
+        return Promise.resolve('EXPIRED');
+      }),
+      refund: jest.fn(() => {
+        recordDepth('stripeRefund');
+        return Promise.resolve({
+          outcome: 'SUCCEEDED',
+          providerRefundRef: null,
+        });
+      }),
     } as unknown as IPaymentLinkProvider;
 
     // Kilitli okuma: handler artık mutasyonu besleyen her okumayı findByIdForUpdate
@@ -184,6 +209,65 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
       }),
     } as any;
 
+    // İade satırları: (provider, charge_provider_ref) unique'ini taklit eden bellek içi depo.
+    // Sahiplenme olay defterinin dedupe'u değil bu satırdır.
+    const refunds: BookingPaymentRefund[] = [];
+    const refundRepo = {
+      findByCharge: jest.fn(
+        (p: { provider: string; chargeProviderRef: string }) =>
+          Promise.resolve(
+            refunds.find(
+              (r) =>
+                r.provider === p.provider &&
+                r.chargeProviderRef === p.chargeProviderRef
+            ) ?? null
+          )
+      ),
+      create: jest.fn((e: BookingPaymentRefund) => {
+        recordDepth('refundCreate');
+        if (
+          refunds.some(
+            (r) =>
+              r.provider === e.provider &&
+              r.chargeProviderRef === e.chargeProviderRef
+          )
+        ) {
+          return Promise.reject(
+            new BookingPaymentRefundAlreadyClaimedException(
+              e.provider,
+              e.chargeProviderRef
+            )
+          );
+        }
+        refunds.push(e);
+        return Promise.resolve(e);
+      }),
+    } as unknown as IBookingPaymentRefundCommandRepository;
+
+    // Yürütücü kendi spec'inde sınanır (sonuç sınıflama, settle, 336 açılışı). Burada yalnız
+    // handler'ın ona NEYİ verdiği ve NE ZAMAN (tx dışında) çağırdığı sınanır; sağlayıcı
+    // çağrısını gerçek adaptör mock'una iletir ki "hangi kanal, hangi tutar" iddiaları sürsün.
+    const executorStatus: { next: BookingPaymentRefundExecution['status'] } = {
+      next: 'CONFIRMED',
+    };
+    const refundExecutor = {
+      execute: jest.fn(async (refund: BookingPaymentRefund) => {
+        recordDepth('executor');
+        const link = refund.provider === 'IYZICO' ? iyzicoLink : stripeLink;
+        await link.refund({
+          providerRef: refund.chargeProviderRef,
+          amount: refund.amount.value.toNumber(),
+          currency: refund.amount.currency,
+          idempotencyKey: refund.idempotencyKey,
+        });
+        return {
+          refundId: refund.id.value,
+          status: executorStatus.next,
+          settleConflict: false,
+        };
+      }),
+    } as unknown as BookingPaymentRefundExecutor;
+
     // Platform defteri: tahsilat kliniğe değil buraya postlanır.
     const platformTenant = {
       resolve: jest.fn().mockResolvedValue({
@@ -203,6 +287,8 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         commandRepo,
         policyFactory,
         natsClient,
+        refundRepo,
+        refundExecutor,
         // Gerçek köprü servisi, mock bus/kiracı/alarm ile kurulur: böylece
         // olay gövdesi, platform defteri hedefi ve tedarikçi carisi zinciri
         // bu testlerin kapsamında kalır (servis ayrıca kendi spec'inde).
@@ -215,6 +301,10 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         criticalFailure as never
       ),
       criticalFailure,
+      refundRepo,
+      refundExecutor,
+      refunds,
+      executorStatus,
       platformTenant,
       commandBus,
       iyzicoLink,
@@ -461,7 +551,7 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
 
   it('çift-çekim: zaten BOOKED kayda ikinci ödeme → ikinci ödeme iade, rebook YOK', async () => {
     const bp = makeBp('BOOKED');
-    const { handler, commandBus, iyzicoLink } = build(bp);
+    const { handler, commandBus, iyzicoLink, refunds } = build(bp);
 
     await handler.execute(
       new ConfirmBookingPaymentCommand({
@@ -479,8 +569,38 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         amount: 4200,
       })
     );
+    // İkinci çekim kendi iade satırını alır (rezervasyonun kendi tahsilatından AYRI).
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0]).toMatchObject({
+      kind: 'UNCLAIMED_CHARGE',
+      provider: 'IYZICO',
+      chargeProviderRef: 'tx_2',
+    });
+    expect(refunds[0].amount.toApiFormat()).toBe('4200.00');
     expect(commandBus.execute).not.toHaveBeenCalled();
     expect(bp.status).toBe('BOOKED');
+  });
+
+  it('çift-çekim: AYNI ikinci çekimin webhook’u tekrar gelirse ikinci iade çağrısı YAPILMAZ', async () => {
+    // Sahiplenme olay defterinin dedupe'u değil iade SATIRININ unique'idir: dedupe mevcut
+    // kimliği sessizce döner, "zaten vardı" bilgisini vermez.
+    const bp = makeBp('BOOKED');
+    const { handler, iyzicoLink, refunds } = build(bp);
+    const second = () =>
+      handler.execute(
+        new ConfirmBookingPaymentCommand({
+          bookingPaymentId: bp.id.value,
+          provider: 'IYZICO',
+          providerRef: 'tx_2',
+          ctx,
+        })
+      );
+
+    await second();
+    await second();
+
+    expect(refunds).toHaveLength(1);
+    expect(iyzicoLink.refund).toHaveBeenCalledTimes(1);
   });
 
   it('AYNI referansla tekrar bildirim → iade YOK (idempotent)', async () => {
@@ -489,8 +609,14 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     // yerel duruma (`isSettled`) göre verildiğinde bu dal MEŞRU ödemeyi iade
     // ettiriyordu: hizmet verilmiş, para geri ödenmiş, kayıt hâlâ BOOKED.
     const bp = makeBp('BOOKED');
-    const { handler, stripeLink, iyzicoLink, commandBus, criticalFailure } =
-      build(bp);
+    const {
+      handler,
+      stripeLink,
+      iyzicoLink,
+      commandBus,
+      criticalFailure,
+      refunds,
+    } = build(bp);
 
     await handler.execute(
       new ConfirmBookingPaymentCommand({
@@ -503,6 +629,7 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
 
     expect(stripeLink.refund).not.toHaveBeenCalled();
     expect(iyzicoLink.refund).not.toHaveBeenCalled();
+    expect(refunds).toHaveLength(0);
     expect(commandBus.execute).not.toHaveBeenCalled();
     expect(criticalFailure.publish).not.toHaveBeenCalled();
     expect(bp.status).toBe('BOOKED');
@@ -536,10 +663,12 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     );
   });
 
-  it('ikinci çekimin iadesi başarısızsa KRİTİK alarm üretilir', async () => {
+  it('ikinci çekimin iadesi DOĞRULANAMADIYSA handler “iade edildi” uyarısı basmaz (alarmı yürütücü basar)', async () => {
+    // Eskiden handler hata yakalayıp CRITICAL basıyordu; artık sağlayıcı sonucu üç durumlu ve
+    // yürütücü REJECTED / UNCONFIRMED'ı kendisi duyurur. Handler'ın işi yanlış beyan etmemek.
     const bp = makeBp('BOOKED');
-    const { handler, iyzicoLink, criticalFailure } = build(bp);
-    (iyzicoLink.refund as jest.Mock).mockRejectedValue(new Error('iyzico 500'));
+    const { handler, criticalFailure, executorStatus, refunds } = build(bp);
+    executorStatus.next = 'UNCONFIRMED';
 
     await handler.execute(
       new ConfirmBookingPaymentCommand({
@@ -550,17 +679,17 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
       })
     );
 
-    expect(criticalFailure.publish).toHaveBeenCalledWith(
+    expect(refunds).toHaveLength(1);
+    expect(criticalFailure.publish).not.toHaveBeenCalledWith(
       expect.objectContaining({
         operation: 'health-tourism.booking-payment.second-charge',
-        severity: 'CRITICAL',
       })
     );
   });
 
-  it('book başarısız → FAILED → ödeme iade → REFUNDED', async () => {
+  it('book başarısız → FAILED + BOOKING_FAILED iade satırı (aynı tx) → yürütücü iadeyi yürütür', async () => {
     const bp = makeBp('PENDING');
-    const { handler, stripeLink } = build(bp, true);
+    const { handler, stripeLink, refunds, refundExecutor } = build(bp, true);
 
     await handler.execute(
       new ConfirmBookingPaymentCommand({
@@ -576,18 +705,27 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         providerRef: 'pi_1',
         currency: 'EUR',
         amount: 120,
+        idempotencyKey: `${refunds[0].id.value}:1`,
       })
     );
-    expect(bp.status).toBe('REFUNDED');
+    expect(refunds).toHaveLength(1);
+    expect(refunds[0]).toMatchObject({
+      kind: 'BOOKING_FAILED',
+      chargeProviderRef: 'pi_1',
+    });
+    expect(refundExecutor.execute).toHaveBeenCalledTimes(1);
+    // REFUNDED'a çekmek artık yürütücünün işi (iade ONAYLANINCA); handler FAILED'da bırakır.
+    expect(bp.status).toBe('FAILED');
   });
 
-  it('iade DE başarısızsa kritik uyarı yayınlanır (para müşteride değil, hizmet de yok)', async () => {
-    // Akışın en kötü hali ve tek telafisi elle iade: burada sessiz kalmak,
-    // müşterinin parasının karşılıksız kalması demek. Daha önce yalnız log'a
-    // yazılıyordu (kodda "TODO: event fırlatılacak" notu duruyordu).
+  it('iade yürütülürken BEKLENMEYEN hata → kritik uyarı; satır PENDING kalır, bp REFUNDED olmaz', async () => {
+    // Akışın en kötü hali: para tahsil edildi, rezervasyon açılamadı ve iade yürütülemedi.
+    // Sessiz kalmak müşterinin parasının karşılıksız kalması demek.
     const bp = makeBp('PENDING');
-    const { handler, stripeLink, criticalFailure } = build(bp, true);
-    (stripeLink.refund as jest.Mock).mockRejectedValue(new Error('stripe 500'));
+    const { handler, refundExecutor, criticalFailure } = build(bp, true);
+    (refundExecutor.execute as jest.Mock).mockRejectedValue(
+      new Error('db koptu')
+    );
 
     await handler.execute(
       new ConfirmBookingPaymentCommand({
@@ -605,8 +743,27 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         context: expect.objectContaining({ bookingPaymentId: bp.id.value }),
       })
     );
-    // İade geçmediği için kayıt REFUNDED'a çekilmez; FAILED'da kalır.
     expect(bp.status).toBe('FAILED');
+  });
+
+  it('başarısız rezervasyonun iade talebi tekrar teslimde ikinci kez açılmaz', async () => {
+    const bp = makeBp('PENDING');
+    const { handler, refunds, refundExecutor, refundRepo } = build(bp, true);
+    (refundRepo.create as jest.Mock).mockRejectedValue(
+      new BookingPaymentRefundAlreadyClaimedException('STRIPE', 'pi_1')
+    );
+
+    await handler.execute(
+      new ConfirmBookingPaymentCommand({
+        bookingPaymentId: bp.id.value,
+        provider: 'STRIPE',
+        providerRef: 'pi_1',
+        ctx,
+      })
+    );
+
+    expect(refunds).toHaveLength(0);
+    expect(refundExecutor.execute).not.toHaveBeenCalled();
   });
 
   it('durumu besleyen okuma kilitli yapılır (findByIdForUpdate) ve tx içinde kalır', async () => {
@@ -663,8 +820,11 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
       })
     );
 
-    expect(bp.status).toBe('REFUNDED');
+    expect(bp.status).toBe('FAILED');
     expect(depthAtCall.stripeRefund).toBe(0);
+    // İade satırı FAILED damgasıyla AYNI tx'te açılır (araya düşen çökme "iadesiz FAILED" bırakmasın).
+    expect(depthAtCall.refundCreate).toBe(1);
+    expect(depthAtCall.executor).toBe(0);
   });
 
   it('kayıt yoksa BookingPaymentNotFoundException', async () => {

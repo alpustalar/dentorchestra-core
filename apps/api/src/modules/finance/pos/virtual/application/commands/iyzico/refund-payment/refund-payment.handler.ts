@@ -10,6 +10,12 @@ import {
 } from '@modules/finance/pos/virtual/domain/repositories/iyzico-transaction.repository.interface';
 import { Inject } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import CardChargebackSourceSchema from '@input-type-schemas/CardChargebackSourceSchema';
+import {
+  CARD_CHARGEBACK_EXPOSURE_GUARD,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
+import { Decimal } from 'decimal.js';
 import {
   CompletedInstallmentNotFoundException,
   PaymentNotFoundException,
@@ -48,7 +54,9 @@ export class RefundPaymentHandler implements ICommandHandler<
     private readonly commandBus: TSCommandBus,
     private readonly queryBus: TSQueryBus,
     @Inject(POLICY_FACTORY)
-    private readonly policyFactory: IPolicyFactory
+    private readonly policyFactory: IPolicyFactory,
+    @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
+    private readonly chargebackExposureGuard: ICardChargebackExposureGuard
   ) {}
 
   async execute(
@@ -76,6 +84,22 @@ export class RefundPaymentHandler implements ICommandHandler<
 
     if (!completedInstallment)
       throw new CompletedInstallmentNotFoundException();
+
+    // Kart itirazı da aynı taksidin aynı tutarına dokunur: açık ya da kaybedilmiş
+    // bir itiraz varken iade/iptal parayı kart sahibine İKİ KEZ götürürdü (bir kez
+    // sağlayıcı kesintisi, bir kez bizim iademiz). Kontrol dış SDK çağrısından
+    // ÖNCE — sonra olsaydı para çoktan hareket etmişti.
+    // Not: bu yolda taksit satırı kilitlenmiyor ve PENDING işareti yok; SDK
+    // uçuştayken kaydedilen bir itiraz yakalanmaz (§88 ertelemesi).
+    const completedAmount = new Decimal(completedInstallment.amount.toString());
+    await this.chargebackExposureGuard.assertReversalWithinCollection({
+      sourceType: CardChargebackSourceSchema.enum.ONLINE_PAYMENT,
+      sourceId: completedInstallment.id,
+      collectedAmount: completedAmount,
+      // COMPLETED taksit henüz iade edilmemiştir (iade → REFUNDED durumuna geçer).
+      alreadyReversedAmount: new Decimal(0),
+      requestedAmount: completedAmount,
+    });
 
     // İade çağrısı için dış referans (paymentTransactionId). Okuma command repo'dan:
     // kayıt az önce yazılmış olabilir, replica gecikmesi iadeyi "kayıt yok" diye

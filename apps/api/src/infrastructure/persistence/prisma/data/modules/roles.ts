@@ -90,6 +90,7 @@ const {
   BANKSTATEMENT,
   BANKSTATEMENTLINE,
   PROVIDERSETTLEMENT,
+  CARDCHARGEBACK,
   // Muhasebe
   ACCOUNT,
   ACCOUNTINGPERIOD,
@@ -218,6 +219,10 @@ const TREASURY = [
   // Sağlayıcı hesap kapaması (108 → 102 + 653): kasa/banka mutabakatının
   // parçası — kartla tahsil edilen paranın bankaya geçişini kaydeder.
   PROVIDERSETTLEMENT,
+  // Kart itirazı (ters ibraz): sağlayıcının parayı geri kesmesi 108/102'yi
+  // hareket ettirir ve sonuçlanınca hasta borcunu yeniden doğurur — aynı
+  // yüksek etkili para yolu ailesi, aynı demet (CLAUDE.md finans kuralı 7).
+  CARDCHARGEBACK,
 ];
 
 /** Çift taraflı muhasebe: hesap planı, dönem, yevmiye, finansal olay parkesi. */

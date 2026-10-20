@@ -63,6 +63,9 @@ export const ENV = {
   // STRIPE (yurtdışı müşteri için EUR/USD ödeme linki — sağlık turizmi B7)
   STRIPE_SECRET_KEY: 'STRIPE_SECRET_KEY',
   STRIPE_WEBHOOK_SECRET: 'STRIPE_WEBHOOK_SECRET',
+  // Stripe ödeme LİNKİ ÜRETİMİNİ açar (yalnız 'true'). Varsayılan KAPALI: Stripe parası için
+  // kapanış akışı (payout→102, Stripe ücreti, itiraz, kur farkı) yok (kural 16).
+  STRIPE_PAYMENT_LINKS_ENABLED: 'STRIPE_PAYMENT_LINKS_ENABLED',
   // FX — net (EUR/USD) → TRY çevrimi (iyzico TRY ister); v1 statik env oranı
   FX_EUR_TRY: 'FX_EUR_TRY',
   FX_USD_TRY: 'FX_USD_TRY',

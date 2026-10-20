@@ -25,7 +25,10 @@ import { FinanceLedgerEvent } from '@src/domain/constants/events/finance-ledger.
 import { FinancialEventEvent } from '@src/domain/constants/events/financial-event.constant';
 import { GovernanceEvent } from '@src/domain/constants/events/governance.constant';
 import { MessagingEvent } from '@src/domain/constants/events/messaging.constant';
-import { HealthTourismConfigEvent } from '@src/domain/constants/events/health-tourism.constant';
+import {
+  BookingPaymentRefundEvent,
+  HealthTourismConfigEvent,
+} from '@src/domain/constants/events/health-tourism.constant';
 import { LeaveEvent } from '@src/domain/constants/events/leave.constant';
 import { EmployeeEvent } from '@src/domain/constants/events/employee.constant';
 import { AttendanceEvent } from '@src/domain/constants/events/attendance.constant';
@@ -62,6 +65,7 @@ export type AppEventName =
   | MessagingEvent
   | PatientTreatmentPackageEvent
   | HealthTourismConfigEvent
+  | BookingPaymentRefundEvent
   | LeaveEvent
   | EmployeeEvent
   | AttendanceEvent

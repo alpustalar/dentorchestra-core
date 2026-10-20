@@ -358,3 +358,47 @@ describe('validateFinancialEventPayload — ödeme yöntemi kapısı', () => {
     expect(issues).toHaveLength(1);
   });
 });
+
+describe('validateFinancialEventPayload — müşteriye iade edilecek tahsilat (336)', () => {
+  const valid = {
+    amount: '250.00',
+    currency: 'TRY',
+    provider: 'IYZICO',
+    chargeReference: 'ptx-2',
+    reason: 'UNCLAIMED_CHARGE',
+    bookingPaymentId: '33333333-3333-4333-8333-333333333333',
+    refundId: '44444444-4444-4444-8444-444444444444',
+  };
+  const types = [
+    FinancialEventTypeSchema.enum.PLATFORM_RETURNABLE_CHARGE_RECEIVED,
+    FinancialEventTypeSchema.enum.PLATFORM_RETURNABLE_CHARGE_REFUNDED,
+  ];
+
+  it.each(types)('%s: geçerli gövde kabul edilir', (type) => {
+    expect(validateFinancialEventPayload(type, valid)).toEqual([]);
+  });
+
+  it.each(types)('%s: TRY dışı para birimi reddedilir (v1)', (type) => {
+    expect(
+      validateFinancialEventPayload(type, { ...valid, currency: 'EUR' }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it.each(types)('%s: kuruş altı tutar reddedilir', (type) => {
+    expect(
+      validateFinancialEventPayload(type, { ...valid, amount: '10.005' }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it.each(types)('%s: sıfır tutar reddedilir', (type) => {
+    expect(
+      validateFinancialEventPayload(type, { ...valid, amount: '0.00' }).length
+    ).toBeGreaterThan(0);
+  });
+
+  it.each(types)('%s: bilinmeyen neden reddedilir', (type) => {
+    expect(
+      validateFinancialEventPayload(type, { ...valid, reason: 'WHATEVER' }).length
+    ).toBeGreaterThan(0);
+  });
+});

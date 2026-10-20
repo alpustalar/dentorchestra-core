@@ -16,18 +16,27 @@ import {
   IBookingPaymentQueryRepository,
 } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.query.repository';
 import { BridgeableBookingLedgerRow } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
+import {
+  BOOKING_PAYMENT_REFUND_QUERY_REPOSITORY,
+  IBookingPaymentRefundQueryRepository,
+} from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment-refund/booking-payment-refund.query.repository';
+import type { BookingPaymentRefund } from '@shared';
 import { FindUnbridgedBookingLedgerEntriesQuery } from './find-unbridged-booking-ledger-entries.query';
 import {
   FindUnbridgedBookingLedgerEntriesResponse,
+  UnbridgedBookingLedgerKind,
   UnbridgedBookingLedgerView,
 } from './find-unbridged-booking-ledger-entries.response';
 
-/** Bir rezervasyonun borçlu olduğu tek bir fiş (yön + anahtar + tarih). */
+/** Borçlu olunan tek bir fiş (yön + anahtar + tarih). */
 interface ExpectedEntry {
-  readonly row: BridgeableBookingLedgerRow;
-  readonly kind: 'SETTLED' | 'REFUNDED';
+  readonly bookingPaymentId: string;
+  readonly clinicId: string;
+  readonly bookingType: string | null;
+  readonly kind: UnbridgedBookingLedgerKind;
   readonly dedupeKey: string;
   readonly occurredAt: Date | null;
+  readonly refundId: string | null;
 }
 
 /**
@@ -56,6 +65,8 @@ export class FindUnbridgedBookingLedgerEntriesHandler implements IQueryHandler<
   constructor(
     @Inject(BOOKING_PAYMENT_QUERY_REPOSITORY)
     private readonly bookingPaymentQueryRepo: IBookingPaymentQueryRepository,
+    @Inject(BOOKING_PAYMENT_REFUND_QUERY_REPOSITORY)
+    private readonly refundQueryRepo: IBookingPaymentRefundQueryRepository,
     @Inject(PLATFORM_TENANT_PROVIDER)
     private readonly platformTenant: IPlatformTenantProvider,
     @Inject(POLICY_FACTORY)
@@ -86,13 +97,22 @@ export class FindUnbridgedBookingLedgerEntriesHandler implements IQueryHandler<
       clinicId: target.clinicId,
     });
 
-    const rows = await this.bookingPaymentQueryRepo.findBridgeable({
+    const window = {
       from: filter.from,
       to: filter.to,
       clinicId: filter.clinicId,
-    });
+    };
+    const [rows, refunds] = await Promise.all([
+      this.bookingPaymentQueryRepo.findBridgeable(window),
+      this.refundQueryRepo.findBridgeable(window),
+    ]);
 
-    const expected = rows.flatMap((row) => this.expectedEntries(row));
+    // Tahsilat yönü rezervasyon satırından, iade / 336 yönü iade SATIRINDAN türer: `refundedAt`
+    // rezervasyon satırında "iade talep edildi" demekti ve sağlayıcı reddetse de dolardı.
+    const expected = [
+      ...rows.map((row) => this.settledEntry(row)),
+      ...refunds.flatMap((refund) => this.refundEntries(refund)),
+    ];
     if (expected.length === 0) {
       return { data: [], meta: { serializationOptions } };
     }
@@ -114,48 +134,95 @@ export class FindUnbridgedBookingLedgerEntriesHandler implements IQueryHandler<
         .filter((entry) => !written.has(entry.dedupeKey))
         .map(
           (entry): UnbridgedBookingLedgerView => ({
-            bookingPaymentId: entry.row.bookingPaymentId,
-            clinicId: entry.row.clinicId,
-            bookingType: entry.row.bookingType,
+            bookingPaymentId: entry.bookingPaymentId,
+            clinicId: entry.clinicId,
+            bookingType: entry.bookingType,
             kind: entry.kind,
             dedupeKey: entry.dedupeKey,
             occurredAt: entry.occurredAt,
+            refundId: entry.refundId,
           })
         ),
       meta: { serializationOptions },
     };
   }
 
-  /**
-   * Bir kaydın borçlu olduğu fişler. Tahsilat her zaman borçludur (aday olma
-   * koşulu rezervasyonun açılmış olması); iade yalnız fiilen gerçekleştiyse.
-   *
-   * İade edilmiş bir kayıtta **iki** fiş de beklenir: tahsilat o gün gerçekten
-   * olmuştu ve iade onun storno'su değil, ayrı bir ekonomik olaydır (§65/§67).
-   */
-  private expectedEntries(row: BridgeableBookingLedgerRow): ExpectedEntry[] {
-    const entries: ExpectedEntry[] = [
-      {
-        row,
-        kind: 'SETTLED',
-        dedupeKey: FinancialEventDedupeKeys.platform_booking_settled(
-          row.bookingPaymentId
-        ),
-        occurredAt: row.paidAt,
-      },
-    ];
+  /** Tahsilat her zaman borçludur: aday olma koşulu rezervasyonun fiilen açılmış olması. */
+  private settledEntry(row: BridgeableBookingLedgerRow): ExpectedEntry {
+    return {
+      bookingPaymentId: row.bookingPaymentId,
+      clinicId: row.clinicId,
+      bookingType: row.bookingType,
+      kind: 'SETTLED',
+      dedupeKey: FinancialEventDedupeKeys.platform_booking_settled(
+        row.bookingPaymentId
+      ),
+      occurredAt: row.paidAt,
+      refundId: null,
+    };
+  }
 
-    if (row.refundedAt) {
-      entries.push({
-        row,
-        kind: 'REFUNDED',
-        dedupeKey: FinancialEventDedupeKeys.platform_booking_refunded(
-          row.bookingPaymentId
-        ),
-        occurredAt: row.refundedAt,
-      });
+  /**
+   * Bir iade satırının borçlu olduğu fişler.
+   *
+   * - `CANCELLATION` CONFIRMED → `PLATFORM_BOOKING_REFUNDED` (iade storno değil, ayrı olay).
+   *   Doğrulanmamış (UNCONFIRMED / FAILED / PENDING) iade için ters fiş BORÇLU DEĞİLDİR:
+   *   para dönmemiş olabilir ve fiş "döndü" derdi — satır `refunds/unresolved` listesinde görünür.
+   * - İade edilecek tahsilat (çift çekim / başarısız rezervasyon) iyzico/TRY:
+   *   `RECEIVED` (336 açılışı) LIVE satırlarda onaylanmasa da borçlu — para platform hesabına
+   *   girdi; LEGACY satırda yalnız onaylanınca (geçmişi yorumlamayız). `REFUNDED` yalnız CONFIRMED.
+   * - Stripe / TRY dışı: 336 yoluna girmez (Stripe kapalı).
+   */
+  private refundEntries(refund: BookingPaymentRefund): ExpectedEntry[] {
+    const base = {
+      bookingPaymentId: refund.bookingPaymentId,
+      clinicId: refund.clinicId,
+      // Rezervasyon türü iade satırında tutulmaz; fiş açıklaması telafi anında bp'den okunur.
+      bookingType: null,
+      refundId: refund.id,
+    };
+    const confirmed = refund.status === 'CONFIRMED';
+
+    if (refund.kind === 'CANCELLATION') {
+      return confirmed
+        ? [
+            {
+              ...base,
+              kind: 'REFUNDED',
+              dedupeKey: FinancialEventDedupeKeys.platform_booking_refunded(
+                refund.bookingPaymentId
+              ),
+              occurredAt: refund.refundedAt,
+            },
+          ]
+        : [];
     }
 
+    if (refund.provider !== 'IYZICO' || refund.currency !== 'TRY') return [];
+
+    const entries: ExpectedEntry[] = [];
+    if (refund.origin === 'LIVE' || confirmed) {
+      entries.push({
+        ...base,
+        kind: 'RETURNABLE_RECEIVED',
+        dedupeKey: FinancialEventDedupeKeys.platform_returnable_charge_received(
+          refund.provider,
+          refund.chargeProviderRef
+        ),
+        occurredAt: refund.requestedAt,
+      });
+    }
+    if (confirmed) {
+      entries.push({
+        ...base,
+        kind: 'RETURNABLE_REFUNDED',
+        dedupeKey: FinancialEventDedupeKeys.platform_returnable_charge_refunded(
+          refund.provider,
+          refund.chargeProviderRef
+        ),
+        occurredAt: refund.refundedAt,
+      });
+    }
     return entries;
   }
 }

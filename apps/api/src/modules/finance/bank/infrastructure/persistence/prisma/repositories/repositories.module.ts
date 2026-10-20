@@ -17,6 +17,12 @@ import { BANK_ACCOUNT_COMMAND_REPOSITORY } from '@modules/finance/bank/domain/re
 import { BANK_ACCOUNT_QUERY_REPOSITORY } from '@modules/finance/bank/domain/repositories/bank-account/bank-account.query.repository';
 import { PROVIDER_SETTLEMENT_COMMAND_REPOSITORY } from '@modules/finance/bank/domain/repositories/provider-settlement/provider-settlement.command.repository';
 import { ProviderSettlementCommandRepository } from './provider-settlement/provider-settlement.command.repository';
+import {
+  CARD_CHARGEBACK_COMMAND_REPOSITORY,
+  CARD_CHARGEBACK_QUERY_REPOSITORY,
+} from '@modules/finance/bank/domain/repositories/card-chargeback/card-chargeback.repository';
+import { CardChargebackCommandRepository } from './card-chargeback/card-chargeback.command.repository';
+import { CardChargebackQueryRepository } from './card-chargeback/card-chargeback.query.repository';
 
 @Module({
   providers: [
@@ -48,6 +54,14 @@ import { ProviderSettlementCommandRepository } from './provider-settlement/provi
       provide: PROVIDER_SETTLEMENT_COMMAND_REPOSITORY,
       useClass: ProviderSettlementCommandRepository,
     },
+    {
+      provide: CARD_CHARGEBACK_COMMAND_REPOSITORY,
+      useClass: CardChargebackCommandRepository,
+    },
+    {
+      provide: CARD_CHARGEBACK_QUERY_REPOSITORY,
+      useClass: CardChargebackQueryRepository,
+    },
   ],
   exports: [
     BANK_ACCOUNT_COMMAND_REPOSITORY,
@@ -57,6 +71,8 @@ import { ProviderSettlementCommandRepository } from './provider-settlement/provi
     BANK_STATEMENT_LINE_COMMAND_REPOSITORY,
     BANK_STATEMENT_LINE_QUERY_REPOSITORY,
     PROVIDER_SETTLEMENT_COMMAND_REPOSITORY,
+    CARD_CHARGEBACK_COMMAND_REPOSITORY,
+    CARD_CHARGEBACK_QUERY_REPOSITORY,
   ],
 })
 export class BankRepositoriesModule {}

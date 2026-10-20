@@ -30,6 +30,14 @@ enum FinancialEventType {
   /// kapanmaz**: her kart tahsilatı orada kalır (bilanço şişik), para 102'ye hiç
   /// girmez ve sağlayıcı komisyonu gider yazılmaz (kâr fazla görünür).
   PROVIDER_SETTLEMENT_RECEIVED
+  /// Kart itirazı AÇILDI: sağlayıcı kart sahibinin itirazı üzerine parayı kesti
+  /// (108'den ya da doğrudan bankadan). Para henüz "kaybedilmiş" sayılmaz — sonuç
+  /// belli olana kadar 127 ara hesabında bekler (`B 127 / A 108|102`).
+  CARD_CHARGEBACK_OPENED
+  /// İtiraz KAZANILDI: sağlayıcı kesilen parayı geri verdi (`B 108|102 / A 127`).
+  CARD_CHARGEBACK_WON
+  /// İtiraz KAYBEDİLDİ: kesinleşti, tahsilat fiilen geri alındı (`B 120 / A 127`).
+  CARD_CHARGEBACK_LOST
   /// Sağlık turizmi rezervasyonunun tahsilatı — platform defterine yazılır.
   /// Klinik defterine YAZILMAZ: klinik bu işleme finansal olarak taraf değildir.
   PLATFORM_BOOKING_SETTLED
@@ -38,6 +46,12 @@ enum FinancialEventType {
   /// (tahsilat fişi yerinde kalır, bkz. PAYMENT_REFUNDED). Üstlenilen iptal
   /// cezası bu fişte zarar olarak tanınır.
   PLATFORM_BOOKING_REFUNDED
+  /// Müşteriye İADE EDİLMESİ gereken bir tahsilat platform hesabına girdi (aynı rezervasyon
+  /// için ikinci çekim, başarısız rezervasyonun tahsilatı): `B 108 / A 336`. Gelir değildir;
+  /// iade doğrulanana kadar 336'da müşteriye borç olarak bekler.
+  PLATFORM_RETURNABLE_CHARGE_RECEIVED
+  /// O tahsilatın müşteriye iadesi sağlayıcıda DOĞRULANDI: `B 336 / A 108`.
+  PLATFORM_RETURNABLE_CHARGE_REFUNDED
 }
 
 model FinancialEvent {

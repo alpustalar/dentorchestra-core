@@ -1,6 +1,13 @@
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../../../../packages/shared/common/constants/error-codes.constant';
 import { DomainException } from '@src/domain/exceptions/domain.exception';
 import { HttpStatus } from '@nestjs/common';
+import type {
+  ChargebackAlreadyRecordedMeta,
+  ChargebackAlreadyResolvedMeta,
+  ChargebackCollectionCapMeta,
+  ChargebackExceedsReversibleMeta,
+  ChargebackSourceNotInLedgerMeta,
+} from '@shared/modules/bank/interfaces';
 
 export class BankAccountNotFoundException extends DomainException<{
   bankAccountId?: string;
@@ -244,6 +251,293 @@ export class SettlementBankAccountMismatchException extends DomainException<{
 }> {
   public readonly errorCode =
     ERROR_CODES.PROVIDER_SETTLEMENT.BANK_ACCOUNT_MISMATCH;
+  public override readonly httpStatus = HttpStatus.FORBIDDEN;
+
+  constructor(bankAccountId: string) {
+    super('Seçilen banka hesabı bu kliniğe ait değil.', { bankAccountId });
+  }
+}
+
+// ============================================================
+// Kart itirazı (chargeback / ters ibraz)
+// ============================================================
+
+/**
+ * Sağlayıcı vaka numarası boş.
+ *
+ * Vaka numarası idempotency anahtarının yarısıdır (`@@unique([clinicId, provider,
+ * caseReference])`): boş geçerse aynı itiraz ikinci kez girildiğinde DB kısıtı onu
+ * ayırt edemez ve 127 **iki kez** dolar, 108 iki kez düşer.
+ */
+export class ChargebackReferenceRequiredException extends DomainException {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.REFERENCE_REQUIRED;
+
+  constructor() {
+    super('Sağlayıcı vaka numarası zorunludur.');
+  }
+}
+
+/** Tutar geçersiz: sonsuz/NaN, sıfır ya da negatif (ücret hariç: ≥ 0). */
+export class ChargebackInvalidAmountException extends DomainException<{
+  amount: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.INVALID_AMOUNT;
+
+  constructor(amount: string) {
+    super(
+      `İtiraz tutarı geçersiz (tutar pozitif, ücret negatif olamaz): ${amount}`,
+      { amount }
+    );
+  }
+}
+
+/** Tutar kuruştan ince — DB kolonu `Decimal(14,2)` sessizce yuvarlar (§81.3). */
+export class ChargebackInvalidPrecisionException extends DomainException<{
+  amount: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.INVALID_PRECISION;
+
+  constructor(amount: string) {
+    super(`Tutar en fazla 2 ondalık basamak taşıyabilir (gelen: ${amount}).`, {
+      amount,
+    });
+  }
+}
+
+/** Çözüm tarihi açılış tarihinden önce olamaz (DB `resolved_at >= opened_at`). */
+export class ChargebackInvalidDateException extends DomainException<{
+  openedAt: string;
+  resolvedAt: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.INVALID_DATE;
+
+  constructor(meta: { openedAt: string; resolvedAt: string }) {
+    super(
+      `İtirazın çözüm tarihi (${meta.resolvedAt}) açılış tarihinden (${meta.openedAt}) önce olamaz.`,
+      meta
+    );
+  }
+}
+
+/** Kazanılan itirazda paranın döndüğü kanal (108 / 102) zorunlu. */
+export class ChargebackReturnChannelRequiredException extends DomainException {
+  public readonly errorCode =
+    ERROR_CODES.CARD_CHARGEBACK.RETURN_CHANNEL_REQUIRED;
+
+  constructor() {
+    super('Kazanılan itirazda paranın döndüğü kanal zorunludur.');
+  }
+}
+
+export class CardChargebackNotFoundException extends DomainException<{
+  chargebackId: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.NOT_FOUND;
+  public override readonly httpStatus = HttpStatus.NOT_FOUND;
+
+  constructor(chargebackId: string) {
+    super('Kart itirazı bulunamadı.', { chargebackId });
+  }
+}
+
+/** Aynı sağlayıcı vakası zaten kayıtlı (idempotency kısıtı). */
+export class ChargebackAlreadyRecordedException extends DomainException<ChargebackAlreadyRecordedMeta> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.ALREADY_RECORDED;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: ChargebackAlreadyRecordedMeta) {
+    super(
+      `Bu itiraz zaten kayıtlı (${meta.provider} / ${meta.caseReference}); ` +
+        'ikinci kez kaydedilirse 127 iki kez dolar.',
+      meta
+    );
+  }
+}
+
+/**
+ * Çözümlenmiş itiraz tekrar çözümlenemez.
+ *
+ * Kazanılan itirazı kaybedilene (ya da tersine) çevirmek ayrı bir ekonomik
+ * olaydır — itirazın yeniden açılması / ikinci tur (pre-arbitration). Bu kayıt
+ * bir durum makinesidir, düzenlenebilir bir form değil.
+ */
+export class ChargebackAlreadyResolvedException extends DomainException<ChargebackAlreadyResolvedMeta> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.ALREADY_RESOLVED;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: ChargebackAlreadyResolvedMeta) {
+    super(
+      `Bu itiraz zaten sonuçlandırılmış (durum: ${meta.status}); tekrar çözümlenemez.`,
+      meta
+    );
+  }
+}
+
+/**
+ * Ödeme planına yansıma sonucu yalnız KAYBEDİLEN itirazda anlamlıdır: kazanılan
+ * itirazda plan değişmez, açık itirazda henüz sonuç yoktur.
+ */
+export class ChargebackPlanSyncNotApplicableException extends DomainException<{
+  chargebackId: string;
+  status: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.CARD_CHARGEBACK.PLAN_SYNC_NOT_APPLICABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { chargebackId: string; status: string }) {
+    super(
+      `Plan yansıması yalnız kaybedilen itirazda kaydedilir (durum: ${meta.status}).`,
+      meta
+    );
+  }
+}
+
+/** İtiraz edilen tahsilat (POS işlemi / taksit) bulunamadı. */
+export class ChargebackSourceNotFoundException extends DomainException<{
+  sourceType: string;
+  sourceId: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.SOURCE_NOT_FOUND;
+  public override readonly httpStatus = HttpStatus.NOT_FOUND;
+
+  constructor(meta: { sourceType: string; sourceId: string }) {
+    super('İtiraz edilen kart tahsilatı bulunamadı.', meta);
+  }
+}
+
+/** Kaynak, itirazın yazıldığı kliniğe ait değil (kiracı sınırı). */
+export class ChargebackSourceClinicMismatchException extends DomainException<{
+  sourceType: string;
+  sourceId: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.CARD_CHARGEBACK.SOURCE_CLINIC_MISMATCH;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { sourceType: string; sourceId: string }) {
+    super('İtiraz edilen kart tahsilatı bu kliniğe ait değil.', meta);
+  }
+}
+
+/**
+ * Kaynak itiraz edilebilir bir kart tahsilatı değil: başarılı bir SATIŞ
+ * olmalıdır (başarısız/askıdaki işlem ya da iade/iptal kaydı değil).
+ */
+export class ChargebackSourceNotChargeableException extends DomainException<{
+  sourceType: string;
+  sourceId: string;
+  reason: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.SOURCE_NOT_CHARGEABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { sourceType: string; sourceId: string; reason: string }) {
+    super(`İtiraz edilen kayıt kart tahsilatı değil: ${meta.reason}`, meta);
+  }
+}
+
+/**
+ * Hastasız kart çekimi: muhasebe köprüsü yalnız hastaya bağlı hareket için
+ * kurulur, yani bu satış deftere **hiç yazılmamıştır**. Yazılmamış bir tahsilata
+ * karşı itiraz kaydetmek, olmayan parayı 108'den düşmek olurdu.
+ */
+export class ChargebackSourcePatientRequiredException extends DomainException<{
+  sourceType: string;
+  sourceId: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.CARD_CHARGEBACK.SOURCE_PATIENT_REQUIRED;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { sourceType: string; sourceId: string }) {
+    super(
+      'Hastaya bağlı olmayan kart çekimi deftere yazılmamıştır; bu tahsilat için itiraz kaydedilemez.',
+      meta
+    );
+  }
+}
+
+/**
+ * Tahsilatın ekonomik olayı olay defterinde yok.
+ *
+ * Defterde olmayan bir tahsilatı geri almak, gelir eksiği değil **olmayan paranın
+ * düşülmesi** olurdu. Genellikle muhasebe köprüsü (best-effort) başarısız olmuştur:
+ * POS için `POST /pos/transactions/backfill-accounting` ile telafi edilir.
+ */
+export class ChargebackSourceNotInLedgerException extends DomainException<ChargebackSourceNotInLedgerMeta> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.SOURCE_NOT_IN_LEDGER;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: ChargebackSourceNotInLedgerMeta) {
+    super(
+      'İtiraz edilen tahsilat deftere yazılmamış; önce muhasebe köprüsü telafi edilmeli.',
+      meta
+    );
+  }
+}
+
+/** v1 yalnız TRY: yabancı para itirazı kur farkı üretir (§88 ertelemesi). */
+export class ChargebackCurrencyNotSupportedException extends DomainException<{
+  currency: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.CARD_CHARGEBACK.CURRENCY_NOT_SUPPORTED;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(currency: string) {
+    super(
+      `Kart itirazı yalnız TRY tahsilatlar için kaydedilebilir (gelen: ${currency}).`,
+      { currency }
+    );
+  }
+}
+
+/**
+ * İtiraz tutarı, geri götürülebilir tutarı aşıyor: tahsilat − iade/iptal − aktif
+ * itirazlar. Aşılırsa aynı para üç kez (iade + itiraz + itiraz) düşülürdü.
+ */
+export class ChargebackExceedsCollectionException extends DomainException<ChargebackExceedsReversibleMeta> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.EXCEEDS_COLLECTION;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: ChargebackExceedsReversibleMeta) {
+    super(
+      `İtiraz tutarı geri götürülebilir tutarı aşıyor: geri götürülebilir ${meta.reversible}, ` +
+        `aktif itiraz ${meta.activeChargebacks}, istenen ${meta.requested} ` +
+        `(en fazla ${meta.available}).`,
+      meta
+    );
+  }
+}
+
+/**
+ * Bu tahsilat kart itirazı altında: iade/iptal, parayı kart sahibine İKİ KEZ
+ * geri götürürdü (biri sağlayıcı kesintisi, biri bizim iademiz).
+ *
+ * Para geri götüren her yol (iade, iptal, ters ibraz) aynı kümülatif tavanı
+ * paylaşır; bir yolun tavanı diğerini bilmiyorsa para iki kez geri gider.
+ */
+export class CollectionUnderChargebackException extends DomainException<ChargebackCollectionCapMeta> {
+  public readonly errorCode =
+    ERROR_CODES.CARD_CHARGEBACK.COLLECTION_UNDER_CHARGEBACK;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: ChargebackCollectionCapMeta) {
+    super(
+      'Bu tahsilatın kart itirazı sürüyor ya da kaybedilmiş; iade/iptal aynı parayı ' +
+        `ikinci kez geri götürürdü (tahsilat ${meta.collected}, iade/iptal ${meta.alreadyReversed}, ` +
+        `aktif itiraz ${meta.activeChargebacks}, istenen ${meta.requested}).`,
+      meta
+    );
+  }
+}
+
+/** Banka hesabı bu kliniğe ait değil (kiracı sınırı) — kart itirazı. */
+export class ChargebackBankAccountMismatchException extends DomainException<{
+  bankAccountId: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.BANK_ACCOUNT_MISMATCH;
   public override readonly httpStatus = HttpStatus.FORBIDDEN;
 
   constructor(bankAccountId: string) {

@@ -4,6 +4,7 @@
  */
 
 import { CurrencyType } from '@input-type-schemas/CurrencySchema';
+import type { ChargebackFundsChannelType } from '@input-type-schemas/ChargebackFundsChannelSchema';
 import type {
   InboundPaymentMethod,
   OutboundPaymentMethod,
@@ -112,6 +113,43 @@ export interface ProviderSettlementReceivedEventPayload {
 }
 
 /**
+ * Kart itirazı AÇILDI — sağlayıcı parayı kesti, sonuç henüz belli değil.
+ *
+ * Para "kaybedilmiş" sayılmaz: 127 ara hesabında bekler (`B 127 / A 108|102`).
+ * `fundsChannel` paranın **nereden** kesildiğini söyler (sağlayıcıdaki bekleyen
+ * bakiye mi, doğrudan banka mı); ücret aynı kanaldan kesilir.
+ */
+export interface CardChargebackOpenedEventPayload {
+  amount: string; // itiraz edilen (kesilen) tutar → 127 borç
+  feeAmount: string; // sağlayıcının itiraz ücreti → 653 borç; 0 olabilir
+  fundsChannel: ChargebackFundsChannelType; // 108 | 102 alacak
+  currency: CurrencyType;
+  provider: string; // IYZICO / PAX_BANK / ... (açıklama ve mutabakat izi)
+  caseReference: string; // sağlayıcının vaka numarası
+}
+
+/** Kart itirazı KAZANILDI — kesilen para geri geldi (`B 108|102 / A 127`). */
+export interface CardChargebackWonEventPayload {
+  amount: string; // 127'den düşen tutar
+  fundsChannel: ChargebackFundsChannelType; // paranın döndüğü yer (açılıştakinden farklı olabilir)
+  currency: CurrencyType;
+  provider: string;
+  caseReference: string;
+}
+
+/**
+ * Kart itirazı KAYBEDİLDİ — kesinleşti (`B 120 / A 127`). Hasta borcu yeniden
+ * doğar: tahsilat fiilen geri alınmıştır, ama borç silinmemiştir.
+ */
+export interface CardChargebackLostEventPayload {
+  amount: string; // 127'den düşen tutar
+  partyId: string; // 120 satırının carisi (requiresParty)
+  currency: CurrencyType;
+  provider: string;
+  caseReference: string;
+}
+
+/**
  * Sağlık turizmi rezervasyon tahsilatı — **platform** defterine yazılır.
  *
  * Platform aracıdır (acente): müşteriden `saleAmount` tahsil edilir, bunun
@@ -180,6 +218,21 @@ export interface PlatformBookingRefundedEventPayload {
   /** 320 ve 689 satırlarının orijinal cinsten tutarları. */
   supplierReleasedOriginalAmount?: string;
   retainedLossOriginalAmount?: string;
+}
+
+/**
+ * Müşteriye iade edilecek tahsilat platform hesabına girdi / iadesi doğrulandı —
+ * PLATFORM_RETURNABLE_CHARGE_RECEIVED (`B 108 / A 336`) ve
+ * PLATFORM_RETURNABLE_CHARGE_REFUNDED (`B 336 / A 108`). İki olay AYNI gövdeyi taşır.
+ */
+export interface PlatformReturnableChargeEventPayload {
+  amount: string; // iade edilecek tutar (kuruş ölçeği, pozitif)
+  currency: CurrencyType; // v1: yalnız TRY (iyzico)
+  provider: string; // IYZICO
+  chargeReference: string; // iade edilecek tahsilatın sağlayıcı referansı
+  reason: string; // RETURNABLE_CHARGE_REASONS
+  bookingPaymentId: string;
+  refundId: string;
 }
 
 /**

@@ -4,7 +4,7 @@
 > Kaynak: `09-guvence-denetimi.md` içindeki "Bilinçli yapılmayanlar" tabloları.
 > Yeniden üretmek için: `node scripts/finans-eksik-liste.cjs`
 
-**2026-10-15 itibarıyla 205 kalem; 193 açık, 12 kapandı.**
+**2026-10-20 itibarıyla 229 kalem; 217 açık, 12 kapandı.**
 
 Bu dosya **tek tek** kalem listesidir (ne yapılacağına karar vermek için
 değil, hiçbir kalemin kaybolmadığını görmek için). Konu bazında gruplanmış,
@@ -396,3 +396,37 @@ hiç olmamasından kötüdür (§55). Bkz. §70 — bu kalemin kendi ertelemesi.
 | 203 | **Banka ekstresi satırı ↔ hesap kapaması otomatik eşleşmesi** | — | açık |
 | 204 | **Sağlayıcı payout API'si** | — | açık |
 | 205 | **Platform defterinin 108'i** | — | açık |
+
+## §88 — kart itirazı turu
+
+| # | Kalem | Tetikleyici | Durum |
+| --- | --- | --- | --- |
+| 206 | **Platform tarafı** (Stripe `charge.dispute.*`, `BookingPayment`, `SubscriptionCharge`) | — | açık |
+| 207 | **Kısmi itirazın plana yansıması** | — | açık |
+| 208 | **Değersiz alacak / telafi taksidinin silinmesi** (128/129/654 ya da 689) | — | açık |
+| 209 | **WON'da ücret iadesi** | — | açık |
+| 210 | **Kazanılandan sonra ikinci tur / pre-arbitration** | — | açık |
+| 211 | **Sanal iade yolunda PENDING işareti ve satır kilidi** | — | açık |
+| 212 | **Döviz cinsinden itiraz** | — | açık |
+| 213 | **Sağlayıcı itiraz API'si / webhook'u** | — | açık |
+| 214 | **Delil iş akışı** | — | açık |
+| 215 | **Hastasız POS satışlarının deftere hiç girmemesi** | — | açık |
+| 216 | **127'nin alt hesaplanması** | — | açık |
+| 217 | **Frontend kayıt ekranı** | — | açık |
+| 218 | **Plan yansıması için "eksik kalanlar" sorgusu** | — | açık |
+
+## §90 — platform iade turu
+
+| # | Kalem | Tetikleyici | Durum |
+| --- | --- | --- | --- |
+| 219 | **Stripe payout / itiraz / kur farkı** | — | açık |
+| 220 | **Platform iyzico itirazı** (`CardChargeback` + `BOOKING_PAYMENT`) | — | açık |
+| 221 | **Rezervasyon için kümülatif tavan kapısı** | — | açık |
+| 222 | **Kısmi iade** (iptal cezasının iadeden düşülmesi) | — | açık |
+| 223 | `resolve` için step-up doğrulama | — | açık |
+| 224 | Sağlayıcı iade-durumu API'siyle otomatik doğrulama | — | açık |
+| 225 | Backfill fişlerinin backfill günüyle tarihlenmesi (SETTLED) | — | açık |
+| 226 | Payout'tan sonra iade edilince 108'in geçici eksiye düşmesi | — | açık |
+| 227 | Platform vergi parametresi | — | açık |
+| 228 | 336'nın alt hesaplanması | — | açık |
+| 229 | `SubscriptionCharge` | — | açık |

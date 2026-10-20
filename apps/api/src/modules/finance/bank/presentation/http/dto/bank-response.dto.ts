@@ -1,9 +1,15 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { FinanceResponseGroups } from '@modules/finance/shared/domain/finance.contracts';
-import { CurrencyType } from '@input-type-schemas/CurrencySchema';
-import { BankAccountStatusType } from '@input-type-schemas/BankAccountStatusSchema';
-import { BankStatementLineMatchStatusType } from '@input-type-schemas/BankStatementLineMatchStatusSchema';
-import { BankStatementLineMatchSourceType } from '@input-type-schemas/BankStatementLineMatchSourceSchema';
+import { CurrencyType, CurrencySchema } from '@input-type-schemas/CurrencySchema';
+import { BankAccountStatusType, BankAccountStatusSchema } from '@input-type-schemas/BankAccountStatusSchema';
+import { BankStatementLineMatchStatusType, BankStatementLineMatchStatusSchema } from '@input-type-schemas/BankStatementLineMatchStatusSchema';
+import { BankStatementLineMatchSourceType, BankStatementLineMatchSourceSchema } from '@input-type-schemas/BankStatementLineMatchSourceSchema';
+import { SettlementProviderType, SettlementProviderSchema } from '@input-type-schemas/SettlementProviderSchema';
+import { CardChargebackSourceType, CardChargebackSourceSchema } from '@input-type-schemas/CardChargebackSourceSchema';
+import { CardChargebackStatusType, CardChargebackStatusSchema } from '@input-type-schemas/CardChargebackStatusSchema';
+import { ChargebackFundsChannelType, ChargebackFundsChannelSchema } from '@input-type-schemas/ChargebackFundsChannelSchema';
+import { CardChargebackPlanSyncType, CardChargebackPlanSyncSchema } from '@input-type-schemas/CardChargebackPlanSyncSchema';
 
 const { FINANCIAL, MANAGEMENT, ADMIN } = FinanceResponseGroups;
 
@@ -20,7 +26,9 @@ export class BankAccountResponseDto {
   @Expose(FIN) clinicId: string;
   @Expose(FIN) name: string;
   @Expose(FIN) bankName: string;
+  @ApiProperty({ enum: CurrencySchema.options })
   @Expose(FIN) currency: CurrencyType;
+  @ApiProperty({ enum: BankAccountStatusSchema.options })
   @Expose(FIN) status: BankAccountStatusType;
 
   @Expose(FIN)
@@ -71,9 +79,11 @@ export class BankStatementLineResponseDto {
   @Expose(FIN) counterpartyName: string | null;
 
   // --- Mutabakat izi ---
+  @ApiProperty({ enum: BankStatementLineMatchStatusSchema.options })
   @Expose(FIN) matchStatus: BankStatementLineMatchStatusType;
   @Expose(FIN) matchedRef: string | null;
   @Expose(FIN) matchNote: string | null;
+  @ApiProperty({ enum: BankStatementLineMatchSourceSchema.options })
   @Expose(FIN) matchSource: BankStatementLineMatchSourceType;
   @Expose(FIN) reconciledById: string | null;
 
@@ -154,4 +164,85 @@ export class LineMatchSuggestionResponseDto {
   @Expose(FIN) dayDifference: number;
   @Expose(FIN) reason: string;
   @Expose(FIN) alreadyUsed: boolean;
+}
+
+/**
+ * Kart itirazı (chargeback). Tutarlar ve hasta/plan kimlikleri finansaldır —
+ * ekstre/hesap kapaması ile aynı hizada tabansız tutulur. Vaka numarası, delil
+ * son günü ve notlar operasyonun günlük işidir; personel kimlikleri ve muhasebe
+ * köprüsü izleri yönetime kapalıdır.
+ */
+export class CardChargebackResponseDto {
+  @Expose(FIN) id: string;
+  @Expose(FIN) clinicId: string;
+  @ApiProperty({ enum: SettlementProviderSchema.options })
+  @Expose(FIN) provider: SettlementProviderType;
+  @Expose(FIN) caseReference: string;
+
+  // --- Kaynak tahsilat ---
+  @ApiProperty({ enum: CardChargebackSourceSchema.options })
+  @Expose(FIN) sourceType: CardChargebackSourceType;
+  @Expose(FIN) sourceId: string;
+  @Expose(FIN) paymentId: string | null;
+  @Expose(FIN) installmentId: string | null;
+  @Expose(FIN) patientId: string;
+
+  @Expose(FIN)
+  @Type(() => String)
+  amount: string;
+
+  @Expose(FIN)
+  @Type(() => String)
+  feeAmount: string;
+
+  @ApiProperty({ enum: CurrencySchema.options })
+  @Expose(FIN) currency: CurrencyType;
+  @ApiProperty({ enum: CardChargebackStatusSchema.options })
+  @Expose(FIN) status: CardChargebackStatusType;
+
+  // --- Açılış ---
+  @Expose(FIN)
+  @Type(() => Date)
+  openedAt: Date;
+
+  @ApiProperty({ enum: ChargebackFundsChannelSchema.options })
+  @Expose(FIN) openedFundsChannel: ChargebackFundsChannelType;
+  @Expose(FIN) openedBankAccountId: string | null;
+
+  @Expose(FIN)
+  @Type(() => Date)
+  evidenceDueAt: Date | null;
+
+  @Expose(FIN) note: string | null;
+
+  // --- Sonuç ---
+  @Expose(FIN)
+  @Type(() => Date)
+  resolvedAt: Date | null;
+
+  @ApiProperty({ enum: ChargebackFundsChannelSchema.options, nullable: true })
+  @Expose(FIN) resolvedFundsChannel: ChargebackFundsChannelType | null;
+  @Expose(FIN) resolvedBankAccountId: string | null;
+  @Expose(FIN) resolutionNote: string | null;
+
+  // --- Ödeme planına yansıma (yalnız LOST) ---
+  @ApiProperty({ enum: CardChargebackPlanSyncSchema.options, nullable: true })
+  @Expose(FIN) planSyncStatus: CardChargebackPlanSyncType | null;
+  @Expose(FIN) recoveryInstallmentId: string | null;
+
+  // --- Yönetim: kim kaydetti / çözdü, köprü izleri ---
+  @Expose({ groups: [MANAGEMENT, ADMIN] }) partyId: string;
+  @Expose({ groups: [MANAGEMENT, ADMIN] }) organizationId: string;
+  @Expose({ groups: [MANAGEMENT, ADMIN] }) recordedById: string;
+  @Expose({ groups: [MANAGEMENT, ADMIN] }) resolvedById: string | null;
+  @Expose({ groups: [MANAGEMENT, ADMIN] }) openedEventId: string | null;
+  @Expose({ groups: [MANAGEMENT, ADMIN] }) resolvedEventId: string | null;
+
+  @Expose(FIN)
+  @Type(() => Date)
+  createdAt: Date;
+
+  @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @Type(() => Date)
+  updatedAt: Date;
 }

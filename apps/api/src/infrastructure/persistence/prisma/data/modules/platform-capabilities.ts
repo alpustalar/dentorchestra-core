@@ -31,6 +31,9 @@ export const PLATFORM_CAPABILITY_MODULES = [
   'module',
   'adminrequest',
   'outbox',
+  // Platform iadelerinin elle doğrulanması: para kararı (kural 7). Klinik sahibi/resepsiyon
+  // personeline dağıtamaz; yalnız ADMIN (tüm yetkiler) ve ileride açıkça tanımlanacak roller.
+  'bookingpaymentrefund',
   // Yetkilendirme tesisatı
   'role',
   'rolecapability',

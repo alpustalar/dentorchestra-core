@@ -4,6 +4,10 @@ import { TransactionManager } from '@src/infrastructure/persistence/prisma/trans
 import { DateTimeManager } from '@common/utils';
 import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
+import {
+  IPlatformTenantProvider,
+  PLATFORM_TENANT_PROVIDER,
+} from '@modules/finance/accounting/posting/domain/interfaces/platform-tenant.provider.interface';
 import { AccountingPeriod } from '@modules/finance/accounting/periods/domain/entities/accounting-period.entity';
 import {
   ACCOUNTING_PERIOD_COMMAND_REPOSITORY,
@@ -26,6 +30,8 @@ export class EnsureLedgerPeriodsHandler implements ICommandHandler<
   constructor(
     @Inject(ACCOUNTING_PERIOD_COMMAND_REPOSITORY)
     private readonly accountingPeriodRepo: IAccountingPeriodCommandRepository,
+    @Inject(PLATFORM_TENANT_PROVIDER)
+    private readonly platformTenant: IPlatformTenantProvider,
     private readonly txManager: TransactionManager,
     private readonly criticalFailure: CriticalFailurePublisher
   ) {}
@@ -36,7 +42,7 @@ export class EnsureLedgerPeriodsHandler implements ICommandHandler<
     // bu sayede kendi kendine onarılır (iş idempotent).
     const targetYears = [currentYear, currentYear + 1];
 
-    const scopes = await this.accountingPeriodRepo.findLedgerScopes();
+    const scopes = await this.resolveScopes();
     const result: EnsureLedgerPeriodsResult = {
       created: 0,
       skipped: 0,
@@ -57,6 +63,41 @@ export class EnsureLedgerPeriodsHandler implements ICommandHandler<
     );
 
     return result;
+  }
+
+  /**
+   * Kapsam = dönemi olan defterler ∪ platform defteri.
+   *
+   * `findLedgerScopes` "zaten dönemi olan kiracıları" döner; platform kiracısı normal
+   * kayıt akışından geçmediği için hiç dönemi olmaz ve bu kümeye **hiç girmez** — kapsamı
+   * mevcut kayıttan türetmek, kaydı hiç olmayanı sonsuza dek dışarıda bırakır (kural 5).
+   */
+  private async resolveScopes(): Promise<LedgerScope[]> {
+    const scopes = await this.accountingPeriodRepo.findLedgerScopes();
+
+    try {
+      const platform = await this.platformTenant.resolve();
+      if (!scopes.some((s) => s.clinicId === platform.clinicId)) {
+        scopes.push({
+          clinicId: platform.clinicId,
+          organizationId: platform.organizationId,
+        });
+      }
+    } catch (error) {
+      // Platform çözülemezse yalnız onun fişleri durur; diğer kiracılar devam eder.
+      this.criticalFailure.publish({
+        operation: 'accounting.period.ensure-ledger-periods',
+        severity: 'CRITICAL',
+        summary:
+          'Platform kiracısı çözülemedi; platform defterinin dönemi açılamadı ve platform fişleri duracak.',
+        errorMessage: error instanceof Error ? error.message : String(error),
+        context: {},
+        clinicId: null,
+        dedupeKey: 'period-ensure-platform-unresolved',
+      });
+    }
+
+    return scopes;
   }
 
   private async ensurePeriod(

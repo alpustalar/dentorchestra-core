@@ -4,7 +4,7 @@ import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { IGetContext } from '@common/decorators';
 import { ActorContext } from '@common/interfaces';
 import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { TimeZoneType } from '@input-type-schemas/TimeZoneSchema';
 import { GetClinicTimezoneQuery } from '@modules/organization/clinic/application/queries/get-clinic-timezone/get-clinic-timezone.query';
 import { GetClinicHealthTourismConfigQuery } from '@modules/crm/health-tourism/config/application/queries/get-clinic-health-tourism-config/get-clinic-health-tourism-config.query';
@@ -144,7 +144,9 @@ export class AiToolSupport {
 
   /**
    * İptal edilen rezervasyon için ödeme iadesini (varsa) tetikler. Ödeme kaydı yoksa (B7
-   * öncesi/ödemesiz rezervasyon) veya iade başarısızsa false döner — iptal mesajı yine de döner.
+   * öncesi/ödemesiz rezervasyon) `true` döner (iade edilecek bir şey yok). Sağlayıcı iadeyi
+   * reddettiyse, sonuç doğrulanamadıysa ya da çağrı hata verdiyse `false` döner — iptal mesajı
+   * yine de döner ama müşteriye "iade edildi" DENMEZ: yalnız `CONFIRMED` iadedir.
    *
    * `retained` **zorunlu**: iptal komutunun döndürdüğü ekonomi buradan geçmezse
    * defter cezasız ters kayıt yazar ve fark sessizce kaybolur. Alanı opsiyonel
@@ -154,7 +156,7 @@ export class AiToolSupport {
     props: RefundForCancelledBookingProps
   ): Promise<boolean> {
     try {
-      await this.commandBus.execute(
+      const result = await this.commandBus.execute(
         new RefundBookingPaymentCommand({
           bookingId: props.bookingId,
           // Sağlayıcının alıkoyduğu ceza iptal yanıtından geliyor ve BURADAN
@@ -164,7 +166,8 @@ export class AiToolSupport {
           reason: 'Rezervasyon iptal edildi.',
         })
       );
-      return true;
+      // Komut artık sağlayıcı reddinde/zaman aşımında FIRLATMAZ (kural 18): sonuç durumdadır.
+      return result.status === 'CONFIRMED' || result.status === 'SKIPPED';
     } catch (err) {
       this.logger.warn(
         `İptal sonrası iade tetiklenemedi (bookingId=${props.bookingId}): ${

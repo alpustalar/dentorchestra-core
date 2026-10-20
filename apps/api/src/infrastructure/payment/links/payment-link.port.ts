@@ -47,7 +47,25 @@ export interface RefundPaymentLinkInput {
   currency: CurrencyType;
   ip?: string;
   reason?: string;
+  /**
+   * Sağlayıcıya iletilen tekrar-güvenli anahtar (`${refundId}:${attempt}`). iyzico'da
+   * `conversationId` olur → operatör panelde bu anahtarla aratıp sonucu doğrulayabilir.
+   */
+  idempotencyKey: string;
 }
+
+/**
+ * İade çağrısının üç durumlu sonucu (kural 18): oldu / olmadı / bilinmiyor.
+ * Adaptör ham SDK sonucunu değil bu tipli sonucu döner; taşıma hatası (zaman aşımı,
+ * bağlantı) fırlatılır ve çağıran onu `UNKNOWN` sayar.
+ */
+export type RefundPaymentLinkResult =
+  | { outcome: 'SUCCEEDED'; providerRefundRef: string | null }
+  | { outcome: 'REJECTED'; errorCode: string | null; errorMessage: string }
+  | { outcome: 'UNKNOWN'; detail: string };
+
+/** `EXPIRED`: sağlayıcıda geçersiz kılındı; `NOT_SUPPORTED`: sağlayıcıda böyle bir API yok. */
+export type ExpirePaymentLinkResult = 'EXPIRED' | 'NOT_SUPPORTED';
 
 export interface IPaymentLinkProvider {
   readonly provider: PaymentLinkProviderName;
@@ -55,9 +73,9 @@ export interface IPaymentLinkProvider {
   /** Barındırılan ödeme sayfası üretir. */
   createLink(input: CreatePaymentLinkInput): Promise<PaymentLinkResult>;
 
-  /** Ödenmemiş linki geçersiz kılar (Stripe: session expire; iyzico: no-op). */
-  expireLink(sessionId: string): Promise<void>;
+  /** Ödenmemiş linki geçersiz kılar (Stripe: session expire; iyzico: desteklenmez). */
+  expireLink(sessionId: string): Promise<ExpirePaymentLinkResult>;
 
-  /** Ödenmiş tutarın (tamamını/kısmını) iadesini yapar. */
-  refund(input: RefundPaymentLinkInput): Promise<void>;
+  /** Ödenmiş tutarın (tamamını/kısmını) iadesini yapar; sonucu tipli döner. */
+  refund(input: RefundPaymentLinkInput): Promise<RefundPaymentLinkResult>;
 }

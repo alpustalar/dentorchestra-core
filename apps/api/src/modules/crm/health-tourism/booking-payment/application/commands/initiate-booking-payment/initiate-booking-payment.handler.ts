@@ -1,3 +1,7 @@
+import {
+  PAYMENT_LINK_CHANNELS,
+  PaymentLinkChannels,
+} from '@src/infrastructure/payment/links/payment-link-channels';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
@@ -55,7 +59,9 @@ export class InitiateBookingPaymentHandler implements ICommandHandler<
     private readonly serviceFee: IServiceFeeProvider,
     @Inject(BOOKING_PAYMENT_COMMAND_REPOSITORY)
     private readonly bookingPaymentRepo: IBookingPaymentCommandRepository,
-    private readonly txManager: TransactionManager
+    private readonly txManager: TransactionManager,
+    @Inject(PAYMENT_LINK_CHANNELS)
+    private readonly channels: PaymentLinkChannels
   ) {}
 
   async execute(
@@ -132,8 +138,10 @@ export class InitiateBookingPaymentHandler implements ICommandHandler<
       }
     }
 
-    // Stripe — EUR/USD (yurt dışı). Satış TRY ise atlanır.
-    if (saleCurrency !== Currency.enum.TRY) {
+    // Stripe — EUR/USD (yurt dışı). Satış TRY ise atlanır; kanal AÇIK değilse hiç üretilmez:
+    // Stripe parası için kapanış akışı yok (payout / ücret / itiraz / kur farkı) — bkz.
+    // `PaymentLinkChannels`. Kapalıyken yabancı satışta yalnız iyzico TRY linki gider.
+    if (this.channels.stripeEnabled && saleCurrency !== Currency.enum.TRY) {
       try {
         const r = await this.stripeLink.createLink({
           bookingPaymentId: id,

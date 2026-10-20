@@ -5,3 +5,4 @@ export type { GetTransferBookings } from './get-transfer-bookings.type';
 export type { SearchFlights } from './search-flights.type';
 export type { GetFlightBookings } from './get-flight-bookings.type';
 export type { GetUnbridgedBookingLedgerEntries } from './get-unbridged-booking-ledger-entries.type';
+export type { GetUnresolvedBookingPaymentRefunds } from './get-unresolved-booking-payment-refunds.type';

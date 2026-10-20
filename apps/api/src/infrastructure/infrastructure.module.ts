@@ -45,6 +45,11 @@ import { MESSAGING_MONGO_CONNECTION } from '@src/infrastructure/persistence/mong
         [ENV.SLACK_OPS_WEBHOOK_URL]: Joi.string().uri().optional(),
         [ENV.SLACK_OPS_WEBHOOK_URL_CRITICAL]: Joi.string().uri().optional(),
 
+        // Stripe ödeme linki üretimi opsiyoneldir ve varsayılan KAPALIdır; yalnız 'true' açar.
+        [ENV.STRIPE_PAYMENT_LINKS_ENABLED]: Joi.string()
+          .valid('true', 'false')
+          .optional(),
+
         // Security & Encryption
         [ENV.TOKEN_CIPHER_KEY]: Joi.string().hex().length(64).required(), // 32 byte hex = 64 karakter
 

@@ -7,6 +7,8 @@ import { IPlatformTenantProvider } from '@modules/finance/accounting/posting/dom
 import { EnsurePartyCommand } from '@modules/finance/party/application/commands/ensure-party/ensure-party.command';
 import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
 import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment.entity';
+import { BookingPaymentRefund } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment-refund.entity';
+import { Money } from '@src/domain/value-objects/money.vo';
 import {
   CreateBookingPaymentProps,
   HotelBookingIntent,
@@ -387,6 +389,145 @@ describe('BookingPlatformLedgerService', () => {
       expect(recordedEvent(execute)).toBeUndefined();
       expect(publish).toHaveBeenCalledTimes(1);
       expect(publish.mock.calls[0][0].summary).toContain('yazılamaz');
+    });
+  });
+
+  describe('müşteriye iade edilecek tahsilat (336)', () => {
+    const refundOf = (
+      kind: 'CANCELLATION' | 'BOOKING_FAILED' | 'UNCLAIMED_CHARGE',
+      provider: 'IYZICO' | 'STRIPE' = 'IYZICO'
+    ) =>
+      BookingPaymentRefund.request({
+        bookingPaymentId: '33333333-3333-4333-8333-333333333333',
+        clinicId: props.clinicId,
+        organizationId: props.organizationId,
+        kind,
+        provider,
+        chargeProviderRef: 'ptx-9',
+        amount:
+          provider === 'IYZICO'
+            ? Money.fromTrusted('250.00', 'TRY')
+            : Money.fromTrusted('10.00', 'EUR'),
+      });
+
+    const recordedEvents = (execute: jest.Mock<Promise<string>, [unknown]>) =>
+      execute.mock.calls
+        .map(([command]) => command)
+        .filter(
+          (command): command is RecordFinancialEventCommand =>
+            command instanceof RecordFinancialEventCommand
+        );
+
+    it('yalnız çift çekim / başarısız rezervasyon ve yalnız iyzico TRY 336 yolundan geçer', () => {
+      const { service } = build();
+
+      expect(service.isReturnableLedgerable(refundOf('UNCLAIMED_CHARGE'))).toBe(
+        true
+      );
+      expect(service.isReturnableLedgerable(refundOf('BOOKING_FAILED'))).toBe(
+        true
+      );
+      expect(service.isReturnableLedgerable(refundOf('CANCELLATION'))).toBe(
+        false
+      );
+      expect(
+        service.isReturnableLedgerable(refundOf('UNCLAIMED_CHARGE', 'STRIPE'))
+      ).toBe(false);
+    });
+
+    it('RECEIVED: tedarikçi carisi AÇILMAZ (336 cari istemez), tutar/neden gövdede', async () => {
+      const { service, execute } = build();
+
+      await service.recordReturnable({
+        kind: 'RETURNABLE_RECEIVED',
+        refund: refundOf('UNCLAIMED_CHARGE'),
+      });
+
+      expect(
+        execute.mock.calls.some(([c]) => c instanceof EnsurePartyCommand)
+      ).toBe(false);
+      const [event] = recordedEvents(execute);
+      expect(event.data.type).toBe('PLATFORM_RETURNABLE_CHARGE_RECEIVED');
+      expect(event.data.payload).toMatchObject({
+        amount: '250.00',
+        currency: 'TRY',
+        reason: 'UNCLAIMED_CHARGE',
+        chargeReference: 'ptx-9',
+      });
+      expect(event.data.dedupeKey).toBe(
+        'platform-returnable-charge-received:IYZICO:ptx-9'
+      );
+    });
+
+    it('REFUNDED yazılırken önce RECEIVED denenir (336 açılmadan kapanmaz, kural 16)', async () => {
+      const { service, execute } = build();
+      const refund = refundOf('UNCLAIMED_CHARGE');
+      refund.markConfirmedByProvider({ attempt: 1, providerRefundRef: null });
+
+      await service.recordReturnable({ kind: 'RETURNABLE_REFUNDED', refund });
+
+      expect(recordedEvents(execute).map((e) => e.data.type)).toEqual([
+        'PLATFORM_RETURNABLE_CHARGE_RECEIVED',
+        'PLATFORM_RETURNABLE_CHARGE_REFUNDED',
+      ]);
+    });
+
+    it('REFUNDED olayı iadenin sağlayıcıda gerçekleştiği günle tarihlenir', async () => {
+      const { service, execute } = build();
+      const refund = refundOf('BOOKING_FAILED');
+      refund.markConfirmedByProvider({ attempt: 1, providerRefundRef: null });
+
+      await service.recordReturnable({ kind: 'RETURNABLE_REFUNDED', refund });
+
+      const refunded = recordedEvents(execute)[1];
+      expect(refunded.data.occurredAt).toEqual(refund.refundedAt);
+    });
+
+    it('Stripe ve iptal iadesi 336 olayı YAZMAZ', async () => {
+      const { service, execute } = build();
+
+      await service.recordReturnable({
+        kind: 'RETURNABLE_RECEIVED',
+        refund: refundOf('UNCLAIMED_CHARGE', 'STRIPE'),
+      });
+      await service.recordReturnable({
+        kind: 'RETURNABLE_RECEIVED',
+        refund: refundOf('CANCELLATION'),
+      });
+
+      expect(recordedEvents(execute)).toHaveLength(0);
+    });
+
+    it('best-effort: defter hatası fırlamaz, CRITICAL basılır', async () => {
+      const { service, execute, publish } = build();
+      execute.mockRejectedValue(new Error('dönem yok'));
+
+      await expect(
+        service.recordReturnableBestEffort({
+          kind: 'RETURNABLE_RECEIVED',
+          refund: refundOf('UNCLAIMED_CHARGE'),
+        })
+      ).resolves.toBeUndefined();
+
+      expect(publish).toHaveBeenCalledWith(
+        expect.objectContaining({ severity: 'CRITICAL' })
+      );
+    });
+
+    it('onaylanan iptal iadesi REFUNDED fişine gider, 336 yoluna değil', async () => {
+      const { service, execute } = build();
+      const bp = BookingPayment.create(props);
+      bp.markPaid('IYZICO', 'tx_1');
+      bp.markBooked('BK-1', 'BK-1');
+      bp.markRefunded({ reason: 'iptal', retained: null });
+      const refund = refundOf('CANCELLATION');
+      refund.markConfirmedByProvider({ attempt: 1, providerRefundRef: null });
+
+      await service.bridgeConfirmedRefundBestEffort({ refund, bp });
+
+      expect(recordedEvents(execute).map((e) => e.data.type)).toEqual([
+        'PLATFORM_BOOKING_REFUNDED',
+      ]);
     });
   });
 });

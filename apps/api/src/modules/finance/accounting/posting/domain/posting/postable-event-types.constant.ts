@@ -27,8 +27,18 @@ export const POSTABLE_FINANCIAL_EVENT_TYPES: readonly FinancialEventType[] = [
   // Sağlayıcı hesap kapaması: 108'de bekleyen kart tahsilatlarının 102'ye
   // geçişi + komisyonun 653'e gider yazılması. Bu tip olmadan 108 hiç kapanmaz.
   T.PROVIDER_SETTLEMENT_RECEIVED,
+  // Kart itirazı üç aşamalıdır ve üçü de fişlenir: açılış (B 127 / A 108|102),
+  // kazanıldı (B 108|102 / A 127), kaybedildi (B 120 / A 127). Biri eksik kalırsa
+  // 127 ara hesabı kapanmaz ya da hiç dolmaz — dönem kapanışı bu boşluğu görmeli.
+  T.CARD_CHARGEBACK_OPENED,
+  T.CARD_CHARGEBACK_WON,
+  T.CARD_CHARGEBACK_LOST,
   T.PLATFORM_BOOKING_SETTLED,
   T.PLATFORM_BOOKING_REFUNDED,
+  // Müşteriye iade edilecek tahsilat (çift çekim / başarısız rezervasyon): 336 açılır, iade
+  // doğrulanınca kapanır. Biri eksik kalırsa 108 payout'u kapatamaz ya da 336 açık kalır.
+  T.PLATFORM_RETURNABLE_CHARGE_RECEIVED,
+  T.PLATFORM_RETURNABLE_CHARGE_REFUNDED,
   // Stok hareketleri: tüketim/zayi/sayım açığı (OUT) ve sayım fazlası (IN).
   // Satın alma girişi köprülenmez — borç kaydı alış faturasından gelir.
   T.STOCK_OUT,

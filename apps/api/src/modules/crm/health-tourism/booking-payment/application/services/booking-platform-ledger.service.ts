@@ -3,7 +3,7 @@ import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { IGetContext } from '@common/decorators';
 import { ActorContext } from '@common/interfaces';
 import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { FinancialEventTypeSchema } from '@shared';
 import { PartyOriginTypeSchema } from '@input-type-schemas/PartyOriginTypeSchema';
@@ -21,8 +21,10 @@ import {
 import {
   PlatformBookingRefundedEventPayload,
   PlatformBookingSettledEventPayload,
+  PlatformReturnableChargeEventPayload,
 } from '@modules/finance/accounting/posting/domain/posting/event-payloads';
 import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment.entity';
+import { BookingPaymentRefund } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment-refund.entity';
 import { BookingPaymentProviderValue } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
 import { resolveBookingSupplier } from '@modules/crm/health-tourism/booking-payment/domain/constants/booking-supplier.constant';
 import { BookingLedgerNotPostableException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
@@ -40,6 +42,23 @@ export interface BookingLedgerInput {
   readonly bp: BookingPayment;
   /** Tahsilatın/iadenin geçtiği kanal (IYZICO | STRIPE) — fiş açıklaması. */
   readonly provider: BookingPaymentProviderValue;
+  /** Ekonomik olayın tarihi; verilmezse "şimdi". İade, sağlayıcıda gerçekleştiği günle yazılır. */
+  readonly occurredAt?: Date;
+}
+
+/**
+ * Müşteriye iade edilecek tahsilat (çift çekim / başarısız rezervasyon):
+ * `RECEIVED` = `B 108 / A 336`, `REFUNDED` = `B 336 / A 108`.
+ */
+export type ReturnableChargeLedgerKind =
+  | 'RETURNABLE_RECEIVED'
+  | 'RETURNABLE_REFUNDED';
+
+export interface ReturnableChargeLedgerInput {
+  readonly kind: ReturnableChargeLedgerKind;
+  readonly refund: BookingPaymentRefund;
+  /** Tahsilatın düştüğü an (RECEIVED tarihi): başarısız rezervasyonda `paidAt`, çift çekimde talep anı. */
+  readonly receivedAt?: Date | null;
 }
 
 /**
@@ -91,6 +110,7 @@ export class BookingPlatformLedgerService {
           clinicId: target.clinicId,
           type: recorded.type,
           payload: recorded.payload,
+          ...(input.occurredAt ? { occurredAt: input.occurredAt } : {}),
           sourceModule: FINANCIAL_EVENT_SOURCE_MODULES.BOOKING_PAYMENT,
           sourceRefId: bp.id.value,
           dedupeKey: recorded.dedupeKey,
@@ -98,6 +118,213 @@ export class BookingPlatformLedgerService {
         ctx
       )
     );
+  }
+
+  // ---- Müşteriye iade edilecek tahsilat (336) ------------------------------------
+
+  /**
+   * Bu iade 336 yolundan deftere girer mi? Yalnız iade edilecek tahsilatlar (çift çekim,
+   * başarısız rezervasyon) ve yalnız iyzico/TRY: Stripe bu akışa bilinçli alınmadı (kapalı,
+   * kur farkı tanınmıyor). Rezervasyonun KENDİ tahsilatının iptal iadesi `REFUNDED` fişine
+   * gider, 336'ya değil.
+   */
+  isReturnableLedgerable(refund: BookingPaymentRefund): boolean {
+    return (
+      refund.kind !== 'CANCELLATION' &&
+      refund.provider === 'IYZICO' &&
+      refund.amount.currency === 'TRY'
+    );
+  }
+
+  /**
+   * Bu iadenin ters kaydının olay defterindeki idempotency anahtarı; ters kayıt bu yoldan hiç
+   * yazılmayacaksa (Stripe 336) `null`. "İade gerçekleşmedi" kararı bu anahtarın var olup
+   * olmadığına bakar: yazılmış bir fişi geri almak storno demektir (muhasebe kararı).
+   */
+  reversalDedupeKey(refund: BookingPaymentRefund): string | null {
+    if (refund.kind === 'CANCELLATION') {
+      return FinancialEventDedupeKeys.platform_booking_refunded(
+        refund.bookingPaymentId.value
+      );
+    }
+    if (!this.isReturnableLedgerable(refund)) return null;
+    return FinancialEventDedupeKeys.platform_returnable_charge_refunded(
+      refund.provider,
+      refund.chargeProviderRef
+    );
+  }
+
+  /**
+   * 336 fişini yazar ve **hata fırlatır** (telafi komutu için). İade yazılırken önce
+   * `RECEIVED` denenir: dedupe tekrarı mükerrer yazmaz, ama 336 açılmadan kapanamaz
+   * (kural 16 — kapanış, açılış olmadan "yetim" fiş olurdu).
+   */
+  async recordReturnable(input: ReturnableChargeLedgerInput): Promise<void> {
+    const { refund } = input;
+    if (!this.isReturnableLedgerable(refund)) return;
+
+    const target = await this.platformTenant.resolve();
+    const ctx = this.buildPlatformContext(target);
+
+    if (input.kind === 'RETURNABLE_REFUNDED') {
+      await this.writeReturnable({
+        kind: 'RETURNABLE_RECEIVED',
+        refund,
+        target,
+        ctx,
+        occurredAt: input.receivedAt ?? refund.requestedAt ?? undefined,
+      });
+    }
+
+    await this.writeReturnable({
+      kind: input.kind,
+      refund,
+      target,
+      ctx,
+      occurredAt:
+        input.kind === 'RETURNABLE_REFUNDED'
+          ? (refund.refundedAt ?? undefined)
+          : (input.receivedAt ?? refund.requestedAt ?? undefined),
+    });
+  }
+
+  /** Para hareketi çoktan olmuş/başlamış: muhasebe hatası iadeyi durdurmaz, alarmla insana gider. */
+  async recordReturnableBestEffort(
+    input: ReturnableChargeLedgerInput
+  ): Promise<void> {
+    const { refund, kind } = input;
+    try {
+      await this.recordReturnable(input);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Platform defterine ${kind} kaydı yazılamadı (refund=${refund.id.value}): ${message}`
+      );
+      this.criticalFailure.publish({
+        operation: 'health-tourism.booking-payment.platform-ledger',
+        severity: 'CRITICAL',
+        summary:
+          kind === 'RETURNABLE_RECEIVED'
+            ? "Müşteriye iade edilecek tahsilat (336) platform defterine yazılamadı: 108 payout'ta görünen parayı göstermiyor."
+            : 'Müşteriye iade edilen tahsilatın kapanış fişi (B 336 / A 108) yazılamadı: 336 açık kalıyor.',
+        errorMessage: message,
+        context: { refundId: refund.id.value, kind },
+        clinicId: refund.clinicId.value,
+        dedupeKey: `booking-platform-ledger-failed:${kind}:${refund.id.value}`,
+      });
+    }
+  }
+
+  private async writeReturnable(params: {
+    kind: ReturnableChargeLedgerKind;
+    refund: BookingPaymentRefund;
+    target: PlatformLedgerTarget;
+    ctx: IGetContext;
+    occurredAt?: Date;
+  }): Promise<void> {
+    const { kind, refund, target, ctx, occurredAt } = params;
+
+    // `satisfies`: sözleşmeye uygunluk derleyicide doğrulanır, literal tip korunur.
+    const payload = {
+      amount: refund.amount.toApiFormat(),
+      currency: refund.amount.currency,
+      provider: refund.provider,
+      chargeReference: refund.chargeProviderRef,
+      reason: refund.kind,
+      bookingPaymentId: refund.bookingPaymentId.value,
+      refundId: refund.id.value,
+    } satisfies PlatformReturnableChargeEventPayload;
+
+    const received = kind === 'RETURNABLE_RECEIVED';
+
+    await this.commandBus.execute(
+      new RecordFinancialEventCommand(
+        {
+          clinicId: target.clinicId,
+          type: received
+            ? FinancialEventTypeSchema.enum.PLATFORM_RETURNABLE_CHARGE_RECEIVED
+            : FinancialEventTypeSchema.enum.PLATFORM_RETURNABLE_CHARGE_REFUNDED,
+          payload,
+          ...(occurredAt ? { occurredAt } : {}),
+          sourceModule: FINANCIAL_EVENT_SOURCE_MODULES.BOOKING_PAYMENT,
+          sourceRefId: refund.bookingPaymentId.value,
+          dedupeKey: received
+            ? FinancialEventDedupeKeys.platform_returnable_charge_received(
+                refund.provider,
+                refund.chargeProviderRef
+              )
+            : FinancialEventDedupeKeys.platform_returnable_charge_refunded(
+                refund.provider,
+                refund.chargeProviderRef
+              ),
+        },
+        ctx
+      )
+    );
+  }
+
+  /**
+   * İade sağlayıcıda DOĞRULANDI (otomatik ya da elle): defter paranın gerçekliğini göstersin.
+   * Rezervasyonun kendi tahsilatının iptal iadesi → `REFUNDED` fişi (+ bilinmeyen ceza
+   * uyarısı); çift çekim / başarısız rezervasyon → `B 336 / A 108`.
+   */
+  async bridgeConfirmedRefundBestEffort(params: {
+    refund: BookingPaymentRefund;
+    bp: BookingPayment;
+  }): Promise<void> {
+    const { refund, bp } = params;
+
+    if (refund.kind === 'CANCELLATION') {
+      await this.recordBestEffort({
+        kind: 'REFUNDED',
+        bp,
+        provider: refund.provider,
+        ...(refund.refundedAt ? { occurredAt: refund.refundedAt } : {}),
+      });
+      // Ceza bilinmiyorsa defter cezasız ters kayıt yazdı: 320'de sağlayıcının yine
+      // faturalayacağı tutar kadar eksik düşüm kalır. Eşik yok — bir kuruş fark da
+      // sağlayıcı mutabakatında açık demektir.
+      this.alertOnUnknownRetainedCost(bp);
+      return;
+    }
+
+    await this.recordReturnableBestEffort({
+      kind: 'RETURNABLE_REFUNDED',
+      refund,
+      receivedAt: refund.kind === 'BOOKING_FAILED' ? bp.paidAt : undefined,
+    });
+  }
+
+  /**
+   * Sağlayıcının alıkoyduğu cezanın öğrenilemediği hâlleri duyurur.
+   *
+   * Neden yasaklamak yerine duyurmak: cezayı bilmeden ters kayıt yazmamak 108'i (giden
+   * para), 601'i (kazanılmamış komisyon) ve 320'yi (artık olmayan borç) birlikte yanlış
+   * bırakırdı. Cezasız varsayım yalnız 320'yi eksik bırakır — üç hesap yerine bir hesap.
+   * Varsayımın bedeli bu alarmla görünür.
+   */
+  private alertOnUnknownRetainedCost(bp: BookingPayment): void {
+    const refund = bp.refundAssessment;
+    if (refund.retainedKnown) return;
+
+    this.criticalFailure.publish({
+      operation: 'health-tourism.booking-payment.cancellation-cost',
+      severity: 'WARNING',
+      summary: refund.retainedCurrencyMismatch
+        ? 'Sağlayıcı iptal cezasını farklı para biriminde bildirdi; ters kayıt cezasız yazıldı (320 eksik düşmüş olabilir).'
+        : 'Sağlayıcı iptal cezasını bildirmedi; ters kayıt cezasız yazıldı (320 eksik düşmüş olabilir).',
+      errorMessage: null,
+      context: {
+        bookingPaymentId: bp.id.value,
+        bookingType: bp.bookingType,
+        retainedReported: bp.supplierRetained?.toApiFormat() ?? null,
+        retainedCurrency: bp.supplierRetained?.currency ?? null,
+        supplierPosted: bp.supplierCost.ledgerAmount.toApiFormat(),
+        saleCurrency: bp.saleCurrency.value,
+      },
+      clinicId: bp.clinicId.value,
+      dedupeKey: `booking-retained-unknown:${bp.id.value}`,
+    });
   }
 
   /**

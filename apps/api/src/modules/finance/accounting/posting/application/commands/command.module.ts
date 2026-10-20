@@ -20,10 +20,13 @@ import { PlatformBookingRefundedRule } from '@modules/finance/accounting/posting
 import { PaymentMadeRule } from '@modules/finance/accounting/posting/domain/posting/rules/payment-made.rule';
 import { StockOutRule } from '@modules/finance/accounting/posting/domain/posting/rules/stock-out.rule';
 import { ProviderSettlementReceivedRule } from '@modules/finance/accounting/posting/domain/posting/rules/provider-settlement-received.rule';
+import { CardChargebackOpenedRule } from '@modules/finance/accounting/posting/domain/posting/rules/card-chargeback-opened.rule';
+import { CardChargebackWonRule } from '@modules/finance/accounting/posting/domain/posting/rules/card-chargeback-won.rule';
+import { CardChargebackLostRule } from '@modules/finance/accounting/posting/domain/posting/rules/card-chargeback-lost.rule';
 import { StockInRule } from '@modules/finance/accounting/posting/domain/posting/rules/stock-in.rule';
-import { PLATFORM_TENANT_PROVIDER } from '@modules/finance/accounting/posting/domain/interfaces/platform-tenant.provider.interface';
-import { PlatformTenantProvider } from '@modules/finance/accounting/posting/infrastructure/platform-tenant.provider';
-import { ChartOfAccountsCommandModule } from '@modules/finance/accounting/chart-of-accounts/application/commands/command.module';
+import { PlatformReturnableChargeReceivedRule } from '@modules/finance/accounting/posting/domain/posting/rules/platform-returnable-charge-received.rule';
+import { PlatformReturnableChargeRefundedRule } from '@modules/finance/accounting/posting/domain/posting/rules/platform-returnable-charge-refunded.rule';
+import { PlatformTenantModule } from '@modules/finance/accounting/posting/infrastructure/platform-tenant.module';
 import { FX_RATE_PROVIDER } from '@src/infrastructure/payment/links/fx-rate.port';
 import { StaticEnvFxRateProvider } from '@src/infrastructure/payment/links/adapters/static-env-fx-rate.provider';
 import { TcmbFxRateProvider } from '@src/infrastructure/payment/links/adapters/tcmb-fx-rate.provider';
@@ -39,13 +42,13 @@ const CommandHandlers = [
 ];
 
 @Module({
-  // ChartOfAccountsCommandModule: platform kliniğinin hesap planını ilk
-  // kullanımda kuran idempotent komut için (PlatformTenantProvider).
+  // PlatformTenantModule: platform kliniğini çözen yaprak modül (hesap planını ilk
+  // kullanımda kuran idempotent komut içeride).
   // AccountingPeriodDomainServicesModule: yevmiye numarası tahsisi (dönem satırı
   // sayacı + kilit) — yaprak modül, dönem modülünün tamamı çekilmez.
   imports: [
     JournalRepositoryModule,
-    ChartOfAccountsCommandModule,
+    PlatformTenantModule,
     AccountingPeriodDomainServicesModule,
     // Belge iptalinin storno zinciri: dedupeKey → FinancialEvent → fiş.
     // Yaprak repository modülü (yalnız Prisma'ya bağlı) — olay modülünün tamamı
@@ -62,11 +65,15 @@ const CommandHandlers = [
     CashSessionClosedRule,
     PlatformBookingSettledRule,
     PlatformBookingRefundedRule,
+    PlatformReturnableChargeReceivedRule,
+    PlatformReturnableChargeRefundedRule,
     PaymentMadeRule,
     StockOutRule,
     StockInRule,
     ProviderSettlementReceivedRule,
-    { provide: PLATFORM_TENANT_PROVIDER, useClass: PlatformTenantProvider },
+    CardChargebackOpenedRule,
+    CardChargebackWonRule,
+    CardChargebackLostRule,
     {
       provide: POSTING_RULES,
       useFactory: (
@@ -78,10 +85,15 @@ const CommandHandlers = [
         cashSessionClosed: CashSessionClosedRule,
         platformBookingSettled: PlatformBookingSettledRule,
         platformBookingRefunded: PlatformBookingRefundedRule,
+        platformReturnableChargeReceived: PlatformReturnableChargeReceivedRule,
+        platformReturnableChargeRefunded: PlatformReturnableChargeRefundedRule,
         paymentMade: PaymentMadeRule,
         stockOut: StockOutRule,
         stockIn: StockInRule,
-        providerSettlement: ProviderSettlementReceivedRule
+        providerSettlement: ProviderSettlementReceivedRule,
+        cardChargebackOpened: CardChargebackOpenedRule,
+        cardChargebackWon: CardChargebackWonRule,
+        cardChargebackLost: CardChargebackLostRule
       ) => [
         paymentReceived,
         paymentRefunded,
@@ -91,10 +103,15 @@ const CommandHandlers = [
         cashSessionClosed,
         platformBookingSettled,
         platformBookingRefunded,
+        platformReturnableChargeReceived,
+        platformReturnableChargeRefunded,
         paymentMade,
         stockOut,
         stockIn,
         providerSettlement,
+        cardChargebackOpened,
+        cardChargebackWon,
+        cardChargebackLost,
       ],
       inject: [
         PaymentReceivedRule,
@@ -105,10 +122,15 @@ const CommandHandlers = [
         CashSessionClosedRule,
         PlatformBookingSettledRule,
         PlatformBookingRefundedRule,
+        PlatformReturnableChargeReceivedRule,
+        PlatformReturnableChargeRefundedRule,
         PaymentMadeRule,
         StockOutRule,
         StockInRule,
         ProviderSettlementReceivedRule,
+        CardChargebackOpenedRule,
+        CardChargebackWonRule,
+        CardChargebackLostRule,
       ],
     },
     PostingRuleRegistry,
@@ -117,6 +139,6 @@ const CommandHandlers = [
     StaticEnvFxRateProvider,
     { provide: FX_RATE_PROVIDER, useClass: TcmbFxRateProvider },
   ],
-  exports: [...CommandHandlers, PLATFORM_TENANT_PROVIDER],
+  exports: [...CommandHandlers, PlatformTenantModule],
 })
 export class PostingCommandModule {}

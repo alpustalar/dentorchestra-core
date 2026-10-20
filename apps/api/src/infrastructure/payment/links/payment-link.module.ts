@@ -1,6 +1,11 @@
 import { Module } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { IyzicoModule } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/iyzico.module';
 import { IYZICO_PAYMENT_LINK, STRIPE_PAYMENT_LINK } from './payment-link.port';
+import {
+  PAYMENT_LINK_CHANNELS,
+  paymentLinkChannelsFactory,
+} from './payment-link-channels';
 import { FX_RATE_PROVIDER } from './fx-rate.port';
 import { SERVICE_FEE_PROVIDER } from './service-fee.port';
 import { IyzicoPaymentLinkAdapter } from './adapters/iyzico-payment-link.adapter';
@@ -19,6 +24,12 @@ import { TcmbFxRateProvider } from './adapters/tcmb-fx-rate.provider';
   imports: [IyzicoModule],
   providers: [
     StripeClientFactory,
+    // Hangi kanalların link ÜRETECEĞİ (Stripe varsayılan kapalı; açılış duyurulur).
+    {
+      provide: PAYMENT_LINK_CHANNELS,
+      useFactory: paymentLinkChannelsFactory,
+      inject: [ConfigService],
+    },
     { provide: IYZICO_PAYMENT_LINK, useClass: IyzicoPaymentLinkAdapter },
     { provide: STRIPE_PAYMENT_LINK, useClass: StripePaymentLinkAdapter },
     // TCMB işlem-tarihli kur (statutory); çözülemezse StaticEnv fallback'e düşer.
@@ -29,6 +40,7 @@ import { TcmbFxRateProvider } from './adapters/tcmb-fx-rate.provider';
   ],
   exports: [
     StripeClientFactory,
+    PAYMENT_LINK_CHANNELS,
     IYZICO_PAYMENT_LINK,
     STRIPE_PAYMENT_LINK,
     FX_RATE_PROVIDER,

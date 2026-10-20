@@ -2,6 +2,8 @@ enum LedgerStatus {
   COMPLETED
   CANCELLED
   REFUNDED
+  /// Kart itirazı kaybedildi (ters ibraz) — para iade edilmedi, sağlayıcı geri aldı.
+  CHARGED_BACK
 }
 
 enum LedgerType {
@@ -89,6 +91,11 @@ enum InstallmentStatus {
   OVERDUE
   CANCELLED
   REFUNDED
+  /// Kart itirazı (chargeback) KAYBEDİLDİ: para iade edilmedi, sağlayıcı kart
+  /// sahibinin lehine geri aldı. `REFUNDED` değildir — iade bizim kararımızla
+  /// geri verilen paradır, bu ise geri alınan paradır; hasta borcu hâlâ geçerlidir
+  /// ve aynı tutarda bir telafi taksiti (`recoversInstallmentId`) açılır.
+  CHARGED_BACK
 }
 
 model Payment {
@@ -133,12 +140,20 @@ model PaymentInstallment {
   note          String?
   status        InstallmentStatus @default(PENDING)
 
+  /// Bu taksit, ters ibrazla (chargeback) geri alınan hangi taksidin YERİNE açıldı.
+  /// Telafi taksiti hastadan yeniden tahsil edilecek aynı tutardır; `@unique` bir
+  /// taksidin yalnız bir telafisi olabileceğini DB'de sabitler (aynı itirazın
+  /// yeniden işlenmesi ikinci bir alacak doğurmasın).
+  recoversInstallmentId String? @unique @map("recovers_installment_id")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  payment           Payment            @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-  iyzicoTransaction IyzicoTransaction?
-  financeLedger     FinanceLedger?
+  payment             Payment             @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  iyzicoTransaction   IyzicoTransaction?
+  financeLedger       FinanceLedger?
+  recoversInstallment PaymentInstallment? @relation("InstallmentRecovery", fields: [recoversInstallmentId], references: [id], onDelete: SetNull)
+  recoveredBy         PaymentInstallment? @relation("InstallmentRecovery")
 
   @@unique([paymentId, installmentNo])
   @@index([paymentId])
