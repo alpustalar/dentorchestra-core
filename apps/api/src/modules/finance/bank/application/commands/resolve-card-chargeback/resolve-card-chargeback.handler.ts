@@ -259,6 +259,10 @@ export class ResolveCardChargebackHandler implements ICommandHandler<
           // Entity WON'da kanalı zorunlu kılar; null olamaz.
           fundsChannel: chargeback.resolvedFundsChannel,
         }
-      : { ...base, partyId: chargeback.partyId.value };
+      : chargeback.partyId
+        ? { ...base, partyId: chargeback.partyId.value }
+        : // Cari yok ⇒ platform rezervasyon itirazı (entity/DB CHECK yalnız `BOOKING_PAYMENT`'ta
+          // izin verir): kayıp 120'ye değil 659.01'e yazılır. İşaret açık yazılır.
+          { ...base, platformLoss: true };
   }
 }

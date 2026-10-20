@@ -8,6 +8,7 @@ import type { ChargebackFundsChannelType } from '@input-type-schemas/ChargebackF
 import type {
   InboundPaymentMethod,
   OutboundPaymentMethod,
+  PurchaseInvoiceLineAccountCode,
 } from '@shared/common/constants';
 
 export interface PaymentReceivedEventPayload {
@@ -76,7 +77,8 @@ export interface PurchaseInvoiceReceivedEventPayload {
   netTotal: string;
   vatTotal: string;
   grandTotal: string;
-  lineAccountCode: string; // 150 (stok) | 770/760/740 (gider)
+  /** Kabul kümesi tek kaynaktan: `PURCHASE_INVOICE_LINE_ACCOUNT_CODES` (329 hariç). */
+  lineAccountCode: PurchaseInvoiceLineAccountCode;
   currency?: CurrencyType; // yurtdışı tedarikçi / ithal (EUR/USD) → posting'de fonksiyonel paraya çevrilir
 }
 
@@ -141,13 +143,30 @@ export interface CardChargebackWonEventPayload {
  * Kart itirazı KAYBEDİLDİ — kesinleşti (`B 120 / A 127`). Hasta borcu yeniden
  * doğar: tahsilat fiilen geri alınmıştır, ama borç silinmemiştir.
  */
-export interface CardChargebackLostEventPayload {
+interface CardChargebackLostBase {
   amount: string; // 127'den düşen tutar
-  partyId: string; // 120 satırının carisi (requiresParty)
   currency: CurrencyType;
   provider: string;
   caseReference: string;
 }
+
+/** Hasta tahsilatı itirazı: kayıp hasta borcunu geri getirir (`B 120`, cari zorunlu). */
+export interface CardChargebackLostPatientPayload extends CardChargebackLostBase {
+  partyId: string; // 120 satırının carisi (requiresParty)
+}
+
+/**
+ * Platform rezervasyon tahsilatı itirazı: platformun alacaklısı olacak bir hasta carisi yoktur,
+ * kayıp 659.01'e gider. `platformLoss: true` bilinçli açık bir işarettir — `partyId` yokluğundan
+ * türetmek, cari unutulmuş bir hasta itirazını sessizce platform zararına çevirirdi.
+ */
+export interface CardChargebackLostPlatformPayload extends CardChargebackLostBase {
+  platformLoss: true;
+}
+
+export type CardChargebackLostEventPayload =
+  | CardChargebackLostPatientPayload
+  | CardChargebackLostPlatformPayload;
 
 /**
  * Sağlık turizmi rezervasyon tahsilatı — **platform** defterine yazılır.

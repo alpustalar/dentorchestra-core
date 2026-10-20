@@ -227,7 +227,8 @@ export const CLINIC_CHART_OF_ACCOUNTS_TEMPLATE: readonly AccountTemplateNode[] =
       isPostable: true,
     },
     {
-      code: '329',
+      // Yıl sonu GRNI tahakkukunun karşı hesabı: YALNIZ kapanış adımları yazar (bkz. TARGET_ACCOUNTS).
+      code: ACCOUNTING_RULES.TARGET_ACCOUNTS.GRNI_ACCRUAL_329,
       name: 'Diğer Ticari Borçlar',
       parentCode: null,
       type: LIABILITY,
@@ -424,6 +425,33 @@ export const CLINIC_CHART_OF_ACCOUNTS_TEMPLATE: readonly AccountTemplateNode[] =
       isPostable: true,
     },
     {
+      // Yıl sonu 7/A yansıtmasının hedefleri (TDHP): 7. sınıf hesaplar giderleri FONKSİYONUNA göre
+      // biriktirir, dönem sonunda buraya yansıtılır (B 622 / A 741 → B 741 / A 740.xx). Dönem içinde
+      // hiçbir posting kuralı bu üç hesaba yazmaz; yalnız yıl sonu kapanışı (`CLOSING`) yazar.
+      code: '622',
+      name: 'Satılan Hizmet Maliyeti (-)',
+      parentCode: null,
+      type: EXPENSE,
+      normalSide: DEBIT,
+      isPostable: true,
+    },
+    {
+      code: '631',
+      name: 'Pazarlama, Satış ve Dağıtım Giderleri (-)',
+      parentCode: null,
+      type: EXPENSE,
+      normalSide: DEBIT,
+      isPostable: true,
+    },
+    {
+      code: '632',
+      name: 'Genel Yönetim Giderleri (-)',
+      parentCode: null,
+      type: EXPENSE,
+      normalSide: DEBIT,
+      isPostable: true,
+    },
+    {
       code: '642',
       name: 'Faiz Gelirleri',
       parentCode: null,
@@ -451,6 +479,24 @@ export const CLINIC_CHART_OF_ACCOUNTS_TEMPLATE: readonly AccountTemplateNode[] =
       code: '656',
       name: 'Kambiyo Zararları',
       parentCode: null,
+      type: EXPENSE,
+      normalSide: DEBIT,
+      isPostable: true,
+    },
+    {
+      // Başlık: postlanamaz. Fişler alt hesaba yazılır; 689'un altına değil, çünkü 689
+      // postlanabilir ve şablon bekçisi postlanabilir hesabın altına alt hesabı yasaklar.
+      code: '659',
+      name: 'Diğer Finansman Giderleri',
+      parentCode: null,
+      type: EXPENSE,
+      normalSide: DEBIT,
+      isPostable: false,
+    },
+    {
+      code: ACCOUNTING_RULES.TARGET_ACCOUNTS.PLATFORM_CHARGEBACK_LOSS_659_01,
+      name: 'Platform İtiraz ve Chargeback Zararları',
+      parentCode: '659',
       type: EXPENSE,
       normalSide: DEBIT,
       isPostable: true,

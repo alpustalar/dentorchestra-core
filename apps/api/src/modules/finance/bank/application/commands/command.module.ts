@@ -14,6 +14,8 @@ import { PostingDomainServicesModule } from '@modules/finance/accounting/posting
 import { FinancialEventDomainServicesModule } from '@modules/finance/accounting/financial-events/domain/services/services.module';
 import { PosDomainServicesModule } from '@modules/finance/pos/physical/domain/services/services.module';
 import { PaymentDomainServicesModule } from '@modules/finance/payment/domain/services/services.module';
+import { BookingPaymentDomainServicesModule } from '@modules/crm/health-tourism/booking-payment/domain/services/services.module';
+import { PlatformTenantModule } from '@modules/finance/accounting/posting/infrastructure/platform-tenant.module';
 
 export const BANK_COMMAND_HANDLERS = [
   CreateBankAccountHandler,
@@ -42,6 +44,10 @@ export const BANK_COMMAND_HANDLERS = [
     FinancialEventDomainServicesModule,
     PosDomainServicesModule,
     PaymentDomainServicesModule,
+    // Platform rezervasyon itirazı: rezervasyon ödemesinin kilitli okuması + platform kliniği
+    // (itiraz yalnız platform defterine yazılır). İkisi de yaprak modül.
+    BookingPaymentDomainServicesModule,
+    PlatformTenantModule,
   ],
   providers: BANK_COMMAND_HANDLERS,
   exports: BANK_COMMAND_HANDLERS,

@@ -16,18 +16,30 @@ export class JournalLine {
     this._accountId = data.accountId;
     this._partyId = data.partyId;
 
+    // Tutarlar domain'e `decimal.js` olarak girer. Repository satırları DB'den Prisma'nın
+    // kendi `Decimal`'iyle döndürür (`Prisma.Decimal` ≠ `decimal.js` — farklı sınıf, `instanceof`
+    // ikisi arasında FALSE verir); `JournalEntryLineAmount` katı `instanceof` istediği için
+    // sınırda çevrilmezse fişi yazan HER çağrı satırları yeniden kurarken patlar ve transaction
+    // geri sarılır. Mock'lu testler hep decimal.js verdiği için bu yalnız gerçek DB'de görünür.
     this._amount = JournalEntryLineAmount.create(
-      data.debit,
-      data.credit,
+      JournalLine.hydrate(data.debit),
+      JournalLine.hydrate(data.credit),
       Currency.create(data.currency).orThrow()
     );
 
-    this._originalDebit = data.originalDebit ?? null;
-    this._originalCredit = data.originalCredit ?? null;
+    this._originalDebit =
+      data.originalDebit != null
+        ? JournalLine.hydrate(data.originalDebit)
+        : null;
+    this._originalCredit =
+      data.originalCredit != null
+        ? JournalLine.hydrate(data.originalCredit)
+        : null;
     this._originalCurrency = data.originalCurrency
       ? Currency.create(data.originalCurrency).orThrow()
       : null;
-    this._fxRate = data.fxRate ?? null;
+    this._fxRate =
+      data.fxRate != null ? JournalLine.hydrate(data.fxRate) : null;
 
     this._lineDesc = data.lineDesc;
   }
@@ -93,6 +105,11 @@ export class JournalLine {
 
   get lineDesc(): string | null {
     return this._lineDesc;
+  }
+
+  /** DB’den (Prisma `Decimal`) ya da domain’den (`decimal.js`) gelen tutarı `decimal.js`’e indirger. */
+  private static hydrate(value: { toString(): string }): Decimal {
+    return new Decimal(value.toString());
   }
 
   public static create(

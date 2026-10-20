@@ -438,6 +438,28 @@ export class ChargebackSourceNotChargeableException extends DomainException<{
 }
 
 /**
+ * İtirazın hasta/cari alanları kaynağıyla uyuşmuyor. Platform rezervasyon tahsilatında
+ * (`BOOKING_PAYMENT`) hasta ve cari OLMAZ (kayıp 120'ye değil 659.01'e yazılır); diğer
+ * kaynaklarda ikisi de ZORUNLUDUR (kaybedilince `B 120` o cariye yazılır ve 120 `requiresParty`
+ * taşır). DB CHECK aynı kuralı zorlar; bu istisna kaydı veritabanına varmadan açıklayıcı reddeder.
+ */
+export class ChargebackSourceActorsInvalidException extends DomainException<{
+  sourceType: string;
+}> {
+  public readonly errorCode = ERROR_CODES.CARD_CHARGEBACK.SOURCE_ACTORS_INVALID;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { sourceType: string }) {
+    super(
+      meta.sourceType === 'BOOKING_PAYMENT'
+        ? 'Rezervasyon tahsilatı itirazında hasta ve cari bulunamaz.'
+        : 'Bu kaynak türünde itirazın hastası ve carisi zorunludur.',
+      meta
+    );
+  }
+}
+
+/**
  * Hastasız kart çekimi: muhasebe köprüsü yalnız hastaya bağlı hareket için
  * kurulur, yani bu satış deftere **hiç yazılmamıştır**. Yazılmamış bir tahsilata
  * karşı itiraz kaydetmek, olmayan parayı 108'den düşmek olurdu.

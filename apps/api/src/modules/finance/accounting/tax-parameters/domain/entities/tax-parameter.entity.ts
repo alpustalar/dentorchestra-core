@@ -20,6 +20,15 @@ import {
  * `validTo = null` → hâlâ yürürlükteki (açık) sürüm. Yeni oran açılınca eski sürüm
  * `close()` ile kapatılır; geçmiş dönemler doğru hesaplansın diye satır silinmez.
  */
+
+// TODO: DB SEED'le başlangıç verisi eklenecek.
+//  (SEED): Diş kliniği / sağlık ERP vergi parametreleri başlangıç verisi kurgulanacak: VAT_HEALTH (%10): Sağlık & Tıbbi Diş Tedavileri KDV
+//  VAT_STANDARD (%20): Estetik Diş Beyazlatma & Genel KDV
+//  VAT_REDUCED (%1): İndirimli Tıbbi Sarf / İlaç KDV
+//  VAT_ZERO (%0): Sağlık Turizmi / İstisna KDV
+//  WITHHOLDING_INCOME (%20): Hekim Serbest Meslek Stopajı (GVK 94/2)
+//  WITHHOLDING_RENT (%20): Mülk Kira Stopajı
+//  CORPORATE_TAX (%25): Kurumlar Vergisi, Not: Tüm varsayılan veriler `validFrom = 2026-01-01 00:00:00` ve `validTo = null` ile seed edilmelidir.
 export class TaxParameter extends AggregateRoot {
   constructor(data: ITaxParameter) {
     super();
@@ -185,15 +194,15 @@ export class TaxParameter extends AggregateRoot {
 
   public toPersistence(): ITaxParameter {
     return {
-      id: this._id,
-      clinicId: this._clinicId,
-      organizationId: this._organizationId,
-      key: this._key,
-      rate: this._rate,
-      validFrom: this._validFrom,
-      validTo: this._validTo,
-      createdAt: this._createdAt,
-      updatedAt: this._updatedAt,
+      id: this.id,
+      clinicId: this.clinicId,
+      organizationId: this.organizationId,
+      key: this.key,
+      rate: this.rate,
+      validFrom: this.validFrom,
+      validTo: this.validTo,
+      createdAt: this.createdAt,
+      updatedAt: this.updatedAt,
     };
   }
 }

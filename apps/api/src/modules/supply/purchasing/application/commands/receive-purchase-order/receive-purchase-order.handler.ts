@@ -49,11 +49,14 @@ export class ReceivePurchaseOrderHandler implements ICommandHandler<
         )
         .orThrow('purchase-order.receive');
 
+      // Kabul günlüğüne kimin girdiği de yazılır (GRNI dayanağı); sistem aktörü
+      // kimliksizdir ve açıkça null geçer.
       order.receive(
         data.items.map((item) => ({
           itemId: item.itemId,
           quantity: item.quantity,
-        }))
+        })),
+        { receivedById: ctx.actor.userId ?? null }
       );
       await this.purchaseOrderRepo.update(order);
 

@@ -6,6 +6,7 @@ import { IPaymentLinkProvider } from '@src/infrastructure/payment/links/payment-
 import { IBookingPaymentCommandRepository } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.command.repository';
 import { BookingPayment } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment.entity';
 import { BookingPaymentRefund } from '@modules/crm/health-tourism/booking-payment/domain/entities/booking-payment-refund.entity';
+import { CollectionUnderChargebackException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 import { BookingPaymentRefundAlreadyClaimedException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment-refund.exceptions';
 import { IBookingPaymentRefundCommandRepository } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment-refund/booking-payment-refund.command.repository';
 import {
@@ -118,7 +119,8 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
   const build = (
     bp: BookingPayment | null,
     bookThrows = false,
-    booked: BookedSupplierResultLike = supplierCost()
+    booked: BookedSupplierResultLike = supplierCost(),
+    guardError: Error | null = null
   ) => {
     // Dış çağrıların kilit (tx) içinde mi dışında mı yapıldığını ölçer: HotelBeds ve
     // iade çağrıları saniyeler sürer, satır kilidini o kadar tutmak kabul edilemez.
@@ -279,6 +281,13 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     // İade/defter/link hataları sessiz kalmasın diye uyarı yayınlanır.
     const criticalFailure = { publish: jest.fn() };
 
+    // Kart itirazı tavan kapısı: varsayılan "aktif itiraz yok".
+    const chargebackExposureGuard = {
+      assertReversalWithinCollection: jest.fn(async () => {
+        if (guardError) throw guardError;
+      }),
+    };
+
     return {
       handler: new ConfirmBookingPaymentHandler(
         commandBus,
@@ -288,6 +297,7 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         policyFactory,
         natsClient,
         refundRepo,
+        chargebackExposureGuard as never,
         refundExecutor,
         // Gerçek köprü servisi, mock bus/kiracı/alarm ile kurulur: böylece
         // olay gövdesi, platform defteri hedefi ve tedarikçi carisi zinciri
@@ -301,6 +311,7 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
         criticalFailure as never
       ),
       criticalFailure,
+      chargebackExposureGuard,
       refundRepo,
       refundExecutor,
       refunds,
@@ -716,6 +727,52 @@ describe('ConfirmBookingPaymentHandler — saga (book replay / iade)', () => {
     expect(refundExecutor.execute).toHaveBeenCalledTimes(1);
     // REFUNDED'a çekmek artık yürütücünün işi (iade ONAYLANINCA); handler FAILED'da bırakır.
     expect(bp.status).toBe('FAILED');
+  });
+
+  it('book başarısız + AKTİF kart itirazı → FAILED yazılır ama iade satırı AÇILMAZ, CRITICAL basılır', async () => {
+    const bp = makeBp('PENDING');
+    const {
+      handler,
+      refunds,
+      refundExecutor,
+      criticalFailure,
+      chargebackExposureGuard,
+    } = build(
+      bp,
+      true,
+      supplierCost(),
+      new CollectionUnderChargebackException({
+        collected: '4200.00',
+        alreadyReversed: '0.00',
+        activeChargebacks: '4200.00',
+        requested: '4200.00',
+      })
+    );
+
+    await handler.execute(
+      new ConfirmBookingPaymentCommand({
+        bookingPaymentId: bp.id.value,
+        provider: 'STRIPE',
+        providerRef: 'pi_1',
+        ctx,
+      })
+    );
+
+    expect(
+      chargebackExposureGuard.assertReversalWithinCollection
+    ).toHaveBeenCalledTimes(1);
+    // Rezervasyon gerçekten açılamadı: FAILED damgası geri sarılmaz.
+    expect(bp.status).toBe('FAILED');
+    // Ama aynı parayı ikinci kez geri götürecek iade ne açılır ne yürütülür.
+    expect(refunds).toHaveLength(0);
+    expect(refundExecutor.execute).not.toHaveBeenCalled();
+    expect(criticalFailure.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severity: 'CRITICAL',
+        operation:
+          'health-tourism.booking-payment.refund-blocked-by-chargeback',
+      })
+    );
   });
 
   it('iade yürütülürken BEKLENMEYEN hata → kritik uyarı; satır PENDING kalır, bp REFUNDED olmaz', async () => {

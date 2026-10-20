@@ -7,6 +7,7 @@ import {
   PurchaseInvoiceAlreadyCancelledException,
   PurchaseInvoiceAlreadyMatchedException,
   PurchaseInvoiceInvalidDateException,
+  PurchaseInvoiceInvalidLineAccountException,
   PurchaseInvoiceInvalidPrecisionException,
   PurchaseInvoiceNotMatchableException,
   PurchaseInvoiceNotMatchedException,
@@ -51,6 +52,28 @@ describe('PurchaseInvoice (alış faturası değişmez kuralları)', () => {
     expect(invoice.grandTotal.toApiFormat()).toBe('1200.00');
     expect(invoice.isMatched).toBe(false);
   });
+
+  // --- Karşı hesap kabul kümesi (kural 12) ---
+
+  it.each(['102', '329', '120', '320', '740'])(
+    'karşı hesap %s kabul edilmez (stok/varlık/gider değil ya da başlık)',
+    (lineAccountCode) => {
+      // Eski davranış: serbest metin. `102` ile `B 102 / B 191 / A 320` — dengeli
+      // fiş, bankada olmayan para. 329 ise yıl sonu GRNI tahakkukunun hesabıdır.
+      expect(() =>
+        PurchaseInvoice.create(baseProps({ lineAccountCode }))
+      ).toThrow(PurchaseInvoiceInvalidLineAccountException);
+    }
+  );
+
+  it.each(['150', '153', '255', '740.01', '760', '770'])(
+    'karşı hesap %s kabul edilir',
+    (lineAccountCode) => {
+      expect(
+        PurchaseInvoice.create(baseProps({ lineAccountCode })).lineAccountCode
+      ).toBe(lineAccountCode);
+    }
+  );
 
   // --- P1-1: denge ---
 

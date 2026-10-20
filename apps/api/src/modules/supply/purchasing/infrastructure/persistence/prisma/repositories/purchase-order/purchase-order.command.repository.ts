@@ -57,9 +57,20 @@ export class PurchaseOrderCommandRepository
     return this.toEntity(raw);
   }
 
-  /** Başlık durumunu + kalemlerin teslim alınan miktarını günceller (mal kabul). */
+  /**
+   * Başlık durumunu + kalemlerin teslim alınan miktarını günceller (mal kabul) ve
+   * aggregate'in ürettiği **mal kabul günlüğü** kayıtlarını AYNI yazmada saklar.
+   *
+   * Günlük ile sayaç tek `update` çağrısında ilerler: ayrı yazılsalardı biri diğerinden
+   * önce commit olabilir ve "31 Aralık itibarıyla teslim alınan" cevabı sayaçla çelişirdi.
+   * Mapping alan-alan yazılıyor (nested create): şemaya eklenen her yeni günlük kolonu
+   * buraya da eklenmek ZORUNDADIR (CLAUDE.md finans kuralı 9) — `purchase-order.command
+   * .repository.spec.ts` bu eşlemeyi kilitler.
+   */
   async update(entity: PurchaseOrder): Promise<PurchaseOrder> {
     const { id, ...update } = entity.toPersistence();
+    const pendingReceipts = entity.pendingReceipts;
+
     const raw = await this.db.purchaseOrder.update({
       where: { id },
       data: {
@@ -70,9 +81,32 @@ export class PurchaseOrderCommandRepository
             data: { quantityReceived: line.quantityReceived },
           })),
         },
+        ...(pendingReceipts.length > 0
+          ? {
+              receipts: {
+                create: pendingReceipts.map((receipt) => ({
+                  id: receipt.id,
+                  clinicId: receipt.clinicId,
+                  organizationId: receipt.organizationId,
+                  receivedAt: receipt.receivedAt,
+                  receivedById: receipt.receivedById,
+                  source: receipt.source,
+                  lines: {
+                    create: receipt.lines.map((line) => ({
+                      id: line.id,
+                      itemId: line.itemId,
+                      quantity: line.quantity,
+                      unitPrice: line.unitPrice,
+                    })),
+                  },
+                })),
+              },
+            }
+          : {}),
       },
       include: { items: true },
     });
+    entity.clearPendingReceipts();
     entity.flushEvents();
     return this.toEntity(raw);
   }

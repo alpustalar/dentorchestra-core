@@ -1,0 +1,37 @@
+{
+  "moduleFileExtensions": [
+    "ts",
+    "js",
+    "json"
+  ],
+  "rootDir": "../src",
+  "roots": [
+    "<rootDir>",
+    "<rootDir>/../../../packages/nest-kernel/src"
+  ],
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "testEnvironment": "node",
+  "moduleNameMapper": {
+    "^@common/(.*)$": [
+      "<rootDir>/common/$1",
+      "<rootDir>/../../../packages/nest-kernel/src/common/$1"
+    ],
+    "^@modules/(.*)$": "<rootDir>/modules/$1",
+    "^@src/(.*)$": [
+      "<rootDir>/$1",
+      "<rootDir>/../../../packages/nest-kernel/src/$1"
+    ],
+    "^@shared/modules/(.*)$": "<rootDir>/../../../packages/shared/modules/$1",
+    "^@shared/common/(.*)$": "<rootDir>/../../../packages/shared/common/$1",
+    "^@shared$": "<rootDir>/../../../packages/shared/index",
+    "^@shared/(.*)$": "<rootDir>/../../../packages/shared/$1",
+    "^@input-type-schemas/(.*)$": "<rootDir>/../../../packages/shared/generated-zod/inputTypeSchemas/$1"
+  },
+  "testRegex": ".*\\.db-spec\\.ts$",
+  "globalSetup": "<rootDir>/../test/db/global-setup.cjs",
+  "globalTeardown": "<rootDir>/../test/db/global-teardown.cjs",
+  "maxWorkers": 1,
+  "testTimeout": 60000
+}

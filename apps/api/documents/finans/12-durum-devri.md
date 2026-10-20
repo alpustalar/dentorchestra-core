@@ -1,10 +1,8 @@
 # Finans — Durum Devri (State Handoff)
 
-**Tarih:** 2026-10-20 (§89 / tur 31 sonrası; **§0 devam noktası** güncel) · **Dal:** `main` (HEAD detached @ `547eced8`) ·
-**Commit:** tur 1–29 (§3–§86) `547eced8`'te main'e girdi (2026-10-18). **Tur 30 (§87/§88, kart
-itirazı) çalışma ağacında**, commit edilmedi; ağaçta ayrıca kullanıcının ~435 dosyalık sabit/`DateTimeManager`
-→ `@shared` taşıma refactor'ü sürüyor (finans dosyalarında yalnız import değişikliği; `git status`
-2026-10-19 sonunda 574 satır = bu taşıma + tur 30).
+**Tarih:** 2026-10-20 (§92 / tur 33 sonrası; **§0 devam noktası** güncel) · **Dal:** `main`
+**Commit:** tur 1–29 `547eced8`; **tur 30 + 31** `ca4b5075` (2026-10-20, kullanıcı isteğiyle); kullanıcının
+nest-kernel → `@shared` taşıma/web refactor'ü `68898279`. **Tur 32 (§91) çalışma ağacında, commit'siz.**
 
 **Bu belge nedir.** Yeni bir sohbete doğrudan bağlam olarak yapıştırılmak üzere
 yazılmış özet. **Yeni sohbette önce §0'ı uygula** (ilk ölçümler + sıradaki tur önerisi).
@@ -12,10 +10,10 @@ Kaynak belgeler hâlâ şunlardır ve bu dosya onların yerini **almaz**:
 
 | Dosya | İçerik |
 | --- | --- |
-| `09-guvence-denetimi.md` (~6.430 satır) | Denetimin tamamı: §2 durum tablosu, §3–§88 tur bölümleri, §45 özet |
+| `09-guvence-denetimi.md` (~6.600 satır) | Denetimin tamamı: §2 durum tablosu, §3–§91 tur bölümleri, §45 özet |
 | `10-kalan-isler.md` | 22 iş paketi + kabul edilmiş tasarımlar + operasyon/kurulum |
 | `11-eksik-kalanlar.md` | **Üretilir** (`pnpm finans:eksik`), 218 kalem düz liste (206 açık) |
-| `/CLAUDE.md` → "Finans / Muhasebe — Para Güvenliği Kuralları" | 17 kural, tam metin |
+| `/CLAUDE.md` → "Finans / Muhasebe — Para Güvenliği Kuralları" | 22 kural, tam metin |
 
 Bir kalem kapandığında **iki yerde** işaretlenir (§-bölümü + `10-kalan-isler.md`),
 yoksa liste sessizce bayatlar.
@@ -24,47 +22,66 @@ yoksa liste sessizce bayatlar.
 
 ## 0. Devam noktası — buradan başla
 
-**Durum (2026-10-20).** Tur 30 (kart itirazı) hâlâ **commit'siz ve migration'ı uygulanmamış**. Üstüne
-**tur 31 (§89, platform iade doğrulaması)** kodlandı, testlerden geçti, **commit'siz**; migration'ı yazıldı,
-**hiçbir veritabanında çalıştırılmadı**. Ağaçta ayrıca kullanıcının `apps/web` Faz 3 ve nest-kernel taşıma
-işleri sürüyor (finans dışı). Devam etmeden önce §0.1 ölçümlerini yeniden al; sapma varsa önce farkı açıkla.
+**Durum (2026-10-20).** Tur 30 (kart itirazı) ve tur 31 (platform iade doğrulaması) `main`'e commit edildi
+(`ca4b5075`); kullanıcının refactor'ü ayrı commit'te (`68898279`). Migration'lar **yerel dev DB'ye uygulandı**
+(90/90), seed çalıştırıldı, uygulama açıldı (platform dönemi açıldı), sekiz `NOT VALID` kısıt doğrulandı,
+`pnpm finans:degismezler` 23/23. **Tur 32 (§91, platform iyzico itirazı)** kodlandı, testlerden geçti,
+**commit'siz**; migration'ı (`20261021120000_booking_payment_chargeback`) dev DB'ye uygulandı. Devam etmeden
+önce §0.1 ölçümlerini yeniden al; sapma varsa önce farkı açıkla.
 
 ### 0.1 İlk ölçümler (hepsi salt-okunur)
 
-| # | Komut (`apps/api` içinden) | Tur 31 bittiğinde ölçülen |
+| # | Komut (`apps/api` içinden) | Tur 32 bittiğinde ölçülen |
 | --- | --- | --- |
-| 1 | `git branch --show-current` · `git status --short` · `git log --oneline -1` | HEAD detached @ `547eced8`; tur 30 + 31 commit'siz |
+| 1 | `git branch --show-current` · `git status --short` · `git log --oneline -3` | `main`; tur 32 değişiklikleri commit'siz; HEAD `68898279` |
 | 2 | `npx tsc --noEmit` | **1** ilgisiz hata (`schedule-appointment.handler.spec.ts`) |
-| 3 | `pnpm test` | 276/277 suite, **2011** test yeşil (kırmızı tek suite ilgisiz `schedule-appointment.handler.spec.ts`) |
-| 4 | `pnpm prisma migrate status` | 89 klasör; **bekleyen 2:** `20261019120000_card_chargeback`, `20261020120000_booking_payment_refunds` |
-| 5 | `pnpm finans:degismezler` | **20** kontrol; migration'lar uygulanana kadar çalıştırılamayanlar var (exit 2); `donemsiz-defter` 1 aykırı (dev DB'de dönem yok) |
+| 3 | `pnpm test` | 278/279 suite, **2059** test yeşil (kırmızı tek suite ilgisiz `schedule-appointment.handler.spec.ts`) |
+| 4 | `pnpm prisma migrate status` | 90 klasör; hepsi uygulanmış (dev DB) |
+| 5 | `pnpm finans:degismezler` | **23** kontrol, hepsi temiz (dev DB) |
 
-### 0.2 Kullanıcıda bekleyen adımlar (kodla çözülemez; sırayla)
+### 0.2 Kullanıcıda bekleyen adımlar (kodla çözülemez)
 
-1. `pnpm migrate:dev` → iki migration sırayla. Prisma ayrıca `appointment_embeddings` (pgvector) migration'ı isteyecek — bağımsız.
-2. **Uygulamayı aç** (bir kerelik dönem işi platform defterine dönem açar) → `pnpm finans:degismezler` 20/20 temiz olmalı.
-3. Temizse sekiz `NOT VALID` kısıt için `VALIDATE CONSTRAINT` (§81).
-4. Seed: `cardchargeback`, `providersettlement`, `subscriptioncharge`, `appointmentembedding`, **`bookingpaymentrefund`** aileleri.
-5. **Legacy REFUNDED satırlarını doğrula:** `GET /health-tourism/booking-payments/refunds/unresolved` → her satırı iyzico panelinde `idempotencyKey`/`chargeProviderRef` ile ara → `POST …/refunds/:id/resolve` (§89.4).
-6. `git switch main` → commit. Tur 30, tur 31 ve taşıma refactor'ü iç içe; ayrı commit'ler `git add -p` ister.
-7. Dev DB'ye muhasebe dönemi + hesap planı (platform dahil). `SLACK_OPS_WEBHOOK_URL`, `POS_CALLBACK_SECRET` hâlâ tanımsız.
+Dev DB'deki adımlar yapıldı. **Kalanlar üretim ortamına özgü:**
 
-### 0.3 Sıradaki tur — öneri: tur 32, platform iyzico itirazı
+1. Üretimde `prisma migrate deploy` (üç migration: tur 30/31/32), ardından uygulama açılışı (bir kerelik dönem
+   işi platform dönemini açar; platform hesap planına `659`/`659.01` additif eklenir), seed
+   (`bookingpaymentrefund`, `cardchargeback` aileleri), `pnpm finans:degismezler` 23/23, sonra sekiz kısıt için
+   `VALIDATE CONSTRAINT`.
+2. **Legacy REFUNDED satırlarını doğrula** (üretimde; dev DB'de hiç `booking_payments` yok):
+   `GET /health-tourism/booking-payments/refunds/unresolved` → her satırı iyzico panelinde
+   `idempotencyKey`/`chargeProviderRef` ile ara → `POST …/refunds/:id/resolve` (§89.4). **iyzico panelinden
+   doğrulama kodla yapılamaz.**
+3. Tur 32'yi commit et (`git add` ile tur 32 dosyaları; çalışma ağacında başka iş yok).
+4. `SLACK_OPS_WEBHOOK_URL`, `POS_CALLBACK_SECRET` hâlâ tanımsız.
 
-Stripe canlıya alınmayacağı için platform tarafı yalnız iyzico/TRY. Kapsam (kullanıcı kararları 2026-10-20):
-`CardChargeback`'e `BOOKING_PAYMENT` kaynağı (tek tablo/tek tavan/tek 127 taraması); hasta/cari kolonları
-platform müşterisi için nullable; TRY kapısı korunur; LOST → yeni **`659` başlığı + `659.01 Platform İtiraz
-ve Chargeback Zararları`** (ek-yönlü şablon, kural 11 sapma raporu; `689` başlığa çevrilemez — bekçi alt
-hesaplı hesabı fişe kapatır). Kural 17: `lockAndGet` booking-collection servisi; tavan = canlı iadeler
-(`BookingPaymentRefund.countsTowardsReturned`: PENDING/UNCONFIRMED/CONFIRMED) + aktif itirazlar + istenen ≤
-tahsilat, **her** iade claim'inde çağrılır. Yeni tarama: `itiraz-tavan-asimi-booking`; platform 127 mutabakatı.
-Kural 15: Stripe `charge.dispute.*` bu turda YOK (bayrak kapalı).
+### 0.3 Tur 33 (§92–§93) kodlandı — yıl sonu kapanışı + GRNI tahakkuku; commit'siz
 
-**Okunacaklar:** `09` §89–§90; `10-kalan-isler.md` #16, #3.
+Kapanış zinciri tek saf planlayıcıdır (`planYearEndClosing`): GRNI tahakkuku (`B 150|gider / A 329`, `ADJUSTING`) →
+7xx yansıtma (`622/631/632`) → 6. sınıf → 690 → 590/591 → ertesi yıl 1 Ocak ters kayıt. Önizleme
+(`POST …/closing-preview`) ile `close` aynı fonksiyonu çağırır; `close` gövdesi `expectedLastEntryNo` +
+`grniAccruals` ister (kural 19). Mal kabul günlüğü (`purchase_order_receipts`) kural 20 için kuruldu. Gizli P0:
+`Prisma.Decimal` ≠ `decimal.js` yüzünden fişi yazan her çağrı gerçek DB'de patlıyordu (kural 21). Ayrıntı:
+`09` §92–§93, kısa devir `13-tur33-devri.md`.
 
-**Alternatifler:** GRNI 159/326 + yıl sonu fiş takımı (iş paketi 1); kart itirazı kalanları (#3); frontend Faz 3 (#13).
+**Ölçümler (tur 33 sonrası):** `tsc` 1 ilgisiz hata; `pnpm test` 292/293 suite, **2237** test yeşil (kırmızı
+tek suite ilgisiz `schedule-appointment.handler.spec.ts`); `finans:degismezler` 30 kontrol, **28 temiz + 2 çalıştırılamadı**
+(`mal-kabul-gunlugu-*`: migration dev DB'de yok → exit 2, tasarım gereği).
 
-**Şimdilik dokunulmaz:** #5 POS EOD, #2 e-belge adapter, #22 alarm olgunlaşması, #4 SoD, Stripe payout/itiraz/kur farkı (Stripe canlıya alınınca).
+**Kullanıcıda bekleyen:** iki migration'ı uygula (`pnpm migrate:dev`) — mal kabul günlüğü **30 Kasım'a kadar**
+canlıda olmalı; sonra `finans:degismezler` 30/30; mevcut kliniklerde `chart-of-accounts/initialize`; tur 32+33 commit.
+
+**İşletme biçimi + devir (§94, 2026-10-21) kodlandı:** `businessType` alanı (kayıtta zorunlu), `SetClinicBusinessType`
+komutu/ucu, planda `EQUITY_CARRYFORWARD` adımı (1 Ocak; şirket 570/580, şahıs 500). **Üçüncü migration:**
+`20261024100000_clinic_business_type` (uygulanmadı). Eski klinikler için seçim ucu çağrılmalı; seçilene kadar devir atlanır.
+
+**Tur 34 (§95, 2026-10-21) — gerçek-DB turu KODLANDI, commit'siz:** `pnpm test:db` (izole DB, 5 suite / 52 test): 17 posting kuralı,
+kasa, kart itirazı (ONLINE_PAYMENT), hesap kapaması, yıl sonu kapanışı (özkaynak devri dahil). **1×P0** (`lockConcept` Prisma `void`
+sütunu → 108 kapısını kullanan her yol patlıyordu) ve **1×P1** (108 kapısı fişlenmemiş kesintileri düşmüyordu) bulundu ve
+kapatıldı. Migration yok. Ölçümler: `tsc` 1 ilgisiz hata; `pnpm test` 293/294 suite, **2266** test; `test:db` **52** test.
+
+**Sıradaki tur önerisi — iş paketi 23'ün kalanı (§95.5):** iade/iptal yolları (sağlayıcı adaptörü taklidi ister) ve
+`POS_TRANSACTION`/`BOOKING_PAYMENT` itirazı; `test:db`'yi CI'a bağlamak. Tur 33'teki P0 ve tur 34'teki ikisi aynı sınıftandı. Alternatifler: `13-organization-clinic-defter-plani.md`
+(tasarım, onay bekliyor), frontend Faz 3 (#13), kapanış `close` için ayrı capability (#4).
 
 ---
 
@@ -75,7 +92,7 @@ Kural 15: Stripe `charge.dispute.*` bu turda YOK (bayrak kapalı).
 | **Migration'ları kullanıcı uygular** (`pnpm migrate:dev`) | Migration yazılır, çalıştırılmaz |
 | **Otomatik yıkıcı veri temizliği yok** | Geçmişi yorumlayan düzeltme muhasebe kararıdır |
 | **`git checkout <dosya>` bu ağaçta asla kullanılmaz** | Commit edilmemiş işi siler → `git restore --staged` |
-| **Hiçbir şey commit edilmez** | İş çalışma ağacında kalır (tur 1–29'u kullanıcı kendisi commit etti; tur 30 bekliyor). HEAD detached: commit öncesi `git switch main` |
+| **Commit yalnız kullanıcı isterse** | Varsayılan: iş çalışma ağacında kalır. Tur 30 + 31 ve refactor, kullanıcının açık isteğiyle (2026-10-20) iki commit olarak atıldı; bu izin sonraki turlara taşınmaz |
 | **Canlı veritabanına yalnız okuma** | `finance-invariants.cjs` ve ölü-mektup betikleri tasarımı gereği salt okunur |
 | Tur düzeni | denetle → düzelt → test → **belgelere yaz** (§-bölüm + §2 satırı + §45 + `10-kalan-isler` + `pnpm finans:eksik` + hafıza) |
 | Yeni devredilebilir ders | `/CLAUDE.md` finans kuralları bölümüne **kural** olarak yazılır |
@@ -110,7 +127,7 @@ Kural 15: Stripe `charge.dispute.*` bu turda YOK (bayrak kapalı).
 
 ---
 
-## 3. 17 para güvenliği kuralı — indeks (tam metin `/CLAUDE.md`)
+## 3. 22 para güvenliği kuralı — indeks (tam metin `/CLAUDE.md`)
 
 1. Dönem kapısı kilit altında, aynı tx'te, Command Repo'dan okunur.
 2. Yevmiye no tek-UPDATE ile tahsis edilir; `MAX(entry_no)+1` yasak.
@@ -133,7 +150,18 @@ Kural 15: Stripe `charge.dispute.*` bu turda YOK (bayrak kapalı).
     kapatma tutarı bekleyen bakiyeyi aşamaz.
 17. Parayı kart sahibine geri götüren **her yol** (iade, iptal, ters ibraz) **aynı kümülatif tavanı**
     paylaşır ve aynı kaynak satırını `FOR UPDATE` kilitler; her kontrol tek başına doğru olsa da toplam
-    satışı aşar ve hata hiçbir yerde görünmez.
+    satışı aşar ve hata hiçbir yerde görünmez. Platform rezervasyonunda aynı kapı `BOOKING_PAYMENT`
+    kaynağıyla üç iade claim'inde çağrılır (§91).
+18. Sağlayıcı çağrısının sonucu **üç durumludur** (oldu / olmadı / bilinmiyor); adaptör ham SDK sonucunu değil
+    tipli sonucu döner; "bilinmiyor" yalnız elle doğrulamayla kapanır, otomatik yeniden denenmez; idempotent
+    olay dedupe'u sahiplenme değildir (§89).
+19. Geri alınamaz toplu yazma önizlemesiz ve önizlemeden bağımsız hesapla çalışmaz (tek planlayıcı, tazelik belirteci,
+    tutar sunucudan) (§92).
+20. Tarihsiz sayaç tarihli soruyu cevaplayamaz; tarihli günlük, soruyu soran ilk dönem sonundan önce kurulur (§92).
+21. Mock'lu test DB'nin döndürdüğü tipi taklit edemez: yazma yolu gerçek DB'ye karşı uçtan uca çalıştırılır
+    (`pnpm test:db`), reddedilen senaryolar hata türüyle sabitlenir (§92, §95).
+22. Kapı, beslendiği veriyi yazan akışın gecikmesini hesaba katar (fişlenmemiş kesintiler düşülür); `void` dönen SQL
+    fonksiyonu `$executeRaw` ile çağrılır (§95).
 
 ---
 
@@ -218,35 +246,33 @@ Toplam: **~61×P0, ~107×P1, ~74×P2 + 2 eksik akış** (§85 settlement, §87 k
 | `LEDGER_EFFECTIVE_ENTRY_STATUSES` | `POSTED` + `REVERSED` — tüm defter sorgularının süzgeci |
 | `CriticalFailurePublisher` → `OPS_ALERT_PORT` | **44** çağrı yeri (§83'te 41, §85'te 42 ölçülmüştü; kart itirazı +2: plan yansıması eşleşmedi, cari ters ibraz işi kuyruğa alınamadı); Slack adaptörü + Redis dedupe + log fallback |
 | `installProcessFailureAlarms` | `src/common/observability/` — yakalanmayan red → CRITICAL + süreç kapanır |
-| `pnpm finans:degismezler` | `scripts/finance-invariants.cjs` — **13** salt-okunur kontrol; aykırılıkta exit 1, **çalıştırılamayan kontrolde exit 2** (çalışmayan kontrol "sağlam" sayılmaz) |
+| `pnpm finans:degismezler` | `scripts/finance-invariants.cjs` — **23** salt-okunur kontrol; aykırılıkta exit 1, **çalıştırılamayan kontrolde exit 2** (çalışmayan kontrol "sağlam" sayılmaz) |
 | `pnpm finans:eksik` | `scripts/finans-eksik-liste.cjs` — `11-eksik-kalanlar.md` üretir |
 
 ---
 
 ## 7. Veritabanı / migration durumu
 
-**17 migration yazıldı; 16'sı uygulandı ve doğrulandı** (2026-10-19: `prisma migrate status` →
-87/87 "Database schema is up to date"; §57…§85'in sekiz migration'ı da uygulanmış — önceki
-devirdeki "8 bekliyor" notu **bayattı**; devir yenilenirken yeniden ölçüldü: 88 klasör, 87'si uygulanmış,
-yalnız aşağıdaki bekliyor). **1 bekliyor**, ek-yönlü, veri çatışması yok:
+**Yerel dev DB'de 90/90 migration uygulandı** (2026-10-20: `prisma migrate status` → "Database schema is up to date").
+Son üçü ek-yönlü, veri çatışması yok:
 
 ```
-20261019120000_card_chargeback    (§87 — 4 enum + 5 enum değeri + card_chargebacks tablosu + 5 CHECK
-                                         + payment_installments.recovers_installment_id)
+20261019120000_card_chargeback           (§87 — 4 enum + 5 enum değeri + card_chargebacks tablosu + 5 CHECK
+                                                + payment_installments.recovers_installment_id)
+20261020120000_booking_payment_refunds   (§89 — 4 enum, 2 olay tipi, tablo + 7 CHECK, legacy REFUNDED→UNCONFIRMED)
+20261021120000_booking_payment_chargeback (§91 — CardChargebackSource += BOOKING_PAYMENT, patient_id/party_id
+                                                nullable + CHECK card_chargebacks_patient_party_by_source)
 ```
 
-> ⚠️ **Yerel Postgres olmadığı için bu migration bir veritabanında denenmedi.** SQL, Prisma'nın
-> `migrate diff` ile ürettiği DDL ile birebir kıyaslandı (tablo, kolon, indeks, FK); 5 CHECK elle yazıldı.
-> Yeni enum değerleri (`ADD VALUE`) migration içinde **kullanılmıyor**; CHECK'ler yalnız aynı migration'da
-> yaratılan enum'lara bakıyor (Postgres'in aynı-transaction kısıtı).
+Uygulama `prisma migrate deploy` ile yapıldı (etkileşimsiz). **Üretimde ayrı adım**; sırası: migration →
+uygulama açılışı (dönem işi + platform `659`/`659.01` additif) → seed → `pnpm finans:degismezler` (**23** kontrol)
+→ temizse sekiz `NOT VALID` kısıt (§81) için `VALIDATE CONSTRAINT` (dev DB'de yapıldı).
 
-Uygulama sırası: `pnpm migrate:dev` → `pnpm finans:degismezler` (artık **13** kontrol; 4'ü yeni tablo
-olmadan çalışamaz) → **temizse** sekiz `NOT VALID` kısıt (§81) için `VALIDATE CONSTRAINT` → seed yeniden
-(`cardchargeback`, `providersettlement`, `subscriptioncharge` yetki aileleri).
+> ⚠️ **`migrate dev` ayrıca `appointment_embeddings` (pgvector) tablosu için bir migration üretmek isteyebilir.**
+> Model şemada committed ama migration'ı yok — önceden var olan, bağımsız sapma (pgvector eklentisi gerektirir).
 
-> ⚠️ **`migrate dev` ayrıca `appointment_embeddings` (pgvector) tablosu için bir migration üretmek isteyecek.**
-> Model şemada committed ama migration'ı yok — bu turdan bağımsız, önceden var olan sapma (pgvector eklentisi
-> gerektirir). Kart itirazı migration'ına **bilinçli olarak alınmadı**.
+> ⚠️ **Yeni enum değeri (`ADD VALUE`) aynı transaction'da kullanılamaz.** Tur 32 migration'ındaki CHECK bu
+> yüzden `source_type::text = 'BOOKING_PAYMENT'` karşılaştırır, enum literal'i kullanmaz.
 
 **Son şema eklemeleri (§87):** `card_chargebacks` (`@@unique([clinicId, provider, caseReference])`,
 `Decimal(14,2)`, 5 CHECK: tutar pozitif, ücret ≥ 0, `OPEN ⇔ resolved_at IS NULL`, `resolved_at ≥ opened_at`,
@@ -333,7 +359,7 @@ ekstre ↔ payout eşleştirme bağı, sağlayıcı payout API'si, **platform de
 ```bash
 cd apps/api && npx tsc --noEmit            # 1 hata (ilgisiz: schedule-appointment.handler.spec.ts import yolu)
 cd apps/messaging && npx tsc --noEmit      # 0
-cd apps/api && pnpm test                   # 276/277 suite, 2011 test yeşil (1 ilgisiz kırmızı suite) — tur 31 sonu
+cd apps/api && pnpm test                   # 278/279 suite, 2059 test yeşil (1 ilgisiz kırmızı suite) — tur 32 sonu
 cd apps/messaging && pnpm test             # 42/43 suite, 256 test yeşil (1 ilgisiz kırmızı: nest-kernel `setup-app.ts` → `@nestjs/swagger` bulunamıyor, kullanıcının WIP'i)
 cd apps/api && pnpm finans:degismezler     # canlı DB'de: 9 kontrol temiz, 4'ü çalıştırılamadı (card_chargebacks yok) → exit 2
 cd apps/api && pnpm finans:eksik           # 218 kalem (206 açık) üretir

@@ -12,10 +12,12 @@ import {
   CancelPurchaseInvoiceProps,
   CreatePurchaseInvoiceProps,
 } from '@modules/finance/purchase-invoice/domain/contracts/purchase-invoice';
+import { isPurchaseInvoiceLineAccountCode } from '@shared/common/constants';
 import {
   PurchaseInvoiceAlreadyCancelledException,
   PurchaseInvoiceAlreadyMatchedException,
   PurchaseInvoiceInvalidDateException,
+  PurchaseInvoiceInvalidLineAccountException,
   PurchaseInvoiceInvalidPrecisionException,
   PurchaseInvoiceNotCancellableException,
   PurchaseInvoiceNotMatchableException,
@@ -221,6 +223,7 @@ export class PurchaseInvoice extends AggregateRoot {
       'grandTotal'
     );
 
+    this.assertLineAccountAllowed(props.lineAccountCode);
     this.assertBalanced({ netTotal, vatTotal, grandTotal });
     this.assertVatMatchesRate({ netTotal, vatTotal, vatRate });
     this.assertInvoiceDateNotInFuture(props.invoiceDate, now);
@@ -264,6 +267,19 @@ export class PurchaseInvoice extends AggregateRoot {
     );
 
     return invoice;
+  }
+
+  /**
+   * Karşı hesap kabul kümesinde olmalı (`PURCHASE_INVOICE_LINE_ACCOUNT_CODES`).
+   * DTO kapısı ondan geniş olamaz ama DTO'dan geçmeyen iç çağrılar da var; entity
+   * son kapıdır. Kod ayrıca hesap planında *var mı / postlanabilir mi* diye
+   * posting'de çözülür (`AccountResolver`) — küme yalnız "bu akış için uygun mu"
+   * sorusunu yanıtlar.
+   */
+  private static assertLineAccountAllowed(lineAccountCode: string): void {
+    if (!isPurchaseInvoiceLineAccountCode(lineAccountCode)) {
+      throw new PurchaseInvoiceInvalidLineAccountException({ lineAccountCode });
+    }
   }
 
   /** Satır tutarı: `Money`'ye çevirir ve kuruş hassasiyetini zorlar. */

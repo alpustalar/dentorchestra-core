@@ -185,7 +185,7 @@ export class CardChargebackResponseDto {
   @Expose(FIN) sourceId: string;
   @Expose(FIN) paymentId: string | null;
   @Expose(FIN) installmentId: string | null;
-  @Expose(FIN) patientId: string;
+  @Expose(FIN) patientId: string | null;
 
   @Expose(FIN)
   @Type(() => String)
@@ -231,7 +231,7 @@ export class CardChargebackResponseDto {
   @Expose(FIN) recoveryInstallmentId: string | null;
 
   // --- Yönetim: kim kaydetti / çözdü, köprü izleri ---
-  @Expose({ groups: [MANAGEMENT, ADMIN] }) partyId: string;
+  @Expose({ groups: [MANAGEMENT, ADMIN] }) partyId: string | null;
   @Expose({ groups: [MANAGEMENT, ADMIN] }) organizationId: string;
   @Expose({ groups: [MANAGEMENT, ADMIN] }) recordedById: string;
   @Expose({ groups: [MANAGEMENT, ADMIN] }) resolvedById: string | null;

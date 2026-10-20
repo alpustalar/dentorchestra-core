@@ -6,6 +6,7 @@ import { FinancialEventTypeType as FinancialEventType } from '@input-type-schema
 import {
   INBOUND_PAYMENT_METHODS,
   OUTBOUND_PAYMENT_METHODS,
+  PURCHASE_INVOICE_LINE_ACCOUNT_CODES,
 } from '@shared/common/constants';
 import { RETURNABLE_CHARGE_REASONS } from '@modules/finance/shared/domain/constants/returnable-charge.constant';
 import { CHARGEBACK_FUNDS_CHANNELS } from '@modules/finance/shared/domain/constants/chargeback-funds.constant';
@@ -139,7 +140,13 @@ const purchaseInvoiceReceived = z.object({
   netTotal: amount,
   vatTotal: amount,
   grandTotal: positiveAmount,
-  lineAccountCode: z.string().min(1),
+  /**
+   * Borcun yazılacağı hesap. Serbest metin iken `102` gibi bir kod gövdeye girip
+   * dengeli ama yanlış bir fiş üretiyordu; olay defteri append-only olduğu için
+   * yazılan gövde düzeltilemez. Kabul kümesi DTO ve posting kuralıyla AYNI sabittir
+   * (CLAUDE.md finans kuralı 12).
+   */
+  lineAccountCode: z.enum(PURCHASE_INVOICE_LINE_ACCOUNT_CODES),
   currency,
 });
 
@@ -221,13 +228,24 @@ const cardChargebackWon = z.object({
  * için cari **zorunlu**: gövde append-only olduğundan eksik cari, postlanamayan
  * ölümsüz bir olay bırakırdı (bkz. `platformBookingSettled` gerekçesi).
  */
-const cardChargebackLost = z.object({
+const cardChargebackLostBase = {
   amount: positiveAmount,
-  partyId,
   currency: CurrencySchema,
   provider: z.string().min(1),
   caseReference: z.string().min(1),
-});
+};
+
+/**
+ * İki varyant, ikisi de KATI (`strict`): eski (hasta) olaylar `platformLoss` taşımaz ve cariyi
+ * zorunlu kılar; platform varyantı cari TAŞIYAMAZ. Ayrım açık bir işarettir — cari yokluğundan
+ * türetilen platform zararı, cari unutulmuş bir hasta itirazını sessizce 659.01'e yazardı.
+ */
+const cardChargebackLost = z.union([
+  z.object({ ...cardChargebackLostBase, partyId }).strict(),
+  z
+    .object({ ...cardChargebackLostBase, platformLoss: z.literal(true) })
+    .strict(),
+]);
 
 const platformBookingSettled = z
   .object({

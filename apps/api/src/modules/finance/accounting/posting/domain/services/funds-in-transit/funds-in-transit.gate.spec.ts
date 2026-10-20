@@ -38,17 +38,17 @@ describe('FundsInTransitGate', () => {
 
     // Kilitsiz okuma yolu (`trialBalance`) bilerek tanımsız: kapı onu
     // kullanırsa test patlar — kilit altında okumak sözleşmenin parçası.
-    const lockAndGetAccountBalance = jest.fn(() => {
+    const lockAndGetSpendableFundsInTransit = jest.fn(() => {
       calls.push('lockAndGetBalance');
       return Promise.resolve(new Prisma.Decimal(options.balance ?? '10000.00'));
     });
     const journalCommandRepo = {
-      lockAndGetAccountBalance,
+      lockAndGetSpendableFundsInTransit,
     } as unknown as IJournalCommandRepository;
 
     return {
       gate: new FundsInTransitGate(journalCommandRepo, accountCommandRepo),
-      lockAndGetAccountBalance,
+      lockAndGetSpendableFundsInTransit,
       calls,
     };
   };
@@ -107,14 +107,14 @@ describe('FundsInTransitGate', () => {
   });
 
   it('bakiye kilitli okunur (kilitsiz yol kullanılmaz)', async () => {
-    const { gate, lockAndGetAccountBalance, calls } = build();
+    const { gate, lockAndGetSpendableFundsInTransit, calls } = build();
 
     await gate.assertCanSettle({
       clinicId: CLINIC_ID,
       grossAmount: new Decimal('100.00'),
     });
 
-    expect(lockAndGetAccountBalance).toHaveBeenCalledWith({
+    expect(lockAndGetSpendableFundsInTransit).toHaveBeenCalledWith({
       clinicId: CLINIC_ID,
       accountId: ACCOUNT_108,
     });
@@ -126,7 +126,7 @@ describe('FundsInTransitGate', () => {
     // operasyonel kaydı reddetmek kaydın kendisini imkânsız kılar. Korunacak
     // bir 108 bakiyesi de yoktur; fişlenemeyen olay süpürme uyarısıyla görünür.
     const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
-    const { gate, lockAndGetAccountBalance } = build({ codeMap: {} });
+    const { gate, lockAndGetSpendableFundsInTransit } = build({ codeMap: {} });
 
     await expect(
       gate.assertCanSettle({
@@ -135,7 +135,7 @@ describe('FundsInTransitGate', () => {
       })
     ).resolves.toBeUndefined();
 
-    expect(lockAndGetAccountBalance).not.toHaveBeenCalled();
+    expect(lockAndGetSpendableFundsInTransit).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('108'));
 
     warn.mockRestore();

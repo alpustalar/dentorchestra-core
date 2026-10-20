@@ -4,6 +4,7 @@ import {
   BookingPaymentRefundNotFoundException,
   BookingPaymentRefundNotRetryableException,
 } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment-refund.exceptions';
+import { CollectionUnderChargebackException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 import { RetryBookingPaymentRefundHandler } from './retry-booking-payment-refund.handler';
 import { RetryBookingPaymentRefundCommand } from './retry-booking-payment-refund.command';
 
@@ -34,7 +35,10 @@ const refundIn = (state: 'FAILED' | 'UNCONFIRMED') => {
 describe('RetryBookingPaymentRefundHandler', () => {
   const ctx = { actor: { userId: 'admin-1' }, source: 'WEB' } as never;
 
-  const build = (refund: BookingPaymentRefund | null) => {
+  const build = (
+    refund: BookingPaymentRefund | null,
+    guardError: Error | null = null
+  ) => {
     let depth = 0;
     const depthAt: Record<string, number> = {};
     const order: string[] = [];
@@ -70,6 +74,12 @@ describe('RetryBookingPaymentRefundHandler', () => {
         };
       }),
     };
+    const exposureGuard = {
+      assertReversalWithinCollection: jest.fn(async () => {
+        mark('guard');
+        if (guardError) throw guardError;
+      }),
+    };
     const handler = new RetryBookingPaymentRefundHandler(
       { resolve: jest.fn(async () => ({ clinicId: IDS.clinic })) } as never,
       {
@@ -79,6 +89,7 @@ describe('RetryBookingPaymentRefundHandler', () => {
       } as never,
       bookingPaymentRepo as never,
       refundRepo as never,
+      exposureGuard as never,
       executor as never,
       {
         outboxRun: jest.fn(async (fn: () => Promise<unknown>) => {
@@ -91,7 +102,7 @@ describe('RetryBookingPaymentRefundHandler', () => {
         }),
       } as never
     );
-    return { handler, order, depthAt, executor, refundRepo };
+    return { handler, order, depthAt, executor, refundRepo, exposureGuard };
   };
 
   it('FAILED yeniden açılır: girişim artar, yürütücü tx DIŞINDA çağrılır', async () => {
@@ -102,7 +113,13 @@ describe('RetryBookingPaymentRefundHandler', () => {
       new RetryBookingPaymentRefundCommand('r-1', ctx)
     );
 
-    expect(order).toEqual(['lock:bp', 'lock:refund', 'update', 'executor']);
+    expect(order).toEqual([
+      'lock:bp',
+      'lock:refund',
+      'guard',
+      'update',
+      'executor',
+    ]);
     expect(depthAt.update).toBe(1);
     expect(depthAt.executor).toBe(0);
     expect(refund.attemptCount).toBe(2);
@@ -125,5 +142,43 @@ describe('RetryBookingPaymentRefundHandler', () => {
     await expect(
       handler.execute(new RetryBookingPaymentRefundCommand('r-1', ctx))
     ).rejects.toBeInstanceOf(BookingPaymentRefundNotFoundException);
+  });
+
+  it('aktif kart itirazı varken yeniden deneme REDDEDİLİR: satır FAILED kalır, yürütücü çağrılmaz', async () => {
+    const refund = refundIn('FAILED');
+    const { handler, executor, refundRepo } = build(
+      refund,
+      new CollectionUnderChargebackException({
+        collected: '900.00',
+        alreadyReversed: '0.00',
+        activeChargebacks: '900.00',
+        requested: '900.00',
+      })
+    );
+
+    await expect(
+      handler.execute(new RetryBookingPaymentRefundCommand('r-1', ctx))
+    ).rejects.toBeInstanceOf(CollectionUnderChargebackException);
+
+    expect(refund.status).toBe('FAILED');
+    expect(refund.attemptCount).toBe(1);
+    expect(refundRepo.update).not.toHaveBeenCalled();
+    expect(executor.execute).not.toHaveBeenCalled();
+  });
+
+  it('kapı booking-payment kaynağı ve satırın tutarıyla çağrılır', async () => {
+    const refund = refundIn('FAILED');
+    const { handler, exposureGuard } = build(refund);
+
+    await handler.execute(new RetryBookingPaymentRefundCommand('r-1', ctx));
+
+    const call = (
+      exposureGuard.assertReversalWithinCollection.mock.calls as unknown as [
+        Record<string, unknown>,
+      ][]
+    )[0][0];
+    expect(call.sourceType).toBe('BOOKING_PAYMENT');
+    expect(call.sourceId).toBe(refund.bookingPaymentId.value);
+    expect(String(call.requestedAmount)).toBe('900');
   });
 });

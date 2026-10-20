@@ -10,6 +10,7 @@ import {
 import { AuthGuard, CapabilityGuard } from '@modules/identity/auth/auth/guards';
 import {
   CreateClinicDto,
+  SetClinicBusinessTypeDto,
   UpdateClinicAppointmentSettingsDto,
   UpdateClinicDto,
 } from '@shared';
@@ -20,11 +21,13 @@ import {
 } from '@common/decorators/get-context.decorator';
 import { UpdateClinicCommand } from '@modules/organization/clinic/application/commands/update-clinic/update-clinic.command';
 import { UpdateClinicAppointmentSettingsCommand } from '@modules/organization/clinic/application/commands/update-clinic-appointment-settings/update-clinic-appointment-settings.command';
+import { SetClinicBusinessTypeCommand } from '@modules/organization/clinic/application/commands/set-clinic-business-type/set-clinic-business-type.command';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { HasCapability } from '@common/decorators';
 import { CAPABILITIES } from '@src/infrastructure/persistence/prisma/data/modules';
 
-const { CLINIC, CLINICAPPOINTMENTSETTINGS } = CAPABILITIES;
+const { CLINIC, CLINICAPPOINTMENTSETTINGS, CLINICFINANCESETTINGS } =
+  CAPABILITIES;
 @UseGuards(AuthGuard, CapabilityGuard)
 @Controller()
 export class ClinicCommandController {
@@ -61,6 +64,18 @@ export class ClinicCommandController {
         data: dto,
         ctx,
       })
+    );
+  }
+
+  @HasCapability(CLINICFINANCESETTINGS.update)
+  @Patch(':id/business-type')
+  setBusinessType(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetClinicBusinessTypeDto,
+    @GetContext() ctx: IGetContext
+  ) {
+    return this.commandBus.execute(
+      new SetClinicBusinessTypeCommand({ clinicId: id, data: dto, ctx })
     );
   }
 }

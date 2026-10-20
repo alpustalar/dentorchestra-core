@@ -195,6 +195,24 @@ export class PurchaseOrderOverReceiptException extends DomainException<{
   }
 }
 
+/**
+ * Mal kabul miktarı sıfır ya da negatif. Kabul günlüğü satırı `quantity > 0` ister (DB
+ * CHECK da vardır); HTTP kapısı zaten pozitif şart koşar, entity ise DTO'dan geçmeyen iç
+ * çağrılar içindir. Sıfır miktarlı bir günlük satırı GRNI hesabında hiçbir şey eklemez
+ * ama sayaçla günlüğün tutarlılığını bozmadan da kalamaz — baştan reddedilir.
+ */
+export class PurchaseOrderInvalidReceiptQuantityException extends DomainException<{
+  itemId: string;
+  quantity: string;
+}> {
+  readonly errorCode = ERROR_CODES.PURCHASE_ORDER.INVALID_RECEIPT_QUANTITY;
+  public override readonly httpStatus = HttpStatus.UNPROCESSABLE_ENTITY;
+
+  constructor(meta: { itemId: string; quantity: string }) {
+    super('Teslim alınan miktar sıfırdan büyük olmalıdır.', meta);
+  }
+}
+
 export class PurchaseOrderCancelWithInvoicesException extends DomainException<{
   orderId: string;
   invoicedTotal: string;

@@ -15,6 +15,8 @@ import {
 import { JournalEntry } from '@modules/finance/accounting/posting/domain/entities/journal-entry.entity';
 import { JournalLine } from '@modules/finance/accounting/posting/domain/entities/journal-line.entity';
 import { queryTrialBalance } from './journal-trial-balance.query';
+import { FinancialEventTypeSchema } from '@shared';
+import ChargebackFundsChannelSchema from '@input-type-schemas/ChargebackFundsChannelSchema';
 
 type JournalEntryWithLines = Prisma.JournalEntryGetPayload<{
   include: { lines: true };
@@ -66,6 +68,44 @@ export class JournalCommandRepository
     if (!row) return new Prisma.Decimal(0);
 
     return row.totalDebit.minus(row.totalCredit);
+  }
+
+  async lockAndGetSpendableFundsInTransit(
+    params: AccountBalanceLockParams
+  ): Promise<Prisma.Decimal> {
+    // Kilit + fişlenmiş bakiye (tek atomik adım); bekleyen kesintiler AYNI kilit
+    // altında okunur — ikinci kapama birincinin olayını mutlaka görür, çünkü
+    // birincinin olayı kilidi bırakan transaction'la birlikte commit olur.
+    const posted = await this.lockAndGetAccountBalance(params);
+
+    const settlement = FinancialEventTypeSchema.enum.PROVIDER_SETTLEMENT_RECEIVED;
+    const opened = FinancialEventTypeSchema.enum.CARD_CHARGEBACK_OPENED;
+    const inTransit = ChargebackFundsChannelSchema.enum.FUNDS_IN_TRANSIT;
+
+    // Kesinti = 108'den çıkan brüt: kapamada `grossAmount`, itirazda `amount + feeAmount`
+    // (yalnız 108 kanalından kesilenler). Fişi olan olay bakiyeye zaten yansımıştır.
+    const [row] = await this.db.$queryRaw<{ pending: Prisma.Decimal }[]>(
+      Prisma.sql`
+        SELECT COALESCE(SUM(
+          CASE e."type"::text
+            WHEN ${settlement} THEN (e."payload"->>'grossAmount')::numeric
+            WHEN ${opened} THEN
+              CASE WHEN e."payload"->>'fundsChannel' = ${inTransit}
+                THEN (e."payload"->>'amount')::numeric + (e."payload"->>'feeAmount')::numeric
+                ELSE 0 END
+            ELSE 0
+          END
+        ), 0) AS pending
+        FROM "financial_events" e
+        WHERE e."clinic_id" = ${params.clinicId}
+          AND e."type"::text IN (${settlement}, ${opened})
+          AND NOT EXISTS (
+            SELECT 1 FROM "journal_entries" j WHERE j."event_id" = e."id"
+          )
+      `
+    );
+
+    return posted.minus(row?.pending ?? new Prisma.Decimal(0));
   }
 
   async create(entry: JournalEntry): Promise<JournalEntry> {

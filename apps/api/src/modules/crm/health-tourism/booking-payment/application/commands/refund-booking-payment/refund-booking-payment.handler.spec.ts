@@ -9,6 +9,7 @@ import {
   CreateBookingPaymentProps,
   HotelBookingIntent,
 } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
+import { CollectionUnderChargebackException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 import {
   BookingPaymentRefundExecution,
   BookingPaymentRefundExecutor,
@@ -48,7 +49,10 @@ describe('RefundBookingPaymentHandler — iptal sonrası iade talebi', () => {
     return bp;
   };
 
-  const build = (bp: BookingPayment | null) => {
+  const build = (
+    bp: BookingPayment | null,
+    guardError: Error | null = null
+  ) => {
     let txDepth = 0;
     const depthAtCall: Record<string, number> = {};
     const saved: BookingPayment[] = [];
@@ -97,13 +101,21 @@ describe('RefundBookingPaymentHandler — iptal sonrası iade talebi', () => {
       }),
     } as never;
 
+    const exposureGuard = {
+      assertReversalWithinCollection: jest.fn(async () => {
+        if (guardError) throw guardError;
+      }),
+    };
+
     return {
       handler: new RefundBookingPaymentHandler(
         bookingPaymentRepo,
         refundRepo,
+        exposureGuard as never,
         refundExecutor,
         txManager
       ),
+      exposureGuard,
       bookingPaymentRepo,
       refundRepo,
       execute,
@@ -227,5 +239,51 @@ describe('RefundBookingPaymentHandler — iptal sonrası iade talebi', () => {
 
     expect(response.status).toBe('SKIPPED');
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  describe('kart itirazı tavan kapısı (kural 17)', () => {
+    it('iyzico: kapı bp kilitliyken, kaynak=BOOKING_PAYMENT ve TRY tahsilatla çağrılır', async () => {
+      const bp = makeBooked('IYZICO');
+      const { handler, exposureGuard } = build(bp);
+
+      await handler.execute(command());
+
+      expect(
+        exposureGuard.assertReversalWithinCollection
+      ).toHaveBeenCalledTimes(1);
+      const call = (
+        exposureGuard.assertReversalWithinCollection.mock.calls as unknown as [
+          Record<string, { toString(): string } | string>,
+        ][]
+      )[0][0];
+      expect(call.sourceType).toBe('BOOKING_PAYMENT');
+      expect(call.sourceId).toBe(bp.id.value);
+      // iyzico TRY çekti: tavan satış (EUR) değil tahsil edilen TRY'dir.
+      expect(String(call.collectedAmount)).toBe('4200');
+      expect(String(call.requestedAmount)).toBe('4200');
+      expect(String(call.alreadyReversedAmount)).toBe('0');
+    });
+
+    it('aktif itiraz varken iade REDDEDİLİR: iade satırı açılmaz, bp BOOKED kalır, sağlayıcı çağrılmaz', async () => {
+      const bp = makeBooked('IYZICO');
+      const { handler, created, saved, execute } = build(
+        bp,
+        new CollectionUnderChargebackException({
+          collected: '4200.00',
+          alreadyReversed: '0.00',
+          activeChargebacks: '4200.00',
+          requested: '4200.00',
+        })
+      );
+
+      await expect(handler.execute(command())).rejects.toBeInstanceOf(
+        CollectionUnderChargebackException
+      );
+
+      expect(created).toHaveLength(0);
+      expect(saved).toHaveLength(0);
+      expect(bp.status).toBe('BOOKED');
+      expect(execute).not.toHaveBeenCalled();
+    });
   });
 });

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { decimalSchema } from '../../common/decimal';
 import { CurrencySchema } from '../inputTypeSchemas/CurrencySchema'
 import { RoundingDirectionSchema } from '../inputTypeSchemas/RoundingDirectionSchema'
+import { BusinessTypeSchema } from '../inputTypeSchemas/BusinessTypeSchema'
 import { PayoutTriggerSchema } from '../inputTypeSchemas/PayoutTriggerSchema'
 
 /////////////////////////////////////////
@@ -11,6 +12,7 @@ import { PayoutTriggerSchema } from '../inputTypeSchemas/PayoutTriggerSchema'
 export const ClinicFinanceSettingsSchema = z.object({
   defaultCurrency: CurrencySchema,
   roundingType: RoundingDirectionSchema,
+  businessType: BusinessTypeSchema.nullable(),
   providerPayoutTrigger: PayoutTriggerSchema,
   id: z.string(),
   clinicId: z.string(),

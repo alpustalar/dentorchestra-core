@@ -6,4 +6,10 @@ export const CLINIC_FINANCE_SETTINGS_COMMAND_REPOSITORY = Symbol(
 );
 
 export type IClinicFinanceSettingsCommandRepository =
-  IBaseCommandRepository<ClinicFinanceSettings>;
+  IBaseCommandRepository<ClinicFinanceSettings> & {
+    findByClinicId(clinicId: string): Promise<ClinicFinanceSettings | null>;
+    /** clinicId unique → get-or-create (satır yoksa ilk seçim kaydı açılır). */
+    upsertByClinicId(
+      entity: ClinicFinanceSettings
+    ): Promise<ClinicFinanceSettings>;
+  };

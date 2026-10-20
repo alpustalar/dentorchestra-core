@@ -1,5 +1,6 @@
 import { Inject } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
+import { assertNever } from '@common/utils';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { FinancialEventTypeSchema, PartyRoleSchema } from '@shared';
 import PosTransactionKindSchema from '@input-type-schemas/PosTransactionKindSchema';
@@ -72,6 +73,14 @@ import {
   IPaymentCollectionService,
   PAYMENT_COLLECTION_SERVICE,
 } from '@modules/finance/payment/domain/services/payment-collection/payment-collection.service.interface';
+import {
+  BOOKING_PAYMENT_COLLECTION_SERVICE,
+  IBookingPaymentCollectionService,
+} from '@modules/crm/health-tourism/booking-payment/domain/services/booking-payment-collection/booking-payment-collection.service.interface';
+import {
+  IPlatformTenantProvider,
+  PLATFORM_TENANT_PROVIDER,
+} from '@modules/finance/accounting/posting/domain/interfaces/platform-tenant.provider.interface';
 import { Money } from '@src/domain/value-objects/money.vo';
 import type { OpenCardChargeback } from '@shared/modules/bank/types/commands';
 import type { IGetContext } from '@common/decorators/get-context.decorator';
@@ -81,7 +90,8 @@ import type { IGetContext } from '@common/decorators/get-context.decorator';
  * idempotency anahtarı. Bir kaynaktan (POS işlemi / sanal POS taksidi) türer.
  */
 interface ChargebackSourceFacts {
-  patientId: string;
+  /** `BOOKING_PAYMENT` kaynağında null: platform müşterisi hasta kaydı değildir. */
+  patientId: string | null;
   paymentId: string | null;
   provider: SettlementProviderType;
   /** Tahsilatın `PAYMENT_RECEIVED` olayının anahtarı — defterde yazıldığının kanıtı. */
@@ -134,6 +144,10 @@ export class OpenCardChargebackHandler implements ICommandHandler<
     private readonly posCollection: IPosCardCollectionService,
     @Inject(PAYMENT_COLLECTION_SERVICE)
     private readonly paymentCollection: IPaymentCollectionService,
+    @Inject(BOOKING_PAYMENT_COLLECTION_SERVICE)
+    private readonly bookingCollection: IBookingPaymentCollectionService,
+    @Inject(PLATFORM_TENANT_PROVIDER)
+    private readonly platformTenant: IPlatformTenantProvider,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
     private readonly commandBus: TSCommandBus,
@@ -165,14 +179,7 @@ export class OpenCardChargebackHandler implements ICommandHandler<
     return this.txManager.outboxRun(async () => {
       // Kaynak satırı kilitle + geri alınabilir tutarı oku (tek atomik adım):
       // iade/iptal handler'ları aynı satırı kilitler, yani üç yol sıraya girer.
-      const reversible =
-        data.sourceType === CardChargebackSourceSchema.enum.POS_TRANSACTION
-          ? await this.posCollection.lockAndGetReversibleAmount({
-              posTransactionId: data.sourceId,
-            })
-          : await this.paymentCollection.lockAndGetCollectedAmount({
-              installmentId: data.sourceId,
-            });
+      const reversible = await this.lockAndGetReversible(data);
 
       // Defterde olmayan bir tahsilatı geri almak, gelir eksiği değil OLMAYAN
       // PARANIN düşülmesi olurdu.
@@ -227,14 +234,19 @@ export class OpenCardChargebackHandler implements ICommandHandler<
 
       // Hasta carisi açılışta garanti edilir: kaybedilince `B 120` bu cariye
       // yazılır ve 120 `requiresParty` taşıdığı için carisiz fiş postlanamaz.
-      const { partyId } = await this.commandBus.execute(
-        new EnsurePartyForPatientCommand(
-          source.patientId,
-          data.clinicId,
-          PartyRoleSchema.enum.CUSTOMER,
-          ExecutionContextFactory.createInternal()
-        )
-      );
+      // Platform rezervasyon itirazında hasta/cari YOKTUR: kayıp 120'ye değil 659.01'e yazılır.
+      const partyId = source.patientId
+        ? (
+            await this.commandBus.execute(
+              new EnsurePartyForPatientCommand(
+                source.patientId,
+                data.clinicId,
+                PartyRoleSchema.enum.CUSTOMER,
+                ExecutionContextFactory.createInternal()
+              )
+            )
+          ).partyId
+        : null;
 
       const chargeback = CardChargeback.open({
         clinicId: data.clinicId,
@@ -291,6 +303,26 @@ export class OpenCardChargebackHandler implements ICommandHandler<
     });
   }
 
+  /** Kaynak satırını kilitler + geri götürülebilir tutarı okur (kaynak türüne göre tek atomik adım). */
+  private lockAndGetReversible(data: OpenCardChargeback): Promise<Decimal> {
+    switch (data.sourceType) {
+      case CardChargebackSourceSchema.enum.POS_TRANSACTION:
+        return this.posCollection.lockAndGetReversibleAmount({
+          posTransactionId: data.sourceId,
+        });
+      case CardChargebackSourceSchema.enum.ONLINE_PAYMENT:
+        return this.paymentCollection.lockAndGetCollectedAmount({
+          installmentId: data.sourceId,
+        });
+      case CardChargebackSourceSchema.enum.BOOKING_PAYMENT:
+        return this.bookingCollection.lockAndGetReversibleAmount({
+          bookingPaymentId: data.sourceId,
+        });
+      default:
+        return assertNever(data.sourceType, 'CardChargebackSource');
+    }
+  }
+
   /**
    * Kaynağın **değişmeyen olgularını** toplar (hasta, ödeme planı, sağlayıcı,
    * para birimi) ve kiracı/tür kapılarını geçirir. Kilitsiz okumadır: burada
@@ -304,6 +336,28 @@ export class OpenCardChargebackHandler implements ICommandHandler<
   }): Promise<ChargebackSourceFacts> {
     const { data, ctx } = params;
     const ref = { sourceType: data.sourceType, sourceId: data.sourceId };
+
+    if (data.sourceType === CardChargebackSourceSchema.enum.BOOKING_PAYMENT) {
+      // Rezervasyon tahsilatı PLATFORM defterindedir (hasta platforma öder, klinik taraf değildir):
+      // itiraz da platform kliniğine yazılır. Gövdedeki `clinicId` platform değilse başka bir
+      // kiracının defterine itiraz yazılırdı.
+      const platform = await this.platformTenant.resolve();
+      if (data.clinicId !== platform.clinicId) {
+        throw new ChargebackSourceClinicMismatchException(ref);
+      }
+
+      return {
+        patientId: null,
+        paymentId: null,
+        provider: CHARGEBACK_PROVIDER_ONLINE,
+        // İleri fiş yazılmamışsa (best-effort köprü düştü ya da rezervasyon hiç açılmadı) 108'de
+        // olmayan paranın itirazı olurdu: presence guard reddeder. Başarısız rezervasyon (336) bu
+        // yolun dışındadır, bkz. §91.
+        ledgerDedupeKey: FinancialEventDedupeKeys.platform_booking_settled(
+          data.sourceId
+        ),
+      };
+    }
 
     if (data.sourceType === CardChargebackSourceSchema.enum.POS_TRANSACTION) {
       const { data: tx } = await this.queryBus.execute(

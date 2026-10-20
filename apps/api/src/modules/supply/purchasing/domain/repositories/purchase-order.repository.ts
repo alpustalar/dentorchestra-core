@@ -1,7 +1,9 @@
 import { IBaseCommandRepository } from '@common/domain/repositories/base-command-repository.interface';
 import { PurchaseOrder } from '@modules/supply/purchasing/domain/entities/purchase-order.entity';
 import {
+  FindGrniAccrualOrdersFilter,
   FindPurchaseOrdersFilter,
+  GrniAccrualOrderRecord,
   PurchaseOrderWithItems,
 } from '@modules/supply/purchasing/domain/contracts';
 import { Paginated } from '@common/interfaces/paginated.type';
@@ -45,4 +47,15 @@ export interface IPurchaseOrderQueryRepository {
   findReceiptVarianceCandidates(
     clinicId: string
   ): Promise<PurchaseOrderWithItems[]>;
+
+  /**
+   * Yıl sonu GRNI tahakkuku: `asOf`'a kadar **kabulü olan** ya da faturası eşleşmiş siparişler,
+   * kabulleri günlükten (`receivedAt ≤ asOf`). Tarihsiz sayaç (`quantityReceived`) kullanılmaz.
+   *
+   * `paginate` kullanılmaz: bu bir **bakiye** hesabının girdi kümesidir (bkz.
+   * `findReceiptVarianceCandidates`).
+   */
+  findGrniAccrualOrders(
+    filter: FindGrniAccrualOrdersFilter
+  ): Promise<GrniAccrualOrderRecord[]>;
 }

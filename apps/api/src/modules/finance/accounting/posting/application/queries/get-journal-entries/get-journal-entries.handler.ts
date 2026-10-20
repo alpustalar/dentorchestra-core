@@ -50,8 +50,11 @@ export class GetJournalEntriesHandler implements IQueryHandler<
       query.payload
     );
 
+    // Erişim `clinicId` için doğrulandı; liste de AYNI klinikle süzülür. Yalnız
+    // organizationId ile süzmek erişim kontrolünü yanıltıcı kılar: kontrol "bu klinik"
+    // için yapılır, satırlar "bu organizasyonun tüm klinikleri"nden gelirdi.
     const { items, total } = await this.journalQueryRepo.findMany(
-      { organizationId, status, periodId },
+      { clinicId, organizationId, status, periodId },
       pagination
     );
 

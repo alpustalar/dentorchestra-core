@@ -45,7 +45,7 @@ export class FundsInTransitGate implements IFundsInTransitGate {
       return;
     }
 
-    const balance = await this.journalCommandRepo.lockAndGetAccountBalance({
+    const balance = await this.journalCommandRepo.lockAndGetSpendableFundsInTransit({
       clinicId: params.clinicId,
       accountId,
     });

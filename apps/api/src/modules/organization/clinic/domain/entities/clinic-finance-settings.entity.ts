@@ -4,7 +4,11 @@ import { Currency } from '@src/domain/value-objects/currency.vo';
 import { VatRate } from '@src/domain/value-objects/vat-rate.vo';
 import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
-import { CreateClinicFinanceSettingsProps } from '@modules/organization/clinic/domain/contracts/clinic-finance-settings';
+import { ClinicBusinessTypeLockedException } from '@modules/organization/clinic/domain/exceptions/clinic-finance-settings.exceptions';
+import {
+  ChangeBusinessTypeProps,
+  CreateClinicFinanceSettingsProps,
+} from '@modules/organization/clinic/domain/contracts/clinic-finance-settings';
 import {
   RoundingDirectionSchema,
   RoundingDirectionType as RoundingDirection,
@@ -13,6 +17,7 @@ import {
   PayoutTriggerSchema,
   PayoutTriggerType as PayoutTrigger,
 } from '@input-type-schemas/PayoutTriggerSchema';
+import { BusinessTypeType as BusinessType } from '@input-type-schemas/BusinessTypeSchema';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 
 interface FinanceSettingsInvariants {
@@ -46,6 +51,7 @@ export class ClinicFinanceSettings {
     this._maxDiscountPercent = new Decimal(data.maxDiscountPercent);
     this._isEInvoiceActive = data.isEInvoiceActive;
     this._fiscalYearStartMonth = data.fiscalYearStartMonth;
+    this._businessType = data.businessType;
     this._updatedAt = data.updatedAt;
   }
 
@@ -193,6 +199,16 @@ export class ClinicFinanceSettings {
     return this._fiscalYearStartMonth;
   }
 
+  private _businessType: BusinessType | null;
+
+  /**
+   * İşletme biçimi (şirket / şahıs) — yıl sonu devrinin hedefini belirler. Kullanıcı seçer;
+   * `null` yalnız bu alandan önce açılmış klinikler içindir.
+   */
+  get businessType(): BusinessType | null {
+    return this._businessType;
+  }
+
   private _updatedAt: Date;
 
   get updatedAt(): Date {
@@ -217,6 +233,20 @@ export class ClinicFinanceSettings {
         ),
       },
     };
+  }
+
+  /**
+   * İşletme biçimini değiştirir. Kapanmış mali yıl varsa DEĞİŞTİRME kararı muhasebecinindir (hesap
+   * planı ve geçmiş devir fişleri eski biçime göre yazıldı): çağıran `hasClosedPeriod` bilgisini
+   * verir. İlk seçim (`null` → değer) kapanmış yıl olsa da serbesttir; o yıllarda devir atlanmıştı.
+   */
+  public changeBusinessType(props: ChangeBusinessTypeProps): void {
+    if (this._businessType === props.businessType) return;
+    if (this._businessType !== null && props.hasClosedPeriod) {
+      throw new ClinicBusinessTypeLockedException();
+    }
+    this._businessType = props.businessType;
+    this._updatedAt = DateTimeManager.create();
   }
 
   /** Klinik için DB default'larıyla birebir varsayılan finans ayarları. */
@@ -266,6 +296,7 @@ export class ClinicFinanceSettings {
       maxDiscountPercent,
       isEInvoiceActive: props.isEInvoiceActive ?? false,
       fiscalYearStartMonth,
+      businessType: props.businessType ?? null,
       updatedAt: DateTimeManager.create(),
     });
   }
@@ -288,6 +319,7 @@ export class ClinicFinanceSettings {
       maxDiscountPercent: this.maxDiscountPercent,
       isEInvoiceActive: this.isEInvoiceActive,
       fiscalYearStartMonth: this.fiscalYearStartMonth,
+      businessType: this.businessType,
       updatedAt: this.updatedAt,
     };
   }

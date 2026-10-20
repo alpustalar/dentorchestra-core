@@ -14,6 +14,10 @@ export class AccountingPeriodQueryRepository
     super(prisma);
   }
 
+  findById(id: string): Promise<IAccountingPeriod | null> {
+    return this.db.accountingPeriod.findUnique({ where: { id } });
+  }
+
   findByDate(clinicId: string, date: Date): Promise<IAccountingPeriod | null> {
     return this.db.accountingPeriod.findFirst({
       where: periodCoveringDateWhere(clinicId, date),

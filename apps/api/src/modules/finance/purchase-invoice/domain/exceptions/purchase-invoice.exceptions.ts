@@ -142,6 +142,25 @@ export class PurchaseInvoiceInvalidPrecisionException extends DomainException<{
   }
 }
 
+/**
+ * Karşı hesap alış faturası için kabul edilen kümede değil (stok / duran varlık /
+ * gider). Banka, kasa, alıcı/satıcı, KDV ve tahakkuk (329) hesapları fatura satırının
+ * borcu olamaz: fiş dengeli kalır ama başka bir akışın hesabını sessizce hareket ettirir.
+ */
+export class PurchaseInvoiceInvalidLineAccountException extends DomainException<{
+  lineAccountCode: string;
+}> {
+  public readonly errorCode = ERROR_CODES.PURCHASE_INVOICE.INVALID_LINE_ACCOUNT;
+  public override readonly httpStatus = HttpStatus.UNPROCESSABLE_ENTITY;
+
+  constructor(meta: { lineAccountCode: string }) {
+    super(
+      `Alış faturası karşı hesabı kabul edilen kümede değil: ${meta.lineAccountCode}`,
+      meta
+    );
+  }
+}
+
 /** Gelecek tarihli alış faturası kaydedilemez. */
 export class PurchaseInvoiceInvalidDateException extends DomainException<{
   invoiceDate: string;

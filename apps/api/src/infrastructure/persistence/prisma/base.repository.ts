@@ -73,7 +73,13 @@ export abstract class BaseRepository {
    */
   protected async lockConcept(key: string): Promise<void> {
     this.assertInTransaction(`lockConcept("${key}")`);
-    await this.db.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
+    // `$queryRaw` DEĞİL: `pg_advisory_xact_lock` `void` döner ve Prisma `void`
+    // sütununu çözemez ("Failed to deserialize column of type 'void'") — kilit
+    // alınır ama çağrı patlar, yani bu kapıyı kullanan her yol (108 bakiyesi,
+    // hesap kapaması, kart itirazı) çalışmaz. `$executeRaw` sonuç kümesini
+    // okumaz; yalnız etkilenen satır sayısını döner. Mock'lu testler bunu
+    // göremedi, gerçek DB turu yakaladı (CLAUDE.md finans kuralı 21).
+    await this.db.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key}))`;
   }
 
   /**

@@ -16,7 +16,8 @@
  *
  * Kullanım: `pnpm finans:degismezler`
  *
- * (20 kontrol; 7'si tur 31: platform dönemi, rezervasyon iadesi, 336.)
+ * (30 kontrol; 7'si tur 31: platform dönemi, rezervasyon iadesi, 336; 3'ü tur 32: platform
+ * itirazı; 7'si tur 33: yıl sonu kapanışı, 329 GRNI tahakkuku, mal kabul günlüğü, fatura hesap kümesi.)
  *
  * Çıkış kodu 1 ise en az bir aykırılık var. Temiz çıktıysa, migration
  * `20261015100000_financial_invariant_checks` içindeki `NOT VALID` kısıtlar
@@ -28,6 +29,9 @@
  */
 const fs = require('fs');
 const path = require('path');
+const {
+  loadPurchaseInvoiceAccountCodes,
+} = require('./lib/purchase-invoice-account-codes.cjs');
 
 const ENV_FILE = path.join(
   __dirname,
@@ -269,6 +273,79 @@ const CHECKS = [
        LIMIT 50`,
   },
   {
+    key: 'itiraz-tavan-asimi-booking',
+    title: 'Kart itirazı + iade platform rezervasyon tahsilatını aşıyor',
+    why: 'Para geri götüren her yol (iade, iptal, ters ibraz) aynı kümülatif tavanı paylaşır (kural 17). Rezervasyon iadesi (PENDING / UNCONFIRMED / CONFIRMED) ile aktif itirazların (OPEN + LOST) toplamı iyzico’nun çektiği TRY tutarı aşıyorsa kart sahibine aynı para iki kez gitmiştir: bir kez sağlayıcı kesintisi, bir kez bizim iademiz.',
+    sql: `
+      SELECT c."source_id" AS booking_payment_id,
+             c."clinic_id",
+             bp."try_amount"::text                 AS collected_try,
+             sum(c."amount")::text                 AS active_chargebacks,
+             coalesce(r.returned, 0)::text         AS live_refunds
+        FROM "card_chargebacks" c
+        JOIN "booking_payments" bp ON bp."id" = c."source_id"
+        LEFT JOIN (
+          SELECT "booking_payment_id", sum("amount") AS returned
+            FROM "booking_payment_refunds"
+           WHERE "kind" IN ('CANCELLATION', 'BOOKING_FAILED')
+             AND "status" <> 'FAILED'
+           GROUP BY "booking_payment_id"
+        ) r ON r."booking_payment_id" = bp."id"
+       WHERE c."source_type" = 'BOOKING_PAYMENT'
+         AND c."status" IN ('OPEN', 'LOST')
+       GROUP BY c."source_id", c."clinic_id", bp."try_amount", r.returned
+      HAVING sum(c."amount") + coalesce(r.returned, 0) > bp."try_amount"
+       LIMIT 50`,
+  },
+  {
+    key: 'itiraz-booking-kaynak-uyumsuz',
+    title: 'Rezervasyon itirazı kaynağı iyzico tahsilatı değil ya da platform defterinde değil',
+    why: 'BOOKING_PAYMENT itirazı yalnız platform kliniğine ve yalnız iyzico/TRY ile tahsil edilmiş bir rezervasyon ödemesine bağlanabilir. Aksi halde 127/659.01 başka bir kiracının ya da kapanış akışı olmayan (Stripe) bir kanalın parasına yazılmıştır.',
+    sql: `
+      SELECT c."id", c."clinic_id", c."source_id",
+             bp."paid_provider"::text AS paid_provider,
+             (cl."is_platform" IS TRUE) AS clinic_is_platform
+        FROM "card_chargebacks" c
+        LEFT JOIN "booking_payments" bp ON bp."id" = c."source_id"
+        LEFT JOIN "clinics" cl ON cl."id" = c."clinic_id"
+       WHERE c."source_type" = 'BOOKING_PAYMENT'
+         AND (
+              bp."id" IS NULL
+           OR bp."paid_provider"::text IS DISTINCT FROM 'IYZICO'
+           OR cl."is_platform" IS NOT TRUE
+         )
+       LIMIT 50`,
+  },
+  {
+    key: 'itiraz-659-mutabakat',
+    title: '659.01 bakiyesi kaybedilen platform itirazlarının toplamına eşit değil',
+    why: '659.01 yalnız kaybedilen platform rezervasyon itirazlarını tutar: bakiye = Σ LOST (BOOKING_PAYMENT) itiraz tutarı olmalı. Fark, fişlenmemiş bir çözüm olayı (önce `pnpm finans:eksik`; kısa süreli fark normaldir) ya da 659.01’e elle yazılmış bir fiştir.',
+    sql: `
+      WITH bal AS (
+        SELECT a."clinic_id", sum(l."debit") - sum(l."credit") AS balance
+          FROM "journal_lines" l
+          JOIN "accounts" a ON a."id" = l."account_id"
+          JOIN "journal_entries" e ON e."id" = l."entry_id"
+         WHERE a."code" = '659.01'
+           AND e."status" IN ('POSTED', 'REVERSED')
+         GROUP BY a."clinic_id"
+      ),
+      lost_total AS (
+        SELECT c."clinic_id", sum(c."amount") AS lost_amount
+          FROM "card_chargebacks" c
+         WHERE c."source_type" = 'BOOKING_PAYMENT'
+           AND c."status" = 'LOST'
+         GROUP BY c."clinic_id"
+      )
+      SELECT coalesce(bal."clinic_id", lost_total."clinic_id") AS clinic_id,
+             coalesce(bal.balance, 0)::text                     AS balance_659_01,
+             coalesce(lost_total.lost_amount, 0)::text          AS lost_chargebacks
+        FROM bal
+        FULL OUTER JOIN lost_total ON lost_total."clinic_id" = bal."clinic_id"
+       WHERE coalesce(bal.balance, 0) <> coalesce(lost_total.lost_amount, 0)
+       LIMIT 50`,
+  },
+  {
     key: 'itiraz-plan-uyumsuz',
     title: 'Kaybedilen itiraz plana yansımış görünüyor ama taksit/telafi tutmuyor',
     why: 'Plan yansıması SYNCED ise geri alınan taksit CHARGED_BACK olmalı ve onu gösteren bir telafi taksidi bulunmalı. Aksi halde hasta borcu defterde (B 120) var, ödeme planında yok.',
@@ -419,6 +496,147 @@ const CHECKS = [
          AND coalesce(b.balance, 0) <> r.open_amount
        LIMIT 50`,
   },
+
+  // ───────────────────────────── Tur 33: yıl sonu kapanışı (§92) ─────────────────────────────
+  {
+    key: 'grni-329-yalniz-duzeltme-fisi',
+    title: "329'a düzeltme (ADJUSTING) dışı bir fiş yazmış",
+    why: "329 (Diğer Ticari Borçlar) yalnız yıl sonu GRNI tahakkuku ve ters kaydının hesabıdır; bu fişler ADJUSTING'tir. Başka bir akış 329'a yazarsa tahakkuk bakiyesi gerçek bir borçla karışır ve '329 yalnız 31.12'de açıktır' değişmezi anlamsızlaşır. Alış faturası kabul kümesinde 329 yoktur — fatura üzerinden yazılması mümkün olmamalıydı.",
+    sql: `
+      SELECT e."id", e."clinic_id", e."entry_no"::text AS entry_no,
+             e."kind"::text AS kind, e."description"
+        FROM "journal_entries" e
+       WHERE e."kind"::text <> 'ADJUSTING'
+         AND EXISTS (
+               SELECT 1
+                 FROM "journal_lines" l
+                 JOIN "accounts" a ON a."id" = l."account_id"
+                WHERE l."entry_id" = e."id" AND a."code" = '329'
+             )
+       ORDER BY e."entry_date" DESC
+       LIMIT 50`,
+  },
+  {
+    key: 'grni-329-bakiye',
+    title: "329 bakiyesi kapanmış yılın 31 Aralık'ı dışında sıfırdan farklı (ya da ters kaydı yok)",
+    why: "Tahakkuk 31.12'de açılır, ertesi yılın 1 Ocak'ında tam tutarıyla kapanır. Başka bir tarihte sıfırdan farklı bakiye, ya yanlış tarihli bir fiş ya da eksik/farklı tutarlı bir ters kayıttır; ters kaydı olmayan tahakkuk faturayla birlikte gideri iki kez sayar. 'bakiye' sütunu alacak bakiyesidir (açık tahakkuk).",
+    sql: `
+      WITH moves AS (
+        SELECT e."clinic_id", e."entry_date", e."id" AS entry_id,
+               sum(l."debit" - l."credit") AS delta
+          FROM "journal_lines" l
+          JOIN "accounts" a ON a."id" = l."account_id" AND a."code" = '329'
+          JOIN "journal_entries" e ON e."id" = l."entry_id"
+         WHERE e."status" IN ('POSTED', 'REVERSED')
+         GROUP BY e."clinic_id", e."entry_date", e."id"
+      ), running AS (
+        SELECT m.*,
+               sum(m.delta) OVER (
+                 PARTITION BY m."clinic_id" ORDER BY m."entry_date", m.entry_id
+               ) AS balance_after
+          FROM moves m
+      ), at_year_end AS (
+        SELECT r.*,
+               (r."entry_date" AT TIME ZONE 'Europe/Istanbul') AS local_ts
+          FROM running r
+      )
+      -- (a) hareket sonrası bakiye sıfır değil ve hareket kapanmış bir yılın 31 Aralık'ında DEĞİL
+      SELECT y."clinic_id", y.entry_id::text AS entry_id, y."entry_date",
+             (-y.balance_after)::text AS open_credit_balance, 'yanlış tarih' AS reason
+        FROM at_year_end y
+       WHERE y.balance_after <> 0
+         AND NOT (
+               extract(month FROM y.local_ts) = 12 AND extract(day FROM y.local_ts) = 31
+           AND EXISTS (
+                 SELECT 1 FROM "accounting_periods" p
+                  WHERE p."clinic_id" = y."clinic_id"
+                    AND p."status" = 'CLOSED'
+                    AND p."year" = extract(year FROM y.local_ts)::int
+               )
+             )
+      UNION ALL
+      -- (b) nihai bakiye sıfır değil: tahakkukun ters kaydı eksik ya da farklı tutarlı
+      SELECT m."clinic_id", NULL, NULL, (-sum(m.delta))::text, 'nihai bakiye sıfır değil'
+        FROM moves m
+       GROUP BY m."clinic_id"
+      HAVING sum(m.delta) <> 0
+       LIMIT 50`,
+  },
+  {
+    key: 'kapanmis-yil-sonuc-bakiyeli',
+    title: 'Kapanmış yılda sıfırlanmamış sonuç hesabı (6, 7 ya da 690)',
+    why: "CLOSED bir dönemde 6/7. sınıf hesapları ve 690 havuzu kapanış fişleriyle sıfırlanmış olmalıdır; kalan bakiye, kapanıştan sonra o yıla düşen bir fiş (dönem kapısı atlanmış) ya da yansıtılmamış/kapatılmamış bir hesaptır. Hata sessizdir: kapanış fişleri kendi içinde dengelidir.",
+    sql: `
+      SELECT p."clinic_id", p."year", a."code",
+             (sum(l."debit") - sum(l."credit"))::text AS balance
+        FROM "accounting_periods" p
+        JOIN "journal_entries" e
+          ON e."clinic_id" = p."clinic_id"
+         AND e."entry_date" >= p."starts_at" AND e."entry_date" <= p."ends_at"
+         AND e."status" IN ('POSTED', 'REVERSED')
+        JOIN "journal_lines" l ON l."entry_id" = e."id"
+        JOIN "accounts" a ON a."id" = l."account_id"
+       WHERE p."status" = 'CLOSED'
+         AND (a."code" ~ '^[67]' OR a."code" = '690')
+       GROUP BY p."clinic_id", p."year", a."code"
+      HAVING sum(l."debit") - sum(l."credit") <> 0
+       ORDER BY p."clinic_id", p."year", a."code"
+       LIMIT 50`,
+  },
+  {
+    key: 'kapanis-sirasi',
+    title: 'Önceki yıl kapanmamışken sonraki yıl kapatılmış',
+    why: "Yıllar sırayla kapanır: kapanmamış bir yıl hâlâ fiş alabilirken sonrakini kapatmak kâr/zarar zincirinin (590/591) bir yıl atlanmasıdır ve geri alınamaz. Kapı yokken (tur 33 öncesi) kapatılmış olabilir; onarım yok — muhasebe kararıdır.",
+    sql: `
+      SELECT p."clinic_id", p."year" AS closed_year,
+             o."year" AS still_open_year, o."status"::text AS still_open_status
+        FROM "accounting_periods" p
+        JOIN "accounting_periods" o
+          ON o."clinic_id" = p."clinic_id" AND o."year" < p."year" AND o."status" <> 'CLOSED'
+       WHERE p."status" = 'CLOSED'
+       ORDER BY p."clinic_id", p."year"
+       LIMIT 50`,
+  },
+  {
+    key: 'mal-kabul-gunlugu-sayac',
+    title: 'Mal kabul günlüğü toplamı kalemin kümülatif sayacına eşit değil',
+    why: "Günlük (purchase_order_receipt_lines) ile sayaç (quantity_received) aynı yazmada ilerler; sapma, günlüğü atlayan bir yol demektir. Yıl sonu GRNI tahakkuku günlükten hesaplanır — sapma tahakkuku yanlış yapar ve geriye dönük düzeltilemez (kabulün tarihi yalnız günlükte durur).",
+    sql: `
+      SELECT i."id" AS item_id, i."order_id",
+             i."quantity_received"::text AS counter,
+             coalesce(sum(l."quantity"), 0)::text AS journal
+        FROM "purchase_order_items" i
+        LEFT JOIN "purchase_order_receipt_lines" l ON l."item_id" = i."id"
+       GROUP BY i."id", i."order_id", i."quantity_received"
+      HAVING i."quantity_received" <> coalesce(sum(l."quantity"), 0)
+       LIMIT 50`,
+  },
+  {
+    key: 'mal-kabul-gunlugu-satirsiz',
+    title: 'Satırsız mal kabul kaydı',
+    why: "Başlık var, hiçbir kalem satırı yok: kabul yapılmış görünür ama tutar taşımaz. Kabul kaydı aggregate tarafından kalem satırlarıyla birlikte üretilir; satırsız başlık bu yolun atlandığını gösterir.",
+    sql: `
+      SELECT r."id", r."order_id", r."received_at", r."source"::text AS source
+        FROM "purchase_order_receipts" r
+        LEFT JOIN "purchase_order_receipt_lines" l ON l."receipt_id" = r."id"
+       GROUP BY r."id", r."order_id", r."received_at", r."source"
+      HAVING count(l."id") = 0
+       LIMIT 50`,
+  },
+  {
+    key: 'alis-faturasi-hesap-kumesi-disi',
+    title: 'Alış faturası karşı hesabı kabul kümesinin dışında',
+    why: "Karşı hesap serbest metin iken '102' (banka), '329' (GRNI tahakkuku) gibi başka akışlara ait bir hesap faturanın borcu olabiliyordu: dengeli fiş, bankada olmayan para. Küme `PURCHASE_INVOICE_LINE_ACCOUNT_CODES` sabitinden okunur. Mevcut kayıt kapı yokken yazılmış olabilir — fiş zaten yazıldıysa onarım muhasebe kararıdır (storno + yeni fatura).",
+    sql: `
+      SELECT f."id", f."clinic_id", f."invoice_number", f."line_account_code",
+             f."status"::text AS status
+        FROM "purchase_invoices" f
+       WHERE f."line_account_code" NOT IN (${loadPurchaseInvoiceAccountCodes()
+         .map((code) => `'${code}'`)
+         .join(', ')})
+       ORDER BY f."created_at" DESC
+       LIMIT 50`,
+  },
 ];
 
 async function main() {
@@ -496,7 +714,13 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+// Betik doğrudan çalıştırılınca tarar; `require` edilince yalnız kontrol listesini verir (testler
+// ve doğrulama araçları SQL'i buradan okur — ikinci bir kopya yazılmaz).
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
+}
+
+module.exports = { CHECKS };

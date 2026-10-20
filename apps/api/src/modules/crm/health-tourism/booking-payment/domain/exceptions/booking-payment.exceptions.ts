@@ -135,3 +135,23 @@ export class BookingLedgerNotPostableException extends DomainException<BookingLe
     }
   }
 }
+
+/**
+ * Bu ödeme kart itirazına konu olamaz: tahsil edilmemiş ya da iyzico dışı bir kanaldan alınmış.
+ * Platform sanal POS'u yalnız iyzico/TRY'dir; Stripe itirazı kapanış akışı olmadığı için
+ * desteklenmez (STRIPE_PAYMENT_LINKS_ENABLED kapalı, §90).
+ */
+export class BookingPaymentNotChargeableException extends DomainException<{
+  bookingPaymentId: string;
+  reason: string;
+}> {
+  public readonly errorCode = ERROR_CODES.BOOKING_PAYMENT.NOT_CHARGEABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { bookingPaymentId: string; reason: string }) {
+    super(
+      `Bu rezervasyon ödemesi için itiraz kaydedilemez: ${meta.reason}`,
+      meta
+    );
+  }
+}

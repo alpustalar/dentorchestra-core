@@ -49,6 +49,7 @@ export class JournalQueryRepository
   ): Promise<{ items: IJournalEntry[]; total: number }> {
     const where: Prisma.JournalEntryWhereInput = {
       organizationId: filter.organizationId,
+      clinicId: filter.clinicId,
       ...(filter.status ? { status: filter.status } : {}),
       ...(filter.periodId ? { periodId: filter.periodId } : {}),
     };

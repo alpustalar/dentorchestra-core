@@ -286,15 +286,16 @@ describe('JournalQueryRepository — fiş niteliği süzgeci (P0)', () => {
     return { repo: new JournalQueryRepository(prisma), journalLine };
   };
 
-  it('kinds verilirse süzgeç kurulur (gelir tablosu: yalnız OPERATIONAL)', async () => {
+  it('kinds verilirse süzgeç kurulur (gelir tablosu: OPERATIONAL + ADJUSTING, CLOSING hariç)', async () => {
     const { repo, journalLine } = buildRepo();
     await repo.trialBalance({
       clinicId: 'c1',
       kinds: INCOME_STATEMENT_ENTRY_KINDS,
     });
 
+    // Tahakkuk (ADJUSTING) ekonomiktir ve gelir tablosunda SAYILIR; kapanış (CLOSING) sayılmaz.
     expect(journalLine.groupBy.mock.calls[0][0].where.entry.kind).toEqual({
-      in: ['OPERATIONAL'],
+      in: ['OPERATIONAL', 'ADJUSTING'],
     });
   });
 
@@ -305,5 +306,36 @@ describe('JournalQueryRepository — fiş niteliği süzgeci (P0)', () => {
     expect(journalLine.groupBy.mock.calls[0][0].where.entry).not.toHaveProperty(
       'kind'
     );
+  });
+});
+
+/**
+ * Yevmiye listesi **kliniğin** defteridir. Eskiden yalnız `organizationId` ile
+ * süzülüyordu: handler erişimi `clinicId` için doğruluyor ama satırlar organizasyonun
+ * TÜM kliniklerinden geliyordu — aynı organizasyondaki başka kliniğin fişi
+ * (franchise'da başka bir işletmenin defteri) listede görünüyordu.
+ */
+describe('JournalQueryRepository — liste klinik defteriyle sınırlı (P1)', () => {
+  const buildRepo = () => {
+    const journalEntry = {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+    };
+    const prisma = { journalEntry } as unknown as PrismaService;
+    return { repo: new JournalQueryRepository(prisma), journalEntry };
+  };
+
+  it('where hem organizationId hem clinicId taşır', async () => {
+    const { repo, journalEntry } = buildRepo();
+    await repo.findMany({ clinicId: 'c1', organizationId: 'o1' }, {
+      skip: 0,
+      take: 20,
+    } as never);
+
+    const where = journalEntry.findMany.mock.calls[0][0].where;
+    expect(where.clinicId).toBe('c1');
+    expect(where.organizationId).toBe('o1');
+    // Sayım da aynı süzgeçten geçer: toplam, listelenen kümeyle tutarlı olmalı.
+    expect(journalEntry.count.mock.calls[0][0].where.clinicId).toBe('c1');
   });
 });

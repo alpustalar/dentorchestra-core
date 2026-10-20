@@ -42,11 +42,15 @@ export const CardChargebackSchema = z.object({
    * POS'ta kaybedilince tutar eşleşmesiyle bulunduğunda dolar.
    */
   installmentId: z.string().nullable(),
-  patientId: z.string(),
+  /**
+   * Hasta ve cari: BOOKING_PAYMENT'ta NULL (platform müşterisi hasta kaydı değildir; kayıp
+   * 120'ye değil 659.01'e yazılır), diğer kaynaklarda ZORUNLU — DB CHECK ile birlikte zorlanır.
+   */
+  patientId: z.string().nullable(),
   /**
    * Hasta carisi — kaybedilince `B 120` bu cariye yazılır; açılışta garanti edilir.
    */
-  partyId: z.string(),
+  partyId: z.string().nullable(),
   /**
    * İtiraz edilen (sağlayıcının kestiği) tutar — kısmi itiraz mümkündür.
    */

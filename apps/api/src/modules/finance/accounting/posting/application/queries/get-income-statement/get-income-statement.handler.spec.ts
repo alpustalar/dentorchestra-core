@@ -224,7 +224,7 @@ describe('GetIncomeStatementHandler — dönem karşılaştırması', () => {
    * mizanın "Σborç = Σalacak" kontrolü de tutmaya devam eder. Süzgeç handler'ın
    * HER mizan okumasında, karşılaştırma dönemi dahil, bulunmak zorundadır.
    */
-  it('her mizan okumasında yalnız OPERATIONAL fişler sayılır (P0)', async () => {
+  it('her mizan okumasında KAPANIŞ dışı fişler sayılır: OPERATIONAL + ADJUSTING (P0)', async () => {
     const { handler, trialBalanceCalls } = build({
       [APRIL_START.toISOString()]: 1000,
       [MARCH_START.toISOString()]: 800,
@@ -242,7 +242,10 @@ describe('GetIncomeStatementHandler — dönem karşılaştırması', () => {
 
     expect(trialBalanceCalls).toHaveLength(2);
     for (const call of trialBalanceCalls) {
-      expect(call.kinds).toEqual(['OPERATIONAL']);
+      // CLOSING dışarıda (cirosu sıfırlar); ADJUSTING içeride: tahakkuk ekonomiktir, gider
+      // satırı ait olduğu yılın gelir tablosunda görünmek zorundadır.
+      expect(call.kinds).toEqual(['OPERATIONAL', 'ADJUSTING']);
+      expect(call.kinds).not.toContain('CLOSING');
     }
   });
 });

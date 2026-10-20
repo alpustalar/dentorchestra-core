@@ -21,6 +21,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:db": "jest --config ./test/jest-db.json",
     "prisma:generate": "prisma generate && pnpm zod:clean",
     "migrate:dev": "prisma migrate dev && pnpm zod:clean",
     "gen:caps": "node scripts/generate-capabilities.js",

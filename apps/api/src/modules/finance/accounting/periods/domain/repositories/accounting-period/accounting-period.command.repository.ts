@@ -73,6 +73,19 @@ export type IAccountingPeriodCommandRepository =
     findByDate(clinicId: string, date: Date): Promise<AccountingPeriod | null>;
 
     /**
+     * Verilen yıldan ÖNCEKİ, henüz kapanmamış (OPEN/LOCKED) dönemler — en eski önce.
+     *
+     * Yıl sonu kapanışının sıra kapısını besler ("önceki yıl kapanmadan sonraki kapatılamaz")
+     * ve kapanışı durdurabildiği için Command Context'e aittir. CLOSED dönem geri dönmediği
+     * (reopen yalnız LOCKED'ı açar) için bu okumada yarış yoktur: kapalı görünen dönem
+     * kapalı kalır.
+     */
+    findNotClosedBefore(
+      clinicId: string,
+      year: number
+    ): Promise<AccountingPeriod[]>;
+
+    /**
      * Defteri olan (en az bir dönemi açılmış) klinikler. Yıllık dönem açma işi
      * bu listeden yürür: yeni yıl dönemi yalnız muhasebesi kurulmuş klinikler için
      * gerekir ve böylece Clinic modülüne bağımlılık doğmaz.

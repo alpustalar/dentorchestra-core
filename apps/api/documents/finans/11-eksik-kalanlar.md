@@ -4,7 +4,7 @@
 > Kaynak: `09-guvence-denetimi.md` içindeki "Bilinçli yapılmayanlar" tabloları.
 > Yeniden üretmek için: `node scripts/finans-eksik-liste.cjs`
 
-**2026-10-20 itibarıyla 229 kalem; 217 açık, 12 kapandı.**
+**2026-10-21 itibarıyla 242 kalem; 227 açık, 15 kapandı.**
 
 Bu dosya **tek tek** kalem listesidir (ne yapılacağına karar vermek için
 değil, hiçbir kalemin kaybolmadığını görmek için). Konu bazında gruplanmış,
@@ -420,8 +420,8 @@ hiç olmamasından kötüdür (§55). Bkz. §70 — bu kalemin kendi ertelemesi.
 | # | Kalem | Tetikleyici | Durum |
 | --- | --- | --- | --- |
 | 219 | **Stripe payout / itiraz / kur farkı** | — | açık |
-| 220 | **Platform iyzico itirazı** (`CardChargeback` + `BOOKING_PAYMENT`) | — | açık |
-| 221 | **Rezervasyon için kümülatif tavan kapısı** | — | açık |
+| 220 | ~~**Platform iyzico itirazı** (`CardChargeback` + `BOOKING_PAYMENT`)~~ | — | ✅ kapandı |
+| 221 | ~~**Rezervasyon için kümülatif tavan kapısı**~~ | — | ✅ kapandı |
 | 222 | **Kısmi iade** (iptal cezasının iadeden düşülmesi) | — | açık |
 | 223 | `resolve` için step-up doğrulama | — | açık |
 | 224 | Sağlayıcı iade-durumu API'siyle otomatik doğrulama | — | açık |
@@ -430,3 +430,21 @@ hiç olmamasından kötüdür (§55). Bkz. §70 — bu kalemin kendi ertelemesi.
 | 227 | Platform vergi parametresi | — | açık |
 | 228 | 336'nın alt hesaplanması | — | açık |
 | 229 | `SubscriptionCharge` | — | açık |
+
+## §93 — yıl sonu kapanışı turu
+
+| # | Kalem | Tetikleyici | Durum |
+| --- | --- | --- | --- |
+| 230 | ~~**Devir: 590/591 → 570/580/500** (K3)~~ | — | ✅ kapandı |
+| 231 | **"Fatura geldi, mal gelmedi" fişi (159)** (K4) | — | açık |
+| 232 | **Amortisman, vergi karşılığı (691/692), kâr dağıtımı** | — | açık |
+| 233 | **Kur değerlemesi** (646/656) ve **yabancı para birimli GRNI** | — | açık |
+| 234 | **Fiziksel teslim tarihi girişi** (`receivedAt` ≠ giriş anı) | — | açık |
+| 235 | **Tahakkuk tutarı override** (kısmi, fiyat uyuşmazlığı) | — | açık |
+| 236 | **Kapanıştan sonra fatura↔sipariş bağının koparılması** | — | açık |
+| 237 | **Ters kaydın Y+1 numarası tarih sırasında değil** | — | açık |
+| 238 | **Yıl bitmeden kapatma engeli** | — | açık |
+| 239 | **`close` için ayrı capability / step-up** (kural 7) | — | açık |
+| 240 | **Seçimin audit olayında ayrıntısı** | — | açık |
+| 241 | **Diğer yazma akışlarının gerçek DB turu** | — | açık |
+| 242 | **Yeni hesapların mevcut kliniklere otomatik eklenmesi** | — | açık |

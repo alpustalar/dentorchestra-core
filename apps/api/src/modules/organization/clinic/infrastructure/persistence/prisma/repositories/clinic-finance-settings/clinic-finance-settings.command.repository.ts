@@ -20,6 +20,26 @@ export class ClinicFinanceSettingsCommandRepository
     return raw ? new ClinicFinanceSettings(raw) : null;
   }
 
+  async findByClinicId(clinicId: string): Promise<ClinicFinanceSettings | null> {
+    const raw = await this.db.clinicFinanceSettings.findUnique({
+      where: { clinicId },
+    });
+    return raw ? new ClinicFinanceSettings(raw) : null;
+  }
+
+  async upsertByClinicId(
+    entity: ClinicFinanceSettings
+  ): Promise<ClinicFinanceSettings> {
+    const data = entity.toPersistence();
+    const { id: _id, ...update } = data;
+    const raw = await this.db.clinicFinanceSettings.upsert({
+      where: { clinicId: data.clinicId },
+      create: data,
+      update,
+    });
+    return new ClinicFinanceSettings(raw);
+  }
+
   async create(entity: ClinicFinanceSettings): Promise<ClinicFinanceSettings> {
     const data = entity.toPersistence();
     const raw = await this.db.clinicFinanceSettings.create({ data });

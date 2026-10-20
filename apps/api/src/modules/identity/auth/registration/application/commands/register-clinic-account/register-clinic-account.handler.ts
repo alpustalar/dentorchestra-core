@@ -10,6 +10,7 @@ import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { CreateOrganizationCommand } from '@modules/organization/organization/application/commands/create-organization/create-organization.command';
 import { CreateClinicCommand } from '@modules/organization/clinic/application/commands/create-clinic/create-clinic.command';
+import { SetClinicBusinessTypeCommand } from '@modules/organization/clinic/application/commands/set-clinic-business-type/set-clinic-business-type.command';
 import { InitializeChartOfAccountsCommand } from '@modules/finance/accounting/chart-of-accounts/application/commands/initialize-chart-of-accounts/initialize-chart-of-accounts.command';
 import { OpenPeriodCommand } from '@modules/finance/accounting/periods/application/commands/open-period/open-period.command';
 import { InitializeTaxParametersCommand } from '@modules/finance/accounting/tax-parameters/application/commands/initialize-tax-parameters/initialize-tax-parameters.command';
@@ -39,7 +40,7 @@ export class RegisterClinicAccountHandler
     command: RegisterClinicAccountCommand
   ): Promise<RegisterClinicAccountResponse> {
     const { data } = command.payload;
-    const { clinic: createClinicData, owner: ownerData } = data;
+    const { clinic: createClinicData, owner: ownerData, businessType } = data;
 
     const { data: role } = await this.queryBus.execute(
       new GetRoleBySlugQuery(ROLE_SLUGS.CLINIC_OWNER)
@@ -79,6 +80,15 @@ export class RegisterClinicAccountHandler
             clinicId: generatedClinicUUID.value,
             organizationId: generatedOrganizationUUID.value,
           },
+        })
+      );
+
+      // İşletme biçimi (şirket / şahıs) yıl sonu devrinin hedefini belirler; kayıtta zorunlu.
+      await this.commandBus.execute(
+        new SetClinicBusinessTypeCommand({
+          clinicId: generatedClinicUUID.value,
+          data: { businessType },
+          ctx: this.internalCtx,
         })
       );
 

@@ -1,6 +1,7 @@
 import { Decimal } from 'decimal.js';
 import { CurrencyType as Currency } from '@input-type-schemas/CurrencySchema';
 import { RoundingDirectionType as RoundingDirection } from '@input-type-schemas/RoundingDirectionSchema';
+import { BusinessTypeType as BusinessType } from '@input-type-schemas/BusinessTypeSchema';
 import { PayoutTriggerType as PayoutTrigger } from '@input-type-schemas/PayoutTriggerSchema';
 
 // ==========================================
@@ -33,4 +34,12 @@ export interface CreateClinicFinanceSettingsProps {
   maxDiscountPercent?: Decimal;
   isEInvoiceActive?: boolean;
   fiscalYearStartMonth?: number;
+  /** İşletme biçimi. Kayıt akışında zorunlu verilir; satır başka yoldan açılırsa boş kalabilir. */
+  businessType?: BusinessType | null;
+}
+
+export interface ChangeBusinessTypeProps {
+  businessType: BusinessType;
+  /** Klinikte kapanmış (CLOSED) mali yıl var mı? Karar çağıranın: dönem modülü bilir. */
+  hasClosedPeriod: boolean;
 }

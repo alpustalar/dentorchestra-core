@@ -6,6 +6,12 @@ export const JOURNAL_COMMAND_REPOSITORY = Symbol('IJournalCommandRepository');
 export const JOURNAL_QUERY_REPOSITORY = Symbol('IJournalQueryRepository');
 
 export interface FindJournalEntriesFilter {
+  /**
+   * Defter **şubenin** (klinik) defteridir; yalnız `organizationId` ile süzmek aynı
+   * organizasyondaki *başka kliniğin* fişlerini de getirir (franchise'da başka bir
+   * işletme). İkisi birlikte verilir: org kiracı sınırı, klinik defter sınırı.
+   */
+  clinicId: string;
   organizationId: string;
   status?: JournalEntryStatus;
   periodId?: string;
@@ -203,6 +209,20 @@ export interface IJournalCommandRepository {
    * (108 → 102 + 653) mevcut bakiyeyi aşmaması buradan doğrulanır.
    */
   lockAndGetAccountBalance(
+    params: AccountBalanceLockParams
+  ): Promise<Prisma.Decimal>;
+
+  /**
+   * 108'de **harcanabilir** tutar: fişlenmiş bakiye − henüz fişlenmemiş (olayı
+   * yazılmış, fişi outbox'ta bekleyen) hesap kapaması / itiraz kesintileri.
+   *
+   * Neden ayrı: kapama bir *olay* yazar, fiş sonradan üretilir; bakiye yalnız
+   * fişlenmişi görürse ilk kapamanın fişi gelene kadar ikinci kapama aynı parayı
+   * ikinci kez harcar (1000'lik bakiyeden 600 + 600) ve 108 eksiye düşer. Fiş
+   * kendi içinde dengeli olduğu için hiçbir kontrol yakalamaz (kural 13: sıra
+   * zamanlamaya bırakılmaz). Kilit ile iki okuma **tek metotta** (`lockAndGet*`).
+   */
+  lockAndGetSpendableFundsInTransit(
     params: AccountBalanceLockParams
   ): Promise<Prisma.Decimal>;
 

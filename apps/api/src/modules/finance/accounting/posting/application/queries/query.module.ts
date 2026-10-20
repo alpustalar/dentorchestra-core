@@ -8,6 +8,7 @@ import { GetBalanceSheetHandler } from './get-balance-sheet/get-balance-sheet.ha
 import { GetCashFlowHandler } from './get-cash-flow/get-cash-flow.handler';
 import { GetVatDeclarationHandler } from './get-vat-declaration/get-vat-declaration.handler';
 import { GetBankLedgerLinesHandler } from './get-bank-ledger-lines/get-bank-ledger-lines.handler';
+import { GetYearEndClosingPreviewHandler } from './get-year-end-closing-preview/get-year-end-closing-preview.handler';
 import { JournalRepositoryModule } from '@modules/finance/accounting/posting/infrastructure/persistence/prisma/repositories/journal/journal.repository.module';
 
 const QueryHandlers = [
@@ -20,6 +21,7 @@ const QueryHandlers = [
   GetCashFlowHandler,
   GetVatDeclarationHandler,
   GetBankLedgerLinesHandler,
+  GetYearEndClosingPreviewHandler,
 ];
 
 @Module({

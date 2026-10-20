@@ -1,3 +1,4 @@
+import { Decimal } from 'decimal.js';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject, Logger } from '@nestjs/common';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
@@ -54,6 +55,11 @@ import {
   BOOKING_PAYMENT_COMMAND_REPOSITORY,
   IBookingPaymentCommandRepository,
 } from '@modules/crm/health-tourism/booking-payment/domain/repositories/booking-payment/booking-payment.command.repository';
+import {
+  CARD_CHARGEBACK_EXPOSURE_GUARD,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
+import { CollectionUnderChargebackException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { BookingPlatformLedgerService } from '@modules/crm/health-tourism/booking-payment/application/services/booking-platform-ledger.service';
@@ -96,6 +102,8 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
     private readonly natsClient: ClientProxy,
     @Inject(BOOKING_PAYMENT_REFUND_COMMAND_REPOSITORY)
     private readonly refundRepo: IBookingPaymentRefundCommandRepository,
+    @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
+    private readonly chargebackExposureGuard: ICardChargebackExposureGuard,
     private readonly refundExecutor: BookingPaymentRefundExecutor,
     private readonly platformLedger: BookingPlatformLedgerService,
     private readonly txManager: TransactionManager,
@@ -226,11 +234,32 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
   }): Promise<BookingPaymentRefund | null> {
     const { bookingPaymentId, provider, providerRef, reason } = input;
 
+    let blockedByChargeback: CollectionUnderChargebackException | null = null;
+
     try {
-      return await this.txManager.run(async () => {
+      const refund = await this.txManager.run(async () => {
         const bp = await this.loadForUpdate(bookingPaymentId);
         bp.markFailed(reason);
         const failed = await this.bookingPaymentRepo.update(bp);
+
+        // Kart itirazı kapısı (kural 17): aktif itiraz varken iade aynı parayı ikinci kez geri
+        // götürür. Ret FAILED damgasını geri SARMAZ — rezervasyon gerçekten açılamadı; yalnız
+        // iade satırı açılmaz ve durum alarmla insana gider (aşağıda).
+        try {
+          await this.chargebackExposureGuard.assertReversalWithinCollection({
+            sourceType: 'BOOKING_PAYMENT',
+            sourceId: failed.id.value,
+            collectedAmount: failed.amountChargedBy(provider).value,
+            alreadyReversedAmount: new Decimal(0),
+            requestedAmount: failed.amountChargedBy(provider).value,
+          });
+        } catch (guardErr) {
+          if (guardErr instanceof CollectionUnderChargebackException) {
+            blockedByChargeback = guardErr;
+            return null;
+          }
+          throw guardErr;
+        }
 
         return this.refundRepo.create(
           BookingPaymentRefund.request({
@@ -245,6 +274,22 @@ export class ConfirmBookingPaymentHandler implements ICommandHandler<
           })
         );
       });
+
+      if (blockedByChargeback) {
+        this.criticalFailure.publish({
+          operation:
+            'health-tourism.booking-payment.refund-blocked-by-chargeback',
+          severity: 'CRITICAL',
+          summary:
+            'Rezervasyon açılamadı ama bu tahsilatın kart itirazı sürüyor/kaybedildi; iade talep edilmedi (aynı parayı ikinci kez geri götürürdü). Itiraz sonucuna göre elle karar verilmeli.',
+          errorMessage: (blockedByChargeback as Error).message,
+          context: { bookingPaymentId, provider, providerRef },
+          clinicId: null,
+          dedupeKey: `booking-refund-blocked-chargeback:${bookingPaymentId}`,
+        });
+      }
+
+      return refund;
     } catch (err) {
       if (err instanceof BookingPaymentRefundAlreadyClaimedException) {
         this.logger.warn(

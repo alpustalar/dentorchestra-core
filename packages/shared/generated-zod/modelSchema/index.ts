@@ -87,6 +87,8 @@ export * from './PurchaseRequestSchema';
 export * from './PurchaseRequestItemSchema';
 export * from './PurchaseOrderSchema';
 export * from './PurchaseOrderItemSchema';
+export * from './PurchaseOrderReceiptSchema';
+export * from './PurchaseOrderReceiptLineSchema';
 export * from './ResourceSchema';
 export * from './ResourceAvailabilitySchema';
 export * from './RoleSchema';

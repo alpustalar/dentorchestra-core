@@ -4,7 +4,9 @@ import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.ser
 import { paginate } from '@src/infrastructure/persistence/prisma/helpers/paginate.helper';
 import { IPurchaseOrderQueryRepository } from '@modules/supply/purchasing/domain/repositories/purchase-order.repository';
 import {
+  FindGrniAccrualOrdersFilter,
   FindPurchaseOrdersFilter,
+  GrniAccrualOrderRecord,
   PurchaseOrderWithItems,
 } from '@modules/supply/purchasing/domain/contracts';
 import { Paginated } from '@common/interfaces/paginated.type';
@@ -63,5 +65,54 @@ export class PurchaseOrderQueryRepository
     });
 
     return rows as unknown as PurchaseOrderWithItems[];
+  }
+
+  async findGrniAccrualOrders(
+    filter: FindGrniAccrualOrdersFilter
+  ): Promise<GrniAccrualOrderRecord[]> {
+    const rows = await this.db.purchaseOrder.findMany({
+      where: {
+        clinicId: filter.clinicId,
+        // Kabulü olan siparişler (tahakkuk adayı) ya da faturası eşleşmiş olanlar (faturası kabulünden
+        // fazla stok uyarısı). Hiçbiri olmayan siparişin sapması tanım gereği sıfırdır.
+        OR: [
+          { receipts: { some: { receivedAt: { lte: filter.asOf } } } },
+          { invoicedTotal: { gt: 0 } },
+        ],
+      },
+      select: {
+        id: true,
+        supplierId: true,
+        orderDate: true,
+        currency: true,
+        items: { select: { id: true, productId: true } },
+        receipts: {
+          where: { receivedAt: { lte: filter.asOf } },
+          select: {
+            source: true,
+            lines: {
+              select: { itemId: true, quantity: true, unitPrice: true },
+            },
+          },
+        },
+      },
+      orderBy: { orderDate: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      supplierId: row.supplierId,
+      orderDate: row.orderDate,
+      currency: row.currency,
+      items: row.items,
+      receipts: row.receipts.map((receipt) => ({
+        source: receipt.source,
+        lines: receipt.lines.map((line) => ({
+          itemId: line.itemId,
+          quantity: line.quantity.toString(),
+          unitPrice: line.unitPrice.toString(),
+        })),
+      })),
+    }));
   }
 }

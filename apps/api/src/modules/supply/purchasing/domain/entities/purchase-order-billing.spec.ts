@@ -81,7 +81,9 @@ describe('PurchaseOrder — fatura eşleştirme (3-way match)', () => {
 
   it('aşım hatası sipariş/teslim/fatura tutarlarını meta ile taşır', () => {
     const order = makeSentOrder();
-    order.receive([{ itemId: order.lines[0].id, quantity: 4 }]);
+    order.receive([{ itemId: order.lines[0].id, quantity: 4 }], {
+      receivedById: null,
+    });
     order.applyInvoice(new Decimal(1000));
 
     try {
@@ -150,7 +152,9 @@ describe('PurchaseOrder — fatura eşleştirme (3-way match)', () => {
 
   it('özet, sipariş/teslim/fatura üçlüsünü ve sapmayı verir', () => {
     const order = makeSentOrder();
-    order.receive([{ itemId: order.lines[0].id, quantity: 6 }]);
+    order.receive([{ itemId: order.lines[0].id, quantity: 6 }], {
+      receivedById: null,
+    });
     order.applyInvoice(new Decimal(480));
 
     // Okuma tarafı entity kurmaz; aynı saf fonksiyonu okuma modeliyle çağırır.

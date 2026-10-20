@@ -1,4 +1,5 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { Decimal } from 'decimal.js';
 import { Inject, Logger } from '@nestjs/common';
 import {
   BOOKING_PAYMENT_COMMAND_REPOSITORY,
@@ -13,6 +14,10 @@ import { BookingPaymentRefund } from '@modules/crm/health-tourism/booking-paymen
 import { BookingPaymentRefundAlreadyClaimedException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment-refund.exceptions';
 import { SupplierRetainedCost } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
 import { BookingPaymentRefundExecutor } from '@modules/crm/health-tourism/booking-payment/application/services/booking-payment-refund.executor';
+import {
+  CARD_CHARGEBACK_EXPOSURE_GUARD,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { RefundBookingPaymentCommand } from './refund-booking-payment.command';
 import { RefundBookingPaymentResponse } from './refund-booking-payment.response';
@@ -35,6 +40,8 @@ export class RefundBookingPaymentHandler implements ICommandHandler<
     private readonly bookingPaymentRepo: IBookingPaymentCommandRepository,
     @Inject(BOOKING_PAYMENT_REFUND_COMMAND_REPOSITORY)
     private readonly refundRepo: IBookingPaymentRefundCommandRepository,
+    @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
+    private readonly chargebackExposureGuard: ICardChargebackExposureGuard,
     private readonly refundExecutor: BookingPaymentRefundExecutor,
     private readonly txManager: TransactionManager
   ) {}
@@ -104,6 +111,19 @@ export class RefundBookingPaymentHandler implements ICommandHandler<
           );
           return null;
         }
+
+        // Kart itirazı kapısı (kural 17): bp satırı yukarıda kilitli, yani aynı satırı kilitleyen
+        // itiraz açılışıyla sıraya girer. Aktif (açık/kaybedilmiş) itiraz varken iade aynı parayı
+        // ikinci kez geri götürür (bir kez sağlayıcı kesintisi, bir kez bizim iademiz). Hata
+        // claim'i geri sarar: bp BOOKED kalır, iade satırı açılmaz.
+        // Tahsilat başına tek iade satırı olduğundan (unique) daha önce geri götürülen tutar 0'dır.
+        await this.chargebackExposureGuard.assertReversalWithinCollection({
+          sourceType: 'BOOKING_PAYMENT',
+          sourceId: bp.id.value,
+          collectedAmount: bp.receivedAmount.value,
+          alreadyReversedAmount: new Decimal(0),
+          requestedAmount: bp.receivedAmount.value,
+        });
 
         // İptal ekonomisi iade damgasıyla **aynı transaction'da** yazılır: ayırmak, araya düşen
         // bir çökmede "iade edildi ama cezası bilinmiyor" satırı bırakır ve ceza bir daha

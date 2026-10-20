@@ -21,12 +21,14 @@ export interface OpenCardChargebackProps {
   /** Sağlayıcının vaka numarası — kiracı+sağlayıcı içinde tekil. */
   caseReference: string;
   sourceType: CardChargebackSourceType;
-  /** POS_TRANSACTION → POS işlem id'si; ONLINE_PAYMENT → taksit id'si. */
+  /** POS_TRANSACTION → POS işlem id'si; ONLINE_PAYMENT → taksit id'si; BOOKING_PAYMENT → rezervasyon ödemesi id'si. */
   sourceId: string;
   /** Bağlı ödeme planı; plansız kart çekiminde null. */
   paymentId: string | null;
-  patientId: string;
-  partyId: string;
+  /** `BOOKING_PAYMENT` kaynağında null (platform müşterisi hasta kaydı değildir); diğerlerinde zorunlu. */
+  patientId: string | null;
+  /** `BOOKING_PAYMENT` kaynağında null (kayıp 659.01'e yazılır); diğerlerinde zorunlu. */
+  partyId: string | null;
   amount: Decimal;
   feeAmount: Decimal;
   currency: CurrencyType;

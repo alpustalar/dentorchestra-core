@@ -33,7 +33,12 @@ Entegratör modülü kapalıyken sistem en azından **önmuhasebe + fiş üretim
 | [`09-guvence-denetimi.md`](./09-guvence-denetimi.md)                     | Para güvenliği denetimi: modül-modül kontrol listesi + açık bulgular (P0/P1/P2)                                                                   | **Canlıya çıkmadan** — herkes       |
 | [`10-kalan-isler.md`](./10-kalan-isler.md)                               | Denetimden kalan işler **tek listede**: 22 iş paketi (tetikleyici + bağımlılık sırası), kabul edilmiş tasarım kararları, kurulum/operasyon durumu | Planlama — sıradaki turu seçerken   |
 | [`11-eksik-kalanlar.md`](./11-eksik-kalanlar.md)                         | Ertelenen kalemlerin düz listesi — **üretilir** (`pnpm finans:eksik`), elle tutulmaz                                                              | Hiçbir kalemin düşmediğini görmek   |
-| [`12-durum-devri.md`](./12-durum-devri.md)                               | **Durum devri:** mimari kararlar + 16 kural indeksi + kapatılan bulgular + migration durumu + bekleyen 22 paket, tek sayfada                      | Yeni bir oturuma bağlam vermek      |
+| [`12-durum-devri.md`](./12-durum-devri.md)                               | **Durum devri:** mimari kararlar + 22 kural indeksi + kapatılan bulgular + migration durumu + bekleyen 23 paket, tek sayfada                      | Yeni bir oturuma bağlam vermek      |
+| [`13-organization-clinic-defter-plani.md`](./13-organization-clinic-defter-plani.md) | **Tasarım — uygulanmadı:** organization/clinic defter sahipliği, şube/franchise ayarları, veri koruyan migration ve frontend uygulama sırası | Yeni muhasebe kapsamının uygulanması |
+
+`13` yeni ürün kapsamının uygulama planıdır; mevcut çalışan kodun açıklaması
+olarak okunmamalıdır. [Frontend iş planı](../../../web/docs/finance-implementation-plan.md)
+ve [API eksikleri](../../../web/docs/frontend-api-endpoint-gaps.md) ile birlikte izlenir.
 
 ## Katman özeti (tek bakışta)
 

@@ -28,6 +28,7 @@ import {
   ChargebackInvalidPrecisionException,
   ChargebackPlanSyncNotApplicableException,
   ChargebackReferenceRequiredException,
+  ChargebackSourceActorsInvalidException,
   ChargebackReturnChannelRequiredException,
 } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 
@@ -64,8 +65,8 @@ export class CardChargeback extends AggregateRoot {
     this._sourceId = data.sourceId;
     this._paymentId = data.paymentId;
     this._installmentId = data.installmentId;
-    this._patientId = UUID.fromTrusted(data.patientId);
-    this._partyId = UUID.fromTrusted(data.partyId);
+    this._patientId = data.patientId ? UUID.fromTrusted(data.patientId) : null;
+    this._partyId = data.partyId ? UUID.fromTrusted(data.partyId) : null;
     this._amount = new Decimal(data.amount.toString());
     this._feeAmount = new Decimal(data.feeAmount.toString());
     this._currency = data.currency;
@@ -134,13 +135,15 @@ export class CardChargeback extends AggregateRoot {
     return this._installmentId;
   }
 
-  private _patientId: UUID;
-  get patientId(): UUID {
+  /** Platform rezervasyon itirazında (`BOOKING_PAYMENT`) yoktur. */
+  private _patientId: UUID | null;
+  get patientId(): UUID | null {
     return this._patientId;
   }
 
-  private _partyId: UUID;
-  get partyId(): UUID {
+  /** Platform rezervasyon itirazında yoktur: kayıp 120'ye değil 659.01'e yazılır. */
+  private _partyId: UUID | null;
+  get partyId(): UUID | null {
     return this._partyId;
   }
 
@@ -249,6 +252,31 @@ export class CardChargeback extends AggregateRoot {
     return this._updatedAt;
   }
 
+  /**
+   * Hasta/cari alanları kaynakla tutarlı mı? `BOOKING_PAYMENT`'ta hiçbiri olmaz ve yalnız
+   * iyzico/TRY olabilir (platform sanal POS'u); diğerlerinde hasta + cari zorunludur. DB CHECK
+   * aynı kuralı zorlar — buradaki kapı kaydı veritabanına varmadan açıklayıcı reddeder.
+   */
+  private static assertSourceActors(props: OpenCardChargebackProps): void {
+    const isBooking =
+      props.sourceType === CardChargebackSourceSchema.enum.BOOKING_PAYMENT;
+    const hasActors = Boolean(props.patientId) && Boolean(props.partyId);
+    const hasAnyActor = Boolean(props.patientId) || Boolean(props.partyId);
+
+    const valid = isBooking
+      ? !hasAnyActor &&
+        props.paymentId === null &&
+        props.provider === 'IYZICO' &&
+        props.currency === 'TRY'
+      : hasActors;
+
+    if (!valid) {
+      throw new ChargebackSourceActorsInvalidException({
+        sourceType: props.sourceType,
+      });
+    }
+  }
+
   public static open(props: OpenCardChargebackProps): CardChargeback {
     const caseReference = props.caseReference.trim();
     if (caseReference.length === 0) {
@@ -261,6 +289,7 @@ export class CardChargeback extends AggregateRoot {
       amount: props.amount,
       feeAmount: props.feeAmount,
     });
+    CardChargeback.assertSourceActors(props);
 
     const now = DateTimeManager.create();
 
@@ -279,8 +308,12 @@ export class CardChargeback extends AggregateRoot {
         props.sourceType === CardChargebackSourceSchema.enum.ONLINE_PAYMENT
           ? props.sourceId
           : null,
-      patientId: UUID.create(props.patientId).orThrow().value,
-      partyId: UUID.create(props.partyId).orThrow().value,
+      patientId: props.patientId
+        ? UUID.create(props.patientId).orThrow().value
+        : null,
+      partyId: props.partyId
+        ? UUID.create(props.partyId).orThrow().value
+        : null,
       amount: props.amount,
       feeAmount: props.feeAmount,
       currency: props.currency,
@@ -418,8 +451,8 @@ export class CardChargeback extends AggregateRoot {
       sourceId: this.sourceId,
       paymentId: this.paymentId,
       installmentId: this.installmentId,
-      patientId: this.patientId.value,
-      partyId: this.partyId.value,
+      patientId: this.patientId?.value ?? null,
+      partyId: this.partyId?.value ?? null,
       amount: this.amount,
       feeAmount: this.feeAmount,
       currency: this.currency,

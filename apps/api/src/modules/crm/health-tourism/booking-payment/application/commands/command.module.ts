@@ -1,3 +1,4 @@
+import { BankDomainServicesModule } from '@modules/finance/bank/domain/services/services.module';
 import { Module } from '@nestjs/common';
 import { CqrsModule } from '@nestjs/cqrs';
 import { PaymentLinkModule } from '@src/infrastructure/payment/links/payment-link.module';
@@ -40,6 +41,8 @@ export const BOOKING_PAYMENT_COMMAND_HANDLERS = [
     // Elle karar: dönem kapısı (iadenin gerçekleştiği gün) ve "ters fiş zaten yazılı mı"
     // kanıtı — ikisi de yaprak domain-servis modülü, sahiplerinin ana modülü çekilmez.
     AccountingPeriodDomainServicesModule,
+    // Kart itirazı tavan kapısı (kural 17): iade/iptal claim'inde aktif itiraz kontrolü.
+    BankDomainServicesModule,
     FinancialEventDomainServicesModule,
     // Telafi komutu "eksik kalanlar" sorgusunu bus üzerinden çağırır.
     BookingPaymentQueryModule,

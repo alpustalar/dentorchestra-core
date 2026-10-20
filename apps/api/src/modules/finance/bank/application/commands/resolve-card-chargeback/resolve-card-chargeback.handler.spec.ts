@@ -39,6 +39,7 @@ describe('ResolveCardChargebackHandler', () => {
   const PARTY_ID = randomUUID();
   const PAYMENT_ID = randomUUID();
   const POS_TX_ID = randomUUID();
+  const BOOKING_PAYMENT_ID = randomUUID();
   const INSTALLMENT_ID = randomUUID();
   const RECOVERY_ID = randomUUID();
   const BANK_ACCOUNT_ID = randomUUID();
@@ -59,21 +60,32 @@ describe('ResolveCardChargebackHandler', () => {
 
   const openChargeback = (
     over: {
-      sourceType?: 'POS_TRANSACTION' | 'ONLINE_PAYMENT';
+      sourceType?: 'POS_TRANSACTION' | 'ONLINE_PAYMENT' | 'BOOKING_PAYMENT';
       paymentId?: string | null;
     } = {}
   ): CardChargeback => {
     const sourceType = over.sourceType ?? 'POS_TRANSACTION';
+    const isBooking = sourceType === 'BOOKING_PAYMENT';
+    const sourceIds = {
+      POS_TRANSACTION: POS_TX_ID,
+      ONLINE_PAYMENT: INSTALLMENT_ID,
+      BOOKING_PAYMENT: BOOKING_PAYMENT_ID,
+    } as const;
     return CardChargeback.open({
       clinicId: CLINIC_ID,
       organizationId: ORG_ID,
-      provider: 'PAX_BANK',
+      provider: isBooking ? 'IYZICO' : 'PAX_BANK',
       caseReference: 'CB-1001',
       sourceType,
-      sourceId: sourceType === 'ONLINE_PAYMENT' ? INSTALLMENT_ID : POS_TX_ID,
-      paymentId: over.paymentId === undefined ? PAYMENT_ID : over.paymentId,
-      patientId: PATIENT_ID,
-      partyId: PARTY_ID,
+      sourceId: sourceIds[sourceType],
+      paymentId: isBooking
+        ? null
+        : over.paymentId === undefined
+          ? PAYMENT_ID
+          : over.paymentId,
+      // Platform rezervasyon itirazında hasta/cari yoktur.
+      patientId: isBooking ? null : PATIENT_ID,
+      partyId: isBooking ? null : PARTY_ID,
       amount: new Decimal('1000.00'),
       feeAmount: new Decimal('25.00'),
       currency: 'TRY',
@@ -374,6 +386,43 @@ describe('ResolveCardChargebackHandler', () => {
         partyId: PARTY_ID,
       });
       expect(event.data.dedupeKey).toContain('card-chargeback-lost:');
+    });
+
+    it('platform rezervasyon itirazı: gövde carisiz ve AÇIK platformLoss işaretli; plana dokunulmaz', async () => {
+      const { handler, commandExecute, update, publish } = build({
+        chargeback: openChargeback({ sourceType: 'BOOKING_PAYMENT' }),
+      });
+
+      await handler.execute(command(lost()));
+
+      const event = eventCommand(commandExecute);
+      expect(event.data.type).toBe('CARD_CHARGEBACK_LOST');
+      expect(event.data.payload).toEqual({
+        amount: '1000.00',
+        currency: 'TRY',
+        provider: 'IYZICO',
+        caseReference: 'CB-1001',
+        platformLoss: true,
+      });
+      expect(event.data.payload).not.toHaveProperty('partyId');
+      // Platformun plan/taksit kaydı yok: ödeme planı komutu çağrılmaz, uyarı çıkmaz.
+      expect(planCommand(commandExecute)).toBeUndefined();
+      expect(update.mock.calls[0][0].planSyncStatus).toBe('NOT_LINKED');
+      expect(publish).not.toHaveBeenCalled();
+    });
+
+    it('platform rezervasyon itirazı KAZANILINCA da carisiz çözülür (127 kapanır, para geri döner)', async () => {
+      const { handler, commandExecute } = build({
+        chargeback: openChargeback({ sourceType: 'BOOKING_PAYMENT' }),
+      });
+
+      await handler.execute(command(won()));
+
+      const event = eventCommand(commandExecute);
+      expect(event.data.type).toBe('CARD_CHARGEBACK_WON');
+      expect(event.data.payload).toEqual(
+        expect.objectContaining({ fundsChannel: 'BANK' })
+      );
     });
 
     it('plansız kart çekimi (paymentId yok): komut çağrılmaz, NOT_LINKED yazılır', async () => {

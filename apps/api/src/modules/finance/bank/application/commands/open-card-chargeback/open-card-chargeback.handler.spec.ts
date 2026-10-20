@@ -25,6 +25,9 @@ import { IPeriodGateService } from '@modules/finance/accounting/periods/domain/s
 import { IFundsInTransitGate } from '@modules/finance/accounting/posting/domain/services/funds-in-transit/funds-in-transit.gate.interface';
 import { IFinancialEventPresenceGuard } from '@modules/finance/accounting/financial-events/domain/services/event-presence/event-presence.guard.interface';
 import { IPosCardCollectionService } from '@modules/finance/pos/physical/domain/services/pos-card-collection/pos-card-collection.service.interface';
+import { IBookingPaymentCollectionService } from '@modules/crm/health-tourism/booking-payment/domain/services/booking-payment-collection/booking-payment-collection.service.interface';
+import { BookingPaymentNotChargeableException } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
+import { IPlatformTenantProvider } from '@modules/finance/accounting/posting/domain/interfaces/platform-tenant.provider.interface';
 import { IPaymentCollectionService } from '@modules/finance/payment/domain/services/payment-collection/payment-collection.service.interface';
 import { EnsurePartyForPatientCommand } from '@modules/finance/party/application/commands/ensure-party-for-patient/ensure-party-for-patient.command';
 import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
@@ -56,6 +59,7 @@ describe('OpenCardChargebackHandler', () => {
   const PAYMENT_ID = randomUUID();
   const POS_TX_ID = randomUUID();
   const INSTALLMENT_ID = randomUUID();
+  const BOOKING_PAYMENT_ID = randomUUID();
   const BANK_ACCOUNT_ID = randomUUID();
   const EVENT_ID = randomUUID();
   const ACTOR_ID = 'aB3xY9zQ7wE1rT5yU8iO2pL4kJ6h';
@@ -92,6 +96,15 @@ describe('OpenCardChargebackHandler', () => {
     posData({
       sourceType: 'ONLINE_PAYMENT',
       sourceId: INSTALLMENT_ID,
+      ...over,
+    });
+
+  const bookingData = (
+    over: Partial<OpenCardChargeback> = {}
+  ): OpenCardChargeback =>
+    posData({
+      sourceType: 'BOOKING_PAYMENT',
+      sourceId: BOOKING_PAYMENT_ID,
       ...over,
     });
 
@@ -136,6 +149,10 @@ describe('OpenCardChargebackHandler', () => {
     createThrows?: boolean;
     bankAccountClinicId?: string;
     posLockError?: Error;
+    /** Platform kliniği (varsayılan: istekteki klinik). */
+    platformClinicId?: string;
+    bookingReversible?: Decimal;
+    bookingLockError?: Error;
   }
 
   const build = (options: BuildOptions = {}) => {
@@ -255,6 +272,26 @@ describe('OpenCardChargebackHandler', () => {
       lockAndGetCollectedAmount: lockOnline,
     } as unknown as IPaymentCollectionService;
 
+    const lockBooking = jest.fn(() => {
+      order.push('sourceLock');
+      depthAtCall.sourceLock = txDepth;
+      return options.bookingLockError
+        ? Promise.reject(options.bookingLockError)
+        : Promise.resolve(options.bookingReversible ?? new Decimal(1000));
+    });
+    const bookingCollection = {
+      lockAndGetReversibleAmount: lockBooking,
+    } as unknown as IBookingPaymentCollectionService;
+
+    const platformTenant = {
+      resolve: jest.fn(() =>
+        Promise.resolve({
+          clinicId: options.platformClinicId ?? CLINIC_ID,
+          organizationId: ORG_ID,
+        })
+      ),
+    } as unknown as IPlatformTenantProvider;
+
     const policyCheck = jest.fn().mockReturnValue({ orThrow: () => undefined });
     const policyFactory = {
       finance: jest.fn().mockReturnValue({
@@ -321,6 +358,8 @@ describe('OpenCardChargebackHandler', () => {
         presenceGuard,
         posCollection,
         paymentCollection,
+        bookingCollection,
+        platformTenant,
         policyFactory,
         commandBus,
         queryBus,
@@ -334,6 +373,8 @@ describe('OpenCardChargebackHandler', () => {
       assertPeriod,
       lockPos,
       lockOnline,
+      lockBooking,
+      queryExecute,
       commandExecute,
       outboxRun,
       order,
@@ -364,8 +405,8 @@ describe('OpenCardChargebackHandler', () => {
       expect(stamped.openedEventId).toBe(EVENT_ID);
       expect(id).toBe(stamped.id.value);
       expect(stamped.status).toBe('OPEN');
-      expect(stamped.partyId.value).toBe(PARTY_ID);
-      expect(stamped.patientId.value).toBe(PATIENT_ID);
+      expect(stamped.partyId?.value).toBe(PARTY_ID);
+      expect(stamped.patientId?.value).toBe(PATIENT_ID);
       expect(stamped.paymentId).toBe(PAYMENT_ID);
       expect(stamped.recordedById).toBe(ACTOR_ID);
       expect(eventCommand(commandExecute)).toBeDefined();
@@ -722,5 +763,130 @@ describe('OpenCardChargebackHandler', () => {
     ).rejects.toBeInstanceOf(OriginalPosTransactionNotFoundException);
 
     expect(create).not.toHaveBeenCalled();
+  });
+
+  describe('platform rezervasyon tahsilatı (BOOKING_PAYMENT)', () => {
+    it('hasta ve cari OLMADAN kaydedilir; cari garantisi (EnsureParty) çağrılmaz', async () => {
+      const { handler, update, commandExecute, lockBooking } = build();
+
+      await handler.execute(new OpenCardChargebackCommand(bookingData(), ctx));
+
+      const stamped = update.mock.calls[0][0];
+      expect(stamped.sourceType).toBe('BOOKING_PAYMENT');
+      expect(stamped.sourceId).toBe(BOOKING_PAYMENT_ID);
+      expect(stamped.patientId).toBeNull();
+      expect(stamped.partyId).toBeNull();
+      expect(stamped.paymentId).toBeNull();
+      expect(stamped.installmentId).toBeNull();
+      expect(stamped.provider).toBe('IYZICO');
+      expect(stamped.currency).toBe('TRY');
+      expect(lockBooking).toHaveBeenCalledWith({
+        bookingPaymentId: BOOKING_PAYMENT_ID,
+      });
+      expect(
+        commandExecute.mock.calls.some(
+          ([c]) => c instanceof EnsurePartyForPatientCommand
+        )
+      ).toBe(false);
+      expect(eventCommand(commandExecute)).toBeDefined();
+    });
+
+    it('kanıt, platform rezervasyon FİŞİNİN dedupe anahtarıyla aranır; hasta/POS sorgusu yapılmaz', async () => {
+      const { handler, assertRecorded, queryExecute } = build();
+
+      await handler.execute(new OpenCardChargebackCommand(bookingData(), ctx));
+
+      expect(assertRecorded.mock.calls[0][0]).toEqual({
+        clinicId: CLINIC_ID,
+        dedupeKey: `platform-booking-settled:${BOOKING_PAYMENT_ID}`,
+      });
+      expect(queryExecute).not.toHaveBeenCalled();
+    });
+
+    it('klinik PLATFORM değilse reddedilir: başka kiracının defterine itiraz yazılamaz', async () => {
+      const { handler, create, lockBooking } = build({
+        platformClinicId: OTHER_CLINIC_ID,
+      });
+
+      await expect(
+        handler.execute(new OpenCardChargebackCommand(bookingData(), ctx))
+      ).rejects.toBeInstanceOf(ChargebackSourceClinicMismatchException);
+
+      expect(lockBooking).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('tavan: aktif itiraz + yeni itiraz geri götürülebilir tutarı aşarsa reddedilir', async () => {
+      const { handler, create, sumActiveBySource } = build({
+        bookingReversible: new Decimal(1000),
+        activeChargebacks: new Decimal(600),
+      });
+
+      await expect(
+        handler.execute(
+          new OpenCardChargebackCommand(bookingData({ amount: 500 }), ctx)
+        )
+      ).rejects.toBeInstanceOf(ChargebackExceedsCollectionException);
+
+      expect(sumActiveBySource).toHaveBeenCalledWith({
+        sourceType: 'BOOKING_PAYMENT',
+        sourceId: BOOKING_PAYMENT_ID,
+      });
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('iade satırı tutarı zaten geri götürdüyse (kilitli okuma 0 döner) itiraz reddedilir', async () => {
+      const { handler, create } = build({ bookingReversible: new Decimal(0) });
+
+      await expect(
+        handler.execute(
+          new OpenCardChargebackCommand(bookingData({ amount: 100 }), ctx)
+        )
+      ).rejects.toBeInstanceOf(ChargebackExceedsCollectionException);
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('tahsil edilmemiş / iyzico dışı ödeme servisinin reddiyle durur; kayıt yazılmaz', async () => {
+      const { handler, create } = build({
+        bookingLockError: new BookingPaymentNotChargeableException({
+          bookingPaymentId: BOOKING_PAYMENT_ID,
+          reason: 'yalnız iyzico tahsilatı desteklenir',
+        }),
+      });
+
+      await expect(
+        handler.execute(new OpenCardChargebackCommand(bookingData(), ctx))
+      ).rejects.toBeInstanceOf(BookingPaymentNotChargeableException);
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('platform fişi yazılmamışsa (ileri fiş yok) 108’de olmayan paranın itirazı reddedilir', async () => {
+      const { handler, create } = build({ notInLedger: true });
+
+      await expect(
+        handler.execute(new OpenCardChargebackCommand(bookingData(), ctx))
+      ).rejects.toBeInstanceOf(ChargebackSourceNotInLedgerException);
+
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('kapı sırası POS ile aynı: kilit → defterde var mı → tavan → dönem → 108 → kayıt → olay', async () => {
+      const { handler, order } = build();
+
+      await handler.execute(new OpenCardChargebackCommand(bookingData(), ctx));
+
+      expect(order).toEqual([
+        'sourceLock',
+        'presence',
+        'cap',
+        'periodGate',
+        'fundsGate',
+        'create',
+        'financialEvent',
+        'update',
+      ]);
+    });
   });
 });

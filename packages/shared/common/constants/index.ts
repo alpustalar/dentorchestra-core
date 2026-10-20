@@ -13,4 +13,13 @@ export type {
   PaymentMethodCode,
 } from './payment-method.constant';
 
+export {
+  DEFAULT_PURCHASE_INVOICE_LINE_ACCOUNT_CODE,
+  PURCHASE_INVOICE_LINE_ACCOUNT_CODES,
+  PURCHASE_INVOICE_STOCK_ACCOUNT_CODES,
+  isPurchaseInvoiceLineAccountCode,
+  isPurchaseInvoiceStockAccountCode,
+} from './purchase-invoice-account.constant';
+export type { PurchaseInvoiceLineAccountCode } from './purchase-invoice-account.constant';
+
 export * from './execution-source.constant';

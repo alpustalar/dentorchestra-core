@@ -302,6 +302,33 @@ export class UnmappedPaymentMethodException extends DomainException<{
 }
 
 /**
+ * Alış faturası olayının karşı hesabı kabul kümesinde değil.
+ *
+ * Bilerek hata: serbest metin iken posting kuralı kodu olduğu gibi borca yazıyordu.
+ * `102` gönderilen bir fatura `B 102 / B 191 / A 320` fişi üretir — dengeli, hiçbir
+ * bütünlük kontrolüne yakalanmaz, ama bankada olmayan para görünür ve banka
+ * mutabakatında kalıcı UNMATCHED üretir.
+ *
+ * Yazma kapıları (DTO, olay gövdesi, entity) aynı sabitten beslendiği için bu hata
+ * normalde oluşmaz; oluştuysa kapı yokken yazılmış eski bir olay vardır. Sessizce
+ * yazmak yerine sesli patlar: olay "fişlenmemiş" listesinde görünür ve CRITICAL basar.
+ */
+export class UnmappedPurchaseInvoiceAccountException extends DomainException<{
+  lineAccountCode: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.POSTING.UNMAPPED_PURCHASE_INVOICE_ACCOUNT;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { lineAccountCode: string }) {
+    super(
+      `Alış faturası karşı hesabı kabul edilen kümede değil: ${meta.lineAccountCode}`,
+      meta
+    );
+  }
+}
+
+/**
  * Kart itirazı kanalının (108 / 102) defter karşılığı yok.
  *
  * Kabul kümesi tek sabitten gelir (`CHARGEBACK_FUNDS_CHANNELS`) ve eşleme tam

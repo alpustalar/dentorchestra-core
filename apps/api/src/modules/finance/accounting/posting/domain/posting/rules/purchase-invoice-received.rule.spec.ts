@@ -1,6 +1,7 @@
 import { PurchaseInvoiceReceivedRule } from './purchase-invoice-received.rule';
 import { FinancialEvent } from '@modules/finance/accounting/financial-events/domain/entities/financial-event.entity';
 import { FinancialEventTypeSchema } from '@shared';
+import { UnmappedPurchaseInvoiceAccountException } from '@modules/finance/accounting/posting/domain/exceptions/posting.exceptions';
 
 describe('PurchaseInvoiceReceivedRule', () => {
   const rule = new PurchaseInvoiceReceivedRule();
@@ -75,5 +76,43 @@ describe('PurchaseInvoiceReceivedRule', () => {
       credit: '500.00',
     });
     expect(sumDebit(draft.lines)).toBe(sumCredit(draft.lines));
+  });
+  // --- Üçüncü kapı: kuralın kendisi (kural 12) ---
+
+  it.each(['102', '329', '120', '740', ''])(
+    'kabul kümesinde olmayan karşı hesap (%j) sessizce borca yazılmaz',
+    (lineAccountCode) => {
+      // Gövde kapı yokken yazılmış olabilir (append-only). Eski kural kodu olduğu
+      // gibi borca yazardı: `B 102 / B 191 / A 320` — dengeli, bankada olmayan para.
+      expect(() =>
+        rule.build(
+          makeEvent({
+            partyId: 'party-1',
+            netTotal: '1000.00',
+            vatTotal: '100.00',
+            grandTotal: '1100.00',
+            lineAccountCode,
+          })
+        )
+      ).toThrow(UnmappedPurchaseInvoiceAccountException);
+    }
+  );
+
+  it('duran varlık (255) ve gider alt hesabı (740.01) kabul edilir', () => {
+    for (const code of ['255', '740.01']) {
+      const draft = rule.build(
+        makeEvent({
+          partyId: 'party-1',
+          netTotal: '100.00',
+          vatTotal: '0.00',
+          grandTotal: '100.00',
+          lineAccountCode: code,
+        })
+      );
+      expect(draft.lines[0]).toMatchObject({
+        accountCode: code,
+        debit: '100.00',
+      });
+    }
   });
 });

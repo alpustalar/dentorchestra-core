@@ -53,6 +53,17 @@ export class AccountingPeriodCommandRepository
     return raw ? new AccountingPeriod(raw) : null;
   }
 
+  async findNotClosedBefore(
+    clinicId: string,
+    year: number
+  ): Promise<AccountingPeriod[]> {
+    const rows = await this.db.accountingPeriod.findMany({
+      where: { clinicId, year: { lt: year }, status: { not: CLOSED } },
+      orderBy: { year: 'asc' },
+    });
+    return rows.map((raw) => new AccountingPeriod(raw));
+  }
+
   async findLedgerScopes(): Promise<LedgerScope[]> {
     const rows = await this.db.accountingPeriod.findMany({
       distinct: ['clinicId'],

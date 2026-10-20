@@ -3,6 +3,14 @@ enum PayoutTrigger {
   ON_TREATMENT_COMPLETED
 }
 
+/// Kliniğin hukuki/vergisel işletme biçimi. Kullanıcı seçer (türetilemez); yıl sonu devrinin hedefini
+/// belirler: COMPANY → 590/591 → 570/580, SOLE_PROPRIETOR → 590/591 → 500. Boş = henüz seçilmemiş
+/// (kapanışta devir adımı atlanır, önizleme uyarır).
+enum BusinessType {
+  COMPANY
+  SOLE_PROPRIETOR
+}
+
 enum RoundingDirection {
   NONE
   UP
@@ -201,6 +209,9 @@ model ClinicFinanceSettings {
   isEInvoiceActive Boolean @default(false) @map("is_e_invoice_active") // E-Fatura/E-Arşiv entegrasyonu aktif mi?
 
   fiscalYearStartMonth Int @default(1) @map("fiscal_year_start_month") // Mali yıl başlangıcı (Genelde 1)
+
+  // İşletme biçimi (şirket / şahıs). Kayıt akışında zorunlu; null yalnız bu alandan ÖNCE açılmış klinikler içindir.
+  businessType BusinessType? @map("business_type")
 
   // Doktor hak ediş "ON_PAYMENT" (Ödeme Alındıkça) veya "ON_TREATMENT_COMPLETED" (Tedavi Bittikçe)
   providerPayoutTrigger PayoutTrigger @default(ON_PAYMENT) @map("provider_payout_trigger")

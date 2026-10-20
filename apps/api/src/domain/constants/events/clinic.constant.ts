@@ -9,6 +9,7 @@ export const CLINIC_EVENTS = {
   DEACTIVATED: 'clinic.deactivated',
   REGISTER_SUBMERCHANT: 'clinic.register_submerchant',
   APPOINTMENT_SETTINGS_UPDATED: 'clinic.appointment_settings_updated',
+  BUSINESS_TYPE_CHANGED: 'clinic.business_type_changed',
 } as const;
 
 export type ClinicEvent = (typeof CLINIC_EVENTS)[keyof typeof CLINIC_EVENTS];

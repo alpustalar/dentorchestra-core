@@ -17,6 +17,15 @@ import { ACCOUNTING_RULES } from '@modules/finance/shared/domain/constants/accou
  *
  * İade değildir: iade bizim kararımızla geri verilen paradır ve hasta borcunu
  * kapatır; ters ibraz geri ALINAN paradır, hasta borcu yerinde durur.
+ *
+ * Platform rezervasyon itirazında (`platformLoss: true`) hasta carisi YOKTUR: platform aracıdır,
+ * müşteri hasta kaydı değildir ve geri alınacak bir alacak doğmaz. Kayıp kesinleşir:
+ *
+ *   B 659.01 Platform İtiraz ve Chargeback Zararları   tutar
+ *       A 127 Diğer Ticari Alacaklar                       tutar
+ *
+ * Tedarikçi borcunun (320) ne olacağı (rezervasyon iptal/iade, tedarikçi mutabakatı) ayrı bir
+ * muhasebe kararıdır (§91 ertelemesi); bu fiş yalnız kesinleşen parayı ara hesaptan çıkarır.
  */
 @Injectable()
 export class CardChargebackLostRule implements PostingRule {
@@ -25,17 +34,27 @@ export class CardChargebackLostRule implements PostingRule {
   build(event: FinancialEvent): DraftJournalEntry {
     const payload = event.payload as unknown as CardChargebackLostEventPayload;
 
+    const lossLine =
+      'platformLoss' in payload
+        ? {
+            accountCode:
+              ACCOUNTING_RULES.TARGET_ACCOUNTS.PLATFORM_CHARGEBACK_LOSS_659_01,
+            debit: payload.amount,
+            desc: `Platform itiraz zararı — ters ibraz (${payload.provider} / ${payload.caseReference})`,
+          }
+        : {
+            accountCode: '120',
+            partyId: payload.partyId,
+            debit: payload.amount,
+            desc: `Alıcılar (cari) — ters ibraz (${payload.provider} / ${payload.caseReference})`,
+          };
+
     return {
       date: event.occurredAt,
       description: `Kart itirazı kaybedildi (${payload.caseReference})`,
       currency: payload.currency,
       lines: [
-        {
-          accountCode: '120',
-          partyId: payload.partyId,
-          debit: payload.amount,
-          desc: `Alıcılar (cari) — ters ibraz (${payload.provider} / ${payload.caseReference})`,
-        },
+        lossLine,
         {
           accountCode: ACCOUNTING_RULES.TARGET_ACCOUNTS.CHARGEBACK_HOLD_127,
           credit: payload.amount,

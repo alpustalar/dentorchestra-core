@@ -11,6 +11,7 @@ import {
   ChargebackPlanSyncNotApplicableException,
   ChargebackReferenceRequiredException,
   ChargebackReturnChannelRequiredException,
+  ChargebackSourceActorsInvalidException,
 } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 
 const CLINIC_ID = randomUUID();
@@ -50,6 +51,86 @@ const props = (
  * için sonradan düzeltilemez (§53 gerekçesi).
  */
 describe('CardChargeback (entity)', () => {
+  describe('open() — platform rezervasyon tahsilatı (BOOKING_PAYMENT)', () => {
+    const bookingProps = (over: Partial<OpenCardChargebackProps> = {}) =>
+      props({
+        sourceType: 'BOOKING_PAYMENT',
+        paymentId: null,
+        patientId: null,
+        partyId: null,
+        ...over,
+      });
+
+    it('hasta, cari, ödeme planı ve taksit OLMADAN açılır; kaynak kimliği korunur', () => {
+      const cb = CardChargeback.open(bookingProps());
+
+      expect(cb.sourceType).toBe('BOOKING_PAYMENT');
+      expect(cb.sourceId).toBe(SOURCE_ID);
+      expect(cb.patientId).toBeNull();
+      expect(cb.partyId).toBeNull();
+      expect(cb.paymentId).toBeNull();
+      // Taksit yalnız ONLINE_PAYMENT’ta kaynakla aynıdır; rezervasyon taksit değildir.
+      expect(cb.installmentId).toBeNull();
+      const row = cb.toPersistence();
+      expect(row.patientId).toBeNull();
+      expect(row.partyId).toBeNull();
+    });
+
+    it('hasta ya da cari verilirse reddedilir (kayıp 120’ye gitmez; yanlış cariye yazılmasın)', () => {
+      expect(() =>
+        CardChargeback.open(bookingProps({ patientId: PATIENT_ID }))
+      ).toThrow(ChargebackSourceActorsInvalidException);
+      expect(() =>
+        CardChargeback.open(bookingProps({ partyId: PARTY_ID }))
+      ).toThrow(ChargebackSourceActorsInvalidException);
+    });
+
+    it('yalnız iyzico / TRY: Stripe ya da yabancı para platform itirazı olamaz', () => {
+      expect(() =>
+        CardChargeback.open(bookingProps({ provider: 'STRIPE' }))
+      ).toThrow(ChargebackSourceActorsInvalidException);
+      expect(() =>
+        CardChargeback.open(bookingProps({ currency: 'EUR' }))
+      ).toThrow(ChargebackSourceActorsInvalidException);
+    });
+
+    it('ödeme planına bağlanamaz (platformun plan/taksit kaydı yok)', () => {
+      expect(() =>
+        CardChargeback.open(bookingProps({ paymentId: PAYMENT_ID }))
+      ).toThrow(ChargebackSourceActorsInvalidException);
+    });
+
+    it('diğer kaynaklarda hasta VE cari hâlâ zorunludur', () => {
+      expect(() => CardChargeback.open(props({ patientId: null }))).toThrow(
+        ChargebackSourceActorsInvalidException
+      );
+      expect(() => CardChargeback.open(props({ partyId: null }))).toThrow(
+        ChargebackSourceActorsInvalidException
+      );
+      expect(() =>
+        CardChargeback.open(
+          props({
+            sourceType: 'ONLINE_PAYMENT',
+            patientId: null,
+            partyId: null,
+          })
+        )
+      ).toThrow(ChargebackSourceActorsInvalidException);
+    });
+
+    it('kayıp çözümü de carisiz yürür (durum makinesi aynı)', () => {
+      const cb = CardChargeback.open(bookingProps());
+
+      cb.resolveLost({
+        resolvedAt: RESOLVED_AT,
+        note: null,
+        resolvedById: 'admin-1',
+      });
+
+      expect(cb.status).toBe('LOST');
+    });
+  });
+
   describe('open()', () => {
     it('OPEN doğar; çözüm alanları boş, köprü izi yok', () => {
       const cb = CardChargeback.open(props());

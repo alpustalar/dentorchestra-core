@@ -15,7 +15,12 @@ enum JournalEntryStatus {
 /// tersine kapanışı saymak ZORUNDADIR — kârı öz kaynağa (590) taşıyan fiş odur.
 enum JournalEntryKind {
   OPERATIONAL /// ekonomik olay (posting kuralı) ve onun stornosu
-  CLOSING /// yıl sonu kapanış/devir fişi — gelir tablosuna girmez
+  CLOSING /// yıl sonu kapanış fişi (yansıtma, 6/7 → 690, 690 → 590/591) — gelir tablosuna girmez
+  /// Dönem sonu DÜZELTME: GRNI tahakkuku (mal geldi, fatura gelmedi) ve ertesi yılın 1 Ocak'ındaki ters kaydı.
+  /// Teknik değil EKONOMİKTİR: tahakkukun gider satırı (ör. 770) ait olduğu yılın gelir tablosunda görünmek,
+  /// ters kaydı da yeni yılda faturayla birlikte sıfırlanmak zorundadır — bu yüzden gelir tablosu SAYAR
+  /// (CLOSING'in tersi). `329` hesabına yalnız bu türdeki fişler yazar (`finans:degismezler` zorlar).
+  ADJUSTING
 }
 
 model JournalEntry {

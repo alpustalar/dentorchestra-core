@@ -124,6 +124,24 @@ describe('ReceivePurchaseOrderHandler — mal kabul (kilit + stok girişi)', () 
     expect(dispatched[0]).toBeInstanceOf(ReceiveStockCommand);
   });
 
+  it('kabulü giren personel günlüğe yazılır (GRNI dayanağı)', async () => {
+    const order = makeSentOrder();
+    const itemId = order.lines[0].id;
+    const { handler } = build(order);
+
+    await handler.execute(
+      new ReceivePurchaseOrderCommand({
+        orderId: order.id.value,
+        data: { items: [{ itemId, quantity: 3 }] },
+        ctx,
+      })
+    );
+
+    expect(order.pendingReceipts).toHaveLength(1);
+    expect(order.pendingReceipts[0].receivedById).toBe('user-1');
+    expect(order.pendingReceipts[0].lines[0].quantity.toNumber()).toBe(3);
+  });
+
   it('mal kabulü besleyen okuma kilitli ve stok girişiyle aynı transaction içinde', async () => {
     const order = makeSentOrder();
     const itemId = order.lines[0].id;

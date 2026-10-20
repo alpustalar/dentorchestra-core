@@ -7,10 +7,12 @@ import {
 } from '../posting-rule.interface';
 import { PurchaseInvoiceReceivedEventPayload } from '../event-payloads';
 import { FinancialEventTypeSchema } from '@shared';
+import { isPurchaseInvoiceLineAccountCode } from '@shared/common/constants';
+import { UnmappedPurchaseInvoiceAccountException } from '@modules/finance/accounting/posting/domain/exceptions/posting.exceptions';
 
 /**
  * Alış Faturası — PURCHASE_INVOICE_RECEIVED
- *   B {lineAccountCode} (150 stok / 770-760-740 gider)   netTotal
+ *   B {lineAccountCode} (stok / duran varlık / gider)    netTotal
  *   B 191 İndirilecek KDV                                  vatTotal   (vat > 0 ise)
  *     A 320 Satıcılar (party=tedarikçi)                                grandTotal
  * (KDV tevkifatı / sorumlu sıfatıyla 360 dalı v2 — parametrik oranla eklenecek.)
@@ -22,6 +24,14 @@ export class PurchaseInvoiceReceivedRule implements PostingRule {
   build(event: FinancialEvent): DraftJournalEntry {
     const payload =
       event.payload as unknown as PurchaseInvoiceReceivedEventPayload;
+
+    // Üçüncü kapı (DTO ve olay gövdesinden sonra): gövde kapı yokken yazılmış olabilir.
+    // Kodu olduğu gibi borca yazmak `102`/`329` gibi bir hesabı sessizce hareket ettirir.
+    if (!isPurchaseInvoiceLineAccountCode(payload.lineAccountCode)) {
+      throw new UnmappedPurchaseInvoiceAccountException({
+        lineAccountCode: String(payload.lineAccountCode),
+      });
+    }
 
     const lines: DraftJournalLine[] = [
       {

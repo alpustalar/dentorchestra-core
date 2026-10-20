@@ -26,6 +26,7 @@ enum CardChargebackStatus {
 enum CardChargebackSource {
   POS_TRANSACTION /// fiziksel POS satışı (PAX / iyzico Terminal) — sourceId = posTransactionId
   ONLINE_PAYMENT /// sanal POS (iyzico) taksit tahsilatı — sourceId = installmentId
+  BOOKING_PAYMENT /// platform sanal POS (iyzico/TRY) rezervasyon tahsilatı — sourceId = bookingPaymentId; hasta/cari YOK
 }
 
 /// Paranın itiraz sırasında hangi hesaptan kesildiği / hangisine döndüğü.
@@ -57,9 +58,11 @@ model CardChargeback {
   /// Telafi taksidinin geri aldığı taksit. ONLINE'da açılışta (= sourceId);
   /// POS'ta kaybedilince tutar eşleşmesiyle bulunduğunda dolar.
   installmentId String?           @map("installment_id")
-  patientId  String               @map("patient_id")
+  /// Hasta ve cari: BOOKING_PAYMENT'ta NULL (platform müşterisi hasta kaydı değildir; kayıp
+  /// 120'ye değil 659.01'e yazılır), diğer kaynaklarda ZORUNLU — DB CHECK ile birlikte zorlanır.
+  patientId  String?              @map("patient_id")
   /// Hasta carisi — kaybedilince `B 120` bu cariye yazılır; açılışta garanti edilir.
-  partyId    String               @map("party_id")
+  partyId    String?              @map("party_id")
 
   /// İtiraz edilen (sağlayıcının kestiği) tutar — kısmi itiraz mümkündür.
   amount    Decimal  @db.Decimal(14, 2)

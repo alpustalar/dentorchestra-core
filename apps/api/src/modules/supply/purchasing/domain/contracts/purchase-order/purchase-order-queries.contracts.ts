@@ -25,3 +25,25 @@ export interface PurchaseOrderPage {
   total: number;
   pagination: Pagination;
 }
+
+/**
+ * Yıl sonu GRNI tahakkuku için siparişin **günlükten** okunan görünümü: kalemler (ürün bağı) +
+ * `asOf`'a kadar yapılmış kabuller. Faturalar başka modülde (QueryBus ile ayrıca okunur).
+ */
+export interface GrniAccrualOrderRecord {
+  id: string;
+  supplierId: string;
+  orderDate: Date;
+  currency: string;
+  items: { id: string; productId: string | null }[];
+  receipts: {
+    source: 'GOODS_RECEIPT' | 'LEGACY_BACKFILL';
+    lines: { itemId: string; quantity: string; unitPrice: string }[];
+  }[];
+}
+
+export interface FindGrniAccrualOrdersFilter {
+  clinicId: string;
+  /** Yalnız `receivedAt ≤ asOf` kabuller okunur. */
+  asOf: Date;
+}

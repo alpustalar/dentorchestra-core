@@ -2761,6 +2761,12 @@ düşülmez. Yeni bir geri götüren yol (ör. başka bir ödeme sağlayıcısı
 bu kapıya bağlamaktır. İtiraz süresince para **doğrudan 120'ye** değil, sonuç belli olana kadar bir
 ara hesapta (127) bekler; kaybedilen itiraz `REFUNDED` değil kendi durumunu (`CHARGED_BACK`) taşır —
 iade geri verilen, ters ibraz geri **alınan** paradır ve hasta borcu yerinde durur.
+**Platform rezervasyon tahsilatı (iyzico/TRY) aynı kapıya girer:** itiraz kaynağı `BOOKING_PAYMENT`, tavan
+`BookingPaymentCollectionService.lockAndGetReversibleAmount` ile (bp satırı `FOR UPDATE`), ve **üç iade claim'i**
+(iptal, başarısız rezervasyon, yeniden deneme) `CARD_CHARGEBACK_EXPOSURE_GUARD`'ı bp kilidi altında çağırır —
+yeni bir iade/iptal yolu eklenirken ilk iş bu kapıya bağlamaktır. Platform müşterisi hasta kaydı değildir:
+kayıp `120`'ye değil `659.01`'e yazılır ve bu ayrım cari yokluğundan **türetilmez**, olay gövdesindeki açık
+`platformLoss: true` işaretiyle yapılır (cari unutulmuş bir hasta itirazı sessizce zarara yazılmasın).
 
 **18. Sağlayıcı çağrısının sonucu üç durumludur: oldu / olmadı / bilinmiyor.** Dış sağlayıcıya para
 geri götüren (iade) ya da para hareketi başlatan her çağrı üç sonuçtan birini verir ve ikisi
@@ -2779,6 +2785,54 @@ yazma kilitsizdir; ikinci iade çağrısını engelleyen şey iade SATIRININ uni
 hareketi başlatan satır sağlayıcı çağrısından ÖNCE kalıcı yazılır (kısa tx), çağrı tx DIŞINDA yapılır,
 sonuç ayrı kısa tx'te `PENDING && girişim eşleşiyor` koşuluyla yazılır (kural 3): araya giren akışın
 sonucu ezilmez.
+
+**19. Geri alınamaz toplu yazma, önizlemesiz ve önizlemeden bağımsız bir hesapla çalışmaz.** Yıl sonu kapanışı
+(CLOSED'dan dönüş yok) örnek: (a) **Önizleme ile yazma AYNI saf planlayıcıyı çağırır** (`planYearEndClosing`);
+gösterilen tutarla yazılan tutar ayrı kod yollarından gelirse sessizce ayrışır. Hesap ne DB ne entity bilir —
+mizanın bellekteki kopyası üzerinde adım adım uygulanır, adımlar arasında DB'den yeniden okuma yoktur. (b) **Yazma,
+önizlemenin döndürdüğü tazelik belirteci (`expectedLastEntryNo`) olmadan çalışmaz** ve belirteç kilit ALTINDA,
+kilidi alan işlemden *sonra* okunur: önizleme ile yazma arasında defter değiştiyse reddedilir, yazma geri sarılır.
+(c) **Para tutarı istemciden gelmez**: istemci yalnız *neyin* seçileceğini söyler (sipariş + borç hesabı), tutar
+sunucunun hesapladığı aday listesinden alınır; aday olmayan seçim reddedilir (`resolveGrniAccruals`). İstemciden
+gelen tutar, yıl sonunda deftere para yazdırmanın yolu olurdu. (d) **Önizleme durduran koşulları fırlatmaz,
+listeler** (`blockers`); komut aynı koşulları fırlatır. (e) Zincirin tamamı tek transaction'dır; ortada patlarsa
+`claim` dahil her şey geri sarılır (gerçek DB'de sınandı). Bakiyesi olan eşlemesiz hesap (`UnmappedCostAccountException`)
+sessizce başka bir hesaba kapanmaz — durdurur.
+
+**20. Tarihsiz sayaç, tarihli bir soruyu cevaplayamaz; tarihli günlük, soruyu soran İLK dönem sonundan önce kurulur.**
+"31 Aralık itibarıyla ne vardı?" (GRNI tahakkuku, geçmişe dönük mutabakat) sayaçtan geriye üretilemez:
+`quantity_received` bugünkü toplamı verir, 31 Aralık'ı vermez. Kabulün **zamanını** yalnız kabul anında yazılan
+günlük (`purchase_order_receipts`) bilir ve bu bilgi sonradan geri kazanılamaz — günlük 1 Ocak'tan sonra kurulsaydı
+önceki yılın tahakkuku tahmine kalırdı. Bu yüzden: (a) yeni bir kümülatif sayaç eklerken "bu sayaca hangi tarihli
+soru sorulacak?" baştan sorulur; (b) günlük sayaçla AYNI yazmada ilerler (aggregate üretir, repository tek `update`'te
+saklar) ve eşitlik taranır (`mal-kabul-gunlugu-sayac`); (c) günlükten önceki veri sayaçtan *türetilir* ve
+`LEGACY_BACKFILL` ile yaklaşık diye işaretlenir (uydurma kesin tarih yazılmaz); (d) karşı taraf da tarihlidir —
+fatura `invoiceDate ≤ asOf` ve iptal anı (`cancelledAt > asOf` ise o anda defterdeydi) ile okunur, siparişin
+tarihsiz `invoicedTotal` sayacıyla değil. Tahakkuk karşı hesabı (329) yalnız bu akışa ayrılır: alış faturası kabul
+kümesinde yoktur (kural 12) ve `finans:degismezler` ona yalnız `ADJUSTING` fişlerin yazdığını doğrular.
+
+**21. Mock'lu test, veritabanının döndürdüğü tipi taklit edemez: bir yazma yolu en az bir kez GERÇEK DB'ye karşı
+uçtan uca çalıştırılır.** `Prisma.Decimal` ile `decimal.js`'in `Decimal`'i **farklı sınıflardır** (`instanceof` FALSE).
+Fişi yazan repository satırları DB'nin döndürdüğü hâliyle yeniden kuruyordu ve katı `instanceof(Decimal)` isteyen VO
+bunu reddediyordu: fişi yazan **her** çağrı satırları yeniden kurarken patlıyor, transaction geri sarılıyordu. 2000'den
+fazla test yeşildi (hepsi decimal.js veriyordu) ve dev DB'de hiç fiş olmadığı için kimse görmedi; yıl sonu kapanışının
+ilk gerçek DB denemesinde ilk adımda yakalandı. Kural: (a) **hidrasyon sınırında** (repository → entity) DB tipleri
+domain tipine ÇEVRİLİR (`new Decimal(x.toString())`); domain katı `instanceof` ile savunmaya geçmez, sınır çevirir.
+(b) Yeni ya da değişen bir yazma yolu için izole, tek kullanımlık bir veritabanında (tüm migration'lar uygulanmış)
+gerçek repository'lerle bir uçtan uca geçiş yapılır — **hata yolunda geri sarma dahil** ("claim geri alındı mı, fiş
+kalmadı mı"). (c) `decimal.js`'te `isPositive()` **sıfır için de `true`** verir (işaret bitine bakar): "sıfırdan büyük"
+sorusu her yerde `gt(0)` / `lt(0)` ile sorulur; aksi halde sıfır tutarlı satır ya da yanlış yönlü fiş üretilir. Düzenek kalıcıdır: `pnpm test:db` (`*.db-spec.ts`, izole tek kullanımlık veritabanı + gerçek repository'ler; `src/testing/finance-db/`). Yeni bir yazma akışı eklenirken `*.db-spec.ts` yazılır, reddedilen senaryolar **hata türüyle** sabitlenir (yanlış sebeple geçen "ret" testi aynı hatayı yakalamaz).
+
+**22. Bir kapı, beslendiği veriyi yazan akışın gecikmesini hesaba katar; ham SQL'in sürücü sözleşmesi mock'ta görünmez.**
+İki hata, ikisi de gerçek DB'nin ilk çalıştırmasında çıktı ve 2000+ birim testi yeşilken yaşıyordu. (a) **Fişlenmemiş talepler düşülür:**
+108'i kapatan akışlar (hesap kapaması, kart itirazı) bir *olay* yazar, fiş outbox'tan sonradan üretilir. Kapı yalnız fişlenmiş bakiyeye
+bakarsa ilk kapamanın fişi gelene kadar ikinci kapama aynı parayı ikinci kez harcar (1000'lik bakiyeden 600 + 600): hesap eksiye düşer,
+fişler kendi içinde dengeli olduğu için hiçbir kontrol uyarmaz. Kapı = fişlenmiş bakiye − **fişi olmayan** kesinti olayları
+(`lockAndGetSpendableFundsInTransit`); fişlenince iki kez sayılmaz. Bir kapıyı yazarken sorulacak soru: "bu kapının okuduğu veriyi
+yazan akış, kapıdan sonra mı üretiyor?" — evetse bekleyeni de say. (b) **`void` dönen SQL fonksiyonu `$queryRaw` ile çağrılmaz:**
+`SELECT pg_advisory_xact_lock(...)` kilidi alır ama Prisma `void` sütununu çözemez ve çağrı patlar; bu kilidi kullanan her yol
+çalışmaz. Sonuç kümesi gerekmeyen çağrı `$executeRaw` ile yapılır. Mock'lanmış `$queryRaw` bunu hiç göremez; kilit ve kapı
+`lockAndGet*` metotlarının gerçek DB regresyon testi (`provider-settlement.db-spec.ts`, `post-financial-event.db-spec.ts`) vardır.
 
 ## Important Notes
 

@@ -2,6 +2,11 @@ import { DomainException } from '@src/domain/exceptions/domain.exception';
 import { ERROR_CODES } from '../../../../../../../../../packages/shared/common/constants/error-codes.constant';
 import { HttpStatus } from '@nestjs/common';
 import { AccountingPeriodStatusType } from '@input-type-schemas/AccountingPeriodStatusSchema';
+import type {
+  ClosingNextPeriodUnavailableMeta,
+  ClosingPreviewStaleMeta,
+  PreviousPeriodNotClosedMeta,
+} from '@shared/modules/accounting-period/interfaces';
 
 interface PeriodStatusMeta {
   periodId?: string;
@@ -150,6 +155,62 @@ export class PeriodSealedForDateException extends DomainException<{
         year: meta.year,
         currentStatus: meta.currentStatus,
       }
+    );
+  }
+}
+
+/**
+ * Önceki yıl kapanmadan sonraki yıl kapatılamaz.
+ *
+ * Yıllar sırayla kapanır: kapanmamış bir yıl varken sonrakini kapatmak, o yıl hâlâ fiş
+ * alabilirken kâr/zarar zincirinin (590/591) bir yıl atlanarak ilerlemesi demektir ve geri
+ * alınamaz (CLOSED'dan dönüş yok). Ayrıca ertesi yıla yazılan GRNI ters kaydı kapalı bir
+ * döneme düşemez; sıra bu yüzden zorunludur.
+ */
+export class PreviousPeriodNotClosedException extends DomainException<PreviousPeriodNotClosedMeta> {
+  readonly errorCode = ERROR_CODES.PERIOD.PREVIOUS_NOT_CLOSED;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: PreviousPeriodNotClosedMeta) {
+    super(
+      `${meta.year} yılı kapatılamaz: önce ${meta.blockingYear} yılı kapatılmalıdır.`,
+      meta
+    );
+  }
+}
+
+/**
+ * Önizleme ile kapanış arasında dönemin defterine fiş girdi (yevmiye sayacı ilerledi).
+ *
+ * Kapanış geri alınamaz; muhasebeci GÖRMEDİĞİ tutarlarla kapatmamalıdır. Önizleme sayacı
+ * döndürür, kapanış onu geri ister — farklıysa kapanış reddedilir ve önizleme yenilenir.
+ */
+export class ClosingPreviewStaleException extends DomainException<ClosingPreviewStaleMeta> {
+  readonly errorCode = ERROR_CODES.PERIOD.CLOSING_PREVIEW_STALE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: ClosingPreviewStaleMeta) {
+    super(
+      'Önizlemeden sonra dönemin defterine yeni fiş girdi; kapanış tutarları değişmiş olabilir. Önizlemeyi yenileyin.',
+      meta
+    );
+  }
+}
+
+/**
+ * GRNI ters kaydının yazılacağı ertesi yıl dönemi yok ya da açık değil. Ters kayıt ertesi
+ * yılın 1 Ocak'ına yazılır; dönem yoksa/kapalıysa tahakkuk yazılsa bile geri alınamaz.
+ */
+export class ClosingNextPeriodUnavailableException extends DomainException<ClosingNextPeriodUnavailableMeta> {
+  readonly errorCode = ERROR_CODES.PERIOD.CLOSING_NEXT_PERIOD_UNAVAILABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: ClosingNextPeriodUnavailableMeta) {
+    super(
+      meta.reason === 'MISSING'
+        ? `${meta.nextYear} dönemi açılmamış; GRNI tahakkukunun ters kaydı yazılamaz.`
+        : `${meta.nextYear} dönemi açık değil; GRNI tahakkukunun ters kaydı yazılamaz.`,
+      meta
     );
   }
 }

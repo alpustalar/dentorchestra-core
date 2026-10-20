@@ -17,4 +17,8 @@ import { JournalEntryKind } from '@prisma/client';
  */
 export const INCOME_STATEMENT_ENTRY_KINDS: readonly JournalEntryKind[] = [
   JournalEntryKind.OPERATIONAL,
+  // Tahakkuk ekonomiktir: gider satırı (ör. 770) ait olduğu yılın gelir tablosunda
+  // görünür, 1 Ocak'taki ters kaydı yeni yılda faturayla birlikte sıfırlanır. `CLOSING`'in
+  // tersine dışlanırsa o yılın gideri eksik, ertesi yılın gideri fazla çıkar.
+  JournalEntryKind.ADJUSTING,
 ];

@@ -9,7 +9,10 @@ import {
 import { AuthGuard, CapabilityGuard } from '@modules/identity/auth/auth/guards';
 import { GetContext, HasCapability, IGetContext } from '@common/decorators';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
-import { OpenPeriodDto } from '@shared/modules/accounting-period/dto/commands';
+import {
+  ClosePeriodDto,
+  OpenPeriodDto,
+} from '@shared/modules/accounting-period/dto/commands';
 import { OpenPeriodCommand } from '@modules/finance/accounting/periods/application/commands/open-period/open-period.command';
 import { LockPeriodCommand } from '@modules/finance/accounting/periods/application/commands/lock-period/lock-period.command';
 import { ReopenPeriodCommand } from '@modules/finance/accounting/periods/application/commands/reopen-period/reopen-period.command';
@@ -53,13 +56,22 @@ export class AccountingPeriodCommandController {
     return this.commandBus.execute(new ReopenPeriodCommand(id, ctx));
   }
 
-  /** Dönemi kapatır: yıl sonu kapanış fişlerini üretir + CLOSED'a alır. */
+  /**
+   * Dönemi kapatır: yıl sonu kapanış fişlerini üretir + CLOSED'a alır. **Geri alınamaz.**
+   *
+   * Gövde zorunludur: `expectedLastEntryNo` önizlemenin (`POST :id/closing-preview`) döndürdüğü
+   * yevmiye sayacıdır — önizlemeyi görmeden ve önizlemeden sonra defter değişmişken kapanış
+   * reddedilir. `grniAccruals` boş liste "bilerek tahakkuk yok" demektir.
+   */
   @HasCapability(ACCOUNTINGPERIOD.update)
   @Post(':id/close')
   closePeriod(
     @GetContext() ctx: IGetContext,
-    @Param('id', ParseUUIDPipe) id: string
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ClosePeriodDto
   ) {
-    return this.commandBus.execute(new ClosePeriodCommand(id, ctx));
+    return this.commandBus.execute(
+      new ClosePeriodCommand({ periodId: id, data: dto, ctx })
+    );
   }
 }

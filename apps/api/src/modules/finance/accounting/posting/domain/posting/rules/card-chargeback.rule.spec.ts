@@ -208,6 +208,46 @@ describe('Kart itirazı posting kuralları', () => {
     });
   });
 
+  describe('CardChargebackLostRule — platform rezervasyon itirazı: B 659.01 / A 127', () => {
+    const rule = new CardChargebackLostRule();
+    const platformLost = () =>
+      buildEvent<CardChargebackLostEventPayload>({
+        amount: '1000.00',
+        platformLoss: true,
+        currency: 'TRY',
+        provider: 'IYZICO',
+        caseReference: 'CB-9001',
+      });
+
+    it('kayıp 659.01’e yazılır, 127 kapanır; 120 ve cari YOK', () => {
+      const entry = rule.build(platformLost());
+
+      expect(linesOf(entry, '659.01')).toEqual([
+        expect.objectContaining({ debit: '1000.00' }),
+      ]);
+      expect(linesOf(entry, '127')).toEqual([
+        expect.objectContaining({ credit: '1000.00' }),
+      ]);
+      expect(linesOf(entry, '120')).toHaveLength(0);
+      expect(entry.lines.some((l) => l.partyId)).toBe(false);
+      expect(total(entry, 'debit').equals(total(entry, 'credit'))).toBe(true);
+    });
+
+    it('659 BAŞLIĞINA ya da 689’a yazılmaz: yalnız postlanabilir alt hesaba', () => {
+      const entry = rule.build(platformLost());
+
+      expect(linesOf(entry, '659')).toHaveLength(0);
+      expect(linesOf(entry, '689')).toHaveLength(0);
+    });
+
+    it('108/102’ye dokunmaz: para zaten açılışta çıkmıştı', () => {
+      const entry = rule.build(platformLost());
+
+      expect(linesOf(entry, '108')).toHaveLength(0);
+      expect(linesOf(entry, '102')).toHaveLength(0);
+    });
+  });
+
   describe('kapsam kilitleri (kural 12 — kapı kullanımdan geniş olamaz)', () => {
     it('her kanalın bir defter hesabı vardır ve kümeler birebir örtüşür', () => {
       expect([...CHARGEBACK_FUNDS_CHANNELS].sort()).toEqual(
@@ -275,6 +315,33 @@ describe('Kart itirazı posting kuralları', () => {
         true
       );
       expect(schema.safeParse(base).success).toBe(false);
+    });
+
+    it('platform varyantı AÇIK işaret ister; cari yokluğundan platform zararı türetilmez', () => {
+      const schema =
+        FINANCIAL_EVENT_PAYLOAD_SCHEMAS[
+          FinancialEventTypeSchema.enum.CARD_CHARGEBACK_LOST
+        ]!;
+      const base = {
+        amount: '1000.00',
+        currency: 'TRY',
+        provider: 'IYZICO',
+        caseReference: 'CB-9001',
+      };
+
+      expect(schema.safeParse({ ...base, platformLoss: true }).success).toBe(
+        true
+      );
+      // İşaret yok, cari yok: cari unutulmuş bir hasta itirazı sessizce 659.01’e yazılamaz.
+      expect(schema.safeParse(base).success).toBe(false);
+      // İkisi birden belirsizdir (hangi hesap?) — reddedilir.
+      expect(
+        schema.safeParse({ ...base, partyId: PARTY_ID, platformLoss: true })
+          .success
+      ).toBe(false);
+      expect(schema.safeParse({ ...base, platformLoss: false }).success).toBe(
+        false
+      );
     });
   });
 });

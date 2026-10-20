@@ -14,6 +14,7 @@ import { z } from 'zod';
 export const CardChargebackSourceEnum = z.enum([
   'POS_TRANSACTION',
   'ONLINE_PAYMENT',
+  'BOOKING_PAYMENT',
 ]);
 
 /** Paranın itiraz sırasında hangi hesaptan kesildiği / hangisine döndüğü. */
@@ -32,9 +33,12 @@ const chargebackAmount = z.number().multipleOf(0.01, {
 
 export const OpenCardChargebackSchema = z.object({
   clinicId: z.uuid(),
-  /** İtiraz edilen tahsilatın türü: fiziksel POS satışı ya da sanal POS taksiti. */
+  /**
+   * İtiraz edilen tahsilatın türü: fiziksel POS satışı, sanal POS taksiti ya da platformun
+   * rezervasyon tahsilatı (`clinicId` o durumda PLATFORM kliniği olmalıdır).
+   */
   sourceType: CardChargebackSourceEnum,
-  /** POS_TRANSACTION → POS işlem id'si; ONLINE_PAYMENT → taksit id'si. */
+  /** POS_TRANSACTION → POS işlem id'si; ONLINE_PAYMENT → taksit id'si; BOOKING_PAYMENT → rezervasyon ödemesi id'si. */
   sourceId: z.uuid(),
   /** Sağlayıcının vaka numarası. */
   caseReference: z.string().trim().min(1),

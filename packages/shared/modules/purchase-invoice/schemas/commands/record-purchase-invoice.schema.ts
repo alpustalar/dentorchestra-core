@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { STATUTORY_VAT_RATES } from '@shared/common/constants';
+import {
+  DEFAULT_PURCHASE_INVOICE_LINE_ACCOUNT_CODE,
+  PURCHASE_INVOICE_LINE_ACCOUNT_CODES,
+  STATUTORY_VAT_RATES,
+} from '@shared/common/constants';
 
 /** Para birimi — @prisma/client'a bağlanmadan (frontend güvenliği) lokal enum. */
 export const PurchaseInvoiceCurrencyEnum = z.enum(['TRY', 'USD', 'EUR', 'GBP']);
@@ -26,8 +30,16 @@ export const RecordPurchaseInvoiceSchema = z.object({
    */
   purchaseOrderId: z.uuid().optional(),
 
-  /** Karşı borç/gider hesabı: 150 (stok) | 770/760/740 (gider). */
-  lineAccountCode: z.string().min(1).default('770'),
+  /**
+   * Karşı borç hesabı: stok (150/153), duran varlık (25x/260) ya da gider
+   * (740.0x/760/770). Kabul kümesi **kullanım yeriyle aynı** sabitten gelir
+   * (`PURCHASE_INVOICE_LINE_ACCOUNT_CODES`): serbest metin iken `102` gönderilen
+   * bir fatura bankada olmayan parayı gösteren dengeli bir fiş üretiyordu
+   * (CLAUDE.md finans kuralı 12).
+   */
+  lineAccountCode: z
+    .enum(PURCHASE_INVOICE_LINE_ACCOUNT_CODES)
+    .default(DEFAULT_PURCHASE_INVOICE_LINE_ACCOUNT_CODE),
   /**
    * Kabul kümesi **kullanım yeriyle aynı** sabitten gelir: entity oranı
    * `VatRate` VO'suna sokuyor ve yasal olmayan oranı reddediyor. Kapı 0–100

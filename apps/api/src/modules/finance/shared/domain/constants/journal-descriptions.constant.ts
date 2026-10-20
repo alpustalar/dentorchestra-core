@@ -8,4 +8,13 @@ export const JOURNAL_DESCRIPTIONS = {
   NET_PROFIT: 'Dönem Net Kârı',
   NET_LOSS_TRANSFER: 'Dönem zararı devri',
   NET_LOSS: 'Dönem Net Zararı',
+  COST_REFLECTION: 'Hizmet üretim ve gider hesaplarının yansıtılması (7 → 6)',
+  COST_REFLECTION_CLOSE: 'Yansıtma hesaplarının kapatılması (7)',
+  EQUITY_CARRYFORWARD: 'Dönem net kâr/zararının öz kaynağa devri (590/591 →)',
+  RETAINED_EARNINGS_TRANSFER: 'Geçmiş yıllar kârlarına devir',
+  RETAINED_LOSSES_TRANSFER: 'Geçmiş yıllar zararlarına devir',
+  CAPITAL_PROFIT_TRANSFER: 'Dönem net kârının sermayeye devri (şahıs işletmesi)',
+  CAPITAL_LOSS_TRANSFER: 'Dönem net zararının sermayeden mahsubu (şahıs işletmesi)',
+  GRNI_ACCRUAL: 'Mal kabul / fatura tahakkuku (GRNI)',
+  GRNI_REVERSAL: 'Mal kabul / fatura tahakkuku ters kaydı (GRNI)',
 } as const;

@@ -28,6 +28,15 @@ enum PurchaseOrderBillingStatus {
   FULLY_BILLED // sipariş tutarının tamamı faturalandı
 }
 
+/// Mal kabul kaydının kaynağı. `LEGACY_BACKFILL`: günlük kurulmadan önce yapılmış kabuller
+/// (yalnız kümülatif sayaç vardı, tarih yoktu) — migration sayaçtan TÜRETTİ; `received_at`
+/// siparişin son güncelleme anıdır, **yaklaşık** bir tarihtir ve yıl sonu önizlemesinde
+/// ayrıca işaretlenir.
+enum PurchaseOrderReceiptSource {
+  GOODS_RECEIPT // mal kabul komutu
+  LEGACY_BACKFILL // günlükten önceki kabullerin sayaçtan türetilmiş kaydı
+}
+
 model PurchaseRequest {
   id             String @id
   clinicId       String @map("clinic_id")
@@ -96,7 +105,8 @@ model PurchaseOrder {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  items PurchaseOrderItem[]
+  items    PurchaseOrderItem[]
+  receipts PurchaseOrderReceipt[]
 
   @@index([clinicId, status])
   @@index([clinicId, billingStatus])
@@ -119,8 +129,58 @@ model PurchaseOrderItem {
   lineVat          Decimal @map("line_vat") @db.Decimal(14, 2)
   lineTotal        Decimal @map("line_total") @db.Decimal(14, 2)
 
-  order PurchaseOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order        PurchaseOrder              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  receiptLines PurchaseOrderReceiptLine[]
 
   @@index([orderId])
   @@map("purchase_order_items")
+}
+
+/// Mal kabul **günlüğü** (başlık). `purchase_order_items.quantity_received` kümülatif bir
+/// sayaçtır ve tarih taşımaz: "31 Aralık itibarıyla faturası gelmemiş mal" (GRNI) sorusunun
+/// cevabı kabulün ZAMANINA bağlıdır ve sonradan geri üretilemez — sayaç bugünkü toplamı verir,
+/// 31 Aralık'ı vermez. Bu yüzden her kabul kendi kaydını bırakır.
+///
+/// Kabul komutuyla AYNI transaction'da yazılır (sipariş aggregate'i üretir); sayaç ile günlük
+/// toplamı her an eşittir (`pnpm finans:degismezler` kontrol eder). Satır silinmez/güncellenmez.
+///
+/// `received_at` kabulün SİSTEME GİRİLDİĞİ andır, fiziksel teslim günü değildir (stok hareketi de
+/// aynı anla damgalanır — ikisi birlikte tutarlıdır). Fiziksel teslim tarihi girişi ayrı bir karar.
+model PurchaseOrderReceipt {
+  id             String                     @id
+  orderId        String                     @map("order_id")
+  clinicId       String                     @map("clinic_id")
+  organizationId String                     @map("organization_id")
+  receivedAt     DateTime                   @map("received_at")
+  /// Personel kimliği (Firebase UID — UUID değil). Backfill'de null.
+  receivedById   String?                    @map("received_by_id")
+  source         PurchaseOrderReceiptSource @default(GOODS_RECEIPT)
+  createdAt      DateTime                   @default(now()) @map("created_at")
+
+  order PurchaseOrder              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines PurchaseOrderReceiptLine[]
+
+  @@index([clinicId, receivedAt])
+  @@index([orderId])
+  @@map("purchase_order_receipts")
+}
+
+/// Kabulün kalem satırı. `unit_price` kabul anındaki birim fiyatın **anlık görüntüsüdür**:
+/// GRNI tutarı (miktar × fiyat) günlüğün kendisinden hesaplanır; sipariş kaleminin sonradan
+/// değişmesi geçmiş bir yılın tahakkukunu oynatamaz.
+model PurchaseOrderReceiptLine {
+  id        String  @id
+  receiptId String  @map("receipt_id")
+  itemId    String  @map("item_id")
+  quantity  Decimal @db.Decimal(12, 3)
+  unitPrice Decimal @map("unit_price") @db.Decimal(12, 2)
+
+  receipt PurchaseOrderReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  // Cascade: sipariş silinirken kalem ve günlük satırı hangi sırayla silinirse silinsin FK takılmasın
+  // (RESTRICT, kalem silinmeden önce satırların silinmesine bağımlı bir sıra gerektirirdi).
+  item    PurchaseOrderItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([receiptId])
+  @@index([itemId])
+  @@map("purchase_order_receipt_lines")
 }

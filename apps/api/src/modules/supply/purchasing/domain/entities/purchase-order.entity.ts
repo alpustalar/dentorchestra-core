@@ -11,10 +11,15 @@ import {
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
-import { CreatePurchaseOrderProps } from '@modules/supply/purchasing/domain/contracts';
+import {
+  CreatePurchaseOrderProps,
+  PurchaseOrderReceiptRecord,
+  ReceiveOrderContext,
+} from '@modules/supply/purchasing/domain/contracts';
 import {
   PurchaseOrderCancelWithInvoicesException,
   PurchaseOrderEmptyItemsException,
+  PurchaseOrderInvalidReceiptQuantityException,
   PurchaseOrderInvalidStateException,
   PurchaseOrderItemNotFoundException,
   PurchaseOrderNotBillableException,
@@ -26,6 +31,7 @@ import PurchaseOrderBillingStatusSchema, {
 } from '@input-type-schemas/PurchaseOrderBillingStatusSchema';
 import { calculateReceivedValue } from '@modules/supply/purchasing/domain/rules/purchase-order-billing.rules';
 import { Money } from '@src/domain/value-objects/money.vo';
+import { PurchaseOrderReceiptSourceSchema } from '@input-type-schemas/PurchaseOrderReceiptSourceSchema';
 
 export interface PurchaseOrderLine {
   id: string;
@@ -177,6 +183,21 @@ export class PurchaseOrder extends AggregateRoot {
     return this._lines;
   }
 
+  /**
+   * Henüz kalıcılaşmamış mal kabul günlüğü kayıtları. `receive()` üretir, repository
+   * `update(order)` içinde siparişle AYNI yazmada saklar ve `clearPendingReceipts()` ile
+   * boşaltır (olaylardaki `flushEvents` deseni). Geçmiş kabuller aggregate'e yüklenmez:
+   * günlük yalnız eklenir, okuması sorgu tarafındadır.
+   */
+  private _pendingReceipts: PurchaseOrderReceiptRecord[] = [];
+  get pendingReceipts(): readonly PurchaseOrderReceiptRecord[] {
+    return this._pendingReceipts;
+  }
+
+  public clearPendingReceipts(): void {
+    this._pendingReceipts = [];
+  }
+
   public static create(props: CreatePurchaseOrderProps): PurchaseOrder {
     if (!props.items || props.items.length === 0) {
       throw new PurchaseOrderEmptyItemsException();
@@ -282,7 +303,7 @@ export class PurchaseOrder extends AggregateRoot {
    * Stok girişini handler ReceiveStockCommand ile yapar (bu metod yalnızca sipariş
    * durumunu tutar).
    */
-  public receive(receipts: ReceiptLine[]): void {
+  public receive(receipts: ReceiptLine[], context: ReceiveOrderContext): void {
     const receivable: PurchaseOrderStatus[] = [
       PurchaseOrderStatusSchema.enum.SENT,
       PurchaseOrderStatusSchema.enum.PARTIALLY_RECEIVED,
@@ -295,11 +316,19 @@ export class PurchaseOrder extends AggregateRoot {
       );
     }
 
+    const journalLines: PurchaseOrderReceiptRecord['lines'] = [];
+
     for (const receipt of receipts) {
       const line = this._lines.find((l) => l.id === receipt.itemId);
       if (!line) throw new PurchaseOrderItemNotFoundException(receipt.itemId);
 
       const attempted = new Decimal(receipt.quantity);
+      if (!attempted.isFinite() || attempted.lessThanOrEqualTo(0)) {
+        throw new PurchaseOrderInvalidReceiptQuantityException({
+          itemId: line.id,
+          quantity: String(receipt.quantity),
+        });
+      }
       const newReceived = line.quantityReceived.plus(attempted);
       if (newReceived.greaterThan(line.quantityOrdered)) {
         throw new PurchaseOrderOverReceiptException({
@@ -310,15 +339,38 @@ export class PurchaseOrder extends AggregateRoot {
         });
       }
       line.quantityReceived = newReceived;
+      journalLines.push({
+        id: UUID.generate().value,
+        itemId: line.id,
+        quantity: attempted,
+        // Anlık görüntü: GRNI tutarı günlükten hesaplanır, kalemin sonraki halinden değil.
+        unitPrice: line.unitPrice,
+      });
     }
 
     const fullyReceived = this._lines.every((l) =>
       l.quantityReceived.greaterThanOrEqualTo(l.quantityOrdered)
     );
+    const now = DateTimeManager.create();
     this._status = fullyReceived
       ? PurchaseOrderStatusSchema.enum.RECEIVED
       : PurchaseOrderStatusSchema.enum.PARTIALLY_RECEIVED;
-    this._updatedAt = DateTimeManager.create();
+    this._updatedAt = now;
+
+    // Sayaçla günlük AYNI çağrıda ilerler: ikisi birbirinden ayrı yazılabilseydi
+    // "31 Aralık itibarıyla teslim alınan" sorusunun cevabı sayaçla çelişirdi.
+    if (journalLines.length === 0) return;
+
+    this._pendingReceipts.push({
+      id: UUID.generate().value,
+      orderId: this._id.value,
+      clinicId: this._clinicId.value,
+      organizationId: this._organizationId.value,
+      receivedAt: now,
+      receivedById: context.receivedById,
+      source: PurchaseOrderReceiptSourceSchema.enum.GOODS_RECEIPT,
+      lines: journalLines,
+    });
   }
 
   /**

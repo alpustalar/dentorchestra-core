@@ -1,5 +1,10 @@
+import { Decimal } from 'decimal.js';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
+import {
+  CARD_CHARGEBACK_EXPOSURE_GUARD,
+  ICardChargebackExposureGuard,
+} from '@modules/finance/bank/domain/services/card-chargeback-exposure/card-chargeback-exposure.guard.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import {
   IPolicyFactory,
@@ -47,6 +52,8 @@ export class RetryBookingPaymentRefundHandler implements ICommandHandler<
     private readonly bookingPaymentRepo: IBookingPaymentCommandRepository,
     @Inject(BOOKING_PAYMENT_REFUND_COMMAND_REPOSITORY)
     private readonly refundRepo: IBookingPaymentRefundCommandRepository,
+    @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
+    private readonly chargebackExposureGuard: ICardChargebackExposureGuard,
     private readonly refundExecutor: BookingPaymentRefundExecutor,
     private readonly txManager: TransactionManager
   ) {}
@@ -76,6 +83,19 @@ export class RetryBookingPaymentRefundHandler implements ICommandHandler<
 
       const locked = await this.refundRepo.findByIdForUpdate(refundId);
       if (!locked) throw new BookingPaymentRefundNotFoundException();
+
+      // Yeniden deneme parayı yeniden geri götürür: reddedilen ilk denemeden sonra sağlayıcı
+      // itiraz açıp parayı kesmiş olabilir (kural 17). Çift çekim iadesi (UNCLAIMED_CHARGE) bp'nin
+      // KENDİ tahsilatı değil, ikinci bir çekimdir; itiraz kaynağı değildir.
+      if (locked.kind !== 'UNCLAIMED_CHARGE') {
+        await this.chargebackExposureGuard.assertReversalWithinCollection({
+          sourceType: 'BOOKING_PAYMENT',
+          sourceId: locked.bookingPaymentId.value,
+          collectedAmount: locked.amount.value,
+          alreadyReversedAmount: new Decimal(0),
+          requestedAmount: locked.amount.value,
+        });
+      }
 
       locked.retry(ctx.actor.userId);
       return this.refundRepo.update(locked);

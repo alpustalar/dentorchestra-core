@@ -127,6 +127,8 @@ export const MODULE_LABELS = {
   purchaserequestitem: 'Satın Alma Talebi Kalemi',
   purchaseorder: 'Satın Alma Siparişi',
   purchaseorderitem: 'Satın Alma Siparişi Kalemi',
+  purchaseorderreceipt: 'Mal Kabul Kaydı',
+  purchaseorderreceiptline: 'Mal Kabul Kaydı Satırı',
   externalworkorder: 'Dış İş Emri',
   externalworkorderitem: 'Dış İş Emri Kalemi',
 
