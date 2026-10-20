@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  Param,
   ParseUUIDPipe,
   Query,
   UseGuards,
@@ -25,11 +24,13 @@ export class SupplierQueryController {
 
   @HasCapability(SUPPLIER.update)
   @Get()
-  @Serialize<Supplier, SupplierResponseDto>(SupplierResponseDto)
+  @Serialize<Supplier, SupplierResponseDto>(SupplierResponseDto, {
+    isArray: true,
+  })
   list(
     @Query() pagination: PaginationDto,
     @GetContext() ctx: IGetContext,
-    @Param('organizationId', ParseUUIDPipe) organizationId: string
+    @Query('organizationId', ParseUUIDPipe) organizationId: string
   ) {
     return this.queryBus.execute(
       new FindSuppliersQuery({ ctx, organizationId, pagination })

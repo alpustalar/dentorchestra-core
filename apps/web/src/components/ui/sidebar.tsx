@@ -39,6 +39,8 @@ type SidebarContextProps = {
   openMobile: boolean;
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
+  isHovered: boolean;
+  setIsHovered: (hovered: boolean) => void;
   toggleSidebar: () => void;
 };
 
@@ -68,6 +70,7 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -119,11 +122,13 @@ function SidebarProvider({
       open,
       setOpen,
       isMobile,
+      isHovered,
+      setIsHovered,
       openMobile,
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [state, open, setOpen, isMobile, isHovered, openMobile, setOpenMobile, toggleSidebar]
   );
 
   return (
@@ -162,7 +167,7 @@ function Sidebar({
   variant?: 'sidebar' | 'floating' | 'inset';
   collapsible?: 'offcanvas' | 'icon' | 'none';
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, isHovered, setIsHovered } = useSidebar();
 
   if (collapsible === 'none') {
     return (
@@ -209,14 +214,36 @@ function Sidebar({
     <div
       className="group peer hidden text-sidebar-foreground md:block"
       data-state={state}
-      data-collapsible={state === 'collapsed' ? collapsible : ''}
+      data-hovered={isHovered && state === 'collapsed' ? 'true' : 'false'}
+      data-collapsible={state === 'collapsed' && !isHovered ? collapsible : ''}
       data-variant={variant}
       data-side={side}
       data-slot="sidebar"
+      onMouseOver={(event) => {
+        if (
+          event.target instanceof Element &&
+          event.target.closest('[data-sidebar-hover-ignore]')
+        ) {
+          return;
+        }
+
+        setIsHovered(true);
+      }}
+      onMouseLeave={() => setIsHovered(false)}
     >
       {/* This is what handles the sidebar gap on desktop */}
       <div
         data-slot="sidebar-gap"
+        style={
+          state === 'collapsed' && isHovered
+            ? {
+                width:
+                  variant === 'floating' || variant === 'inset'
+                    ? 'calc(var(--sidebar-width-icon) + 1rem)'
+                    : 'var(--sidebar-width-icon)',
+              }
+            : undefined
+        }
         className={cn(
           'relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear',
           'group-data-[collapsible=offcanvas]:w-0',
@@ -229,8 +256,13 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         data-side={side}
+        style={
+          isHovered && state === 'collapsed'
+            ? { width: 'var(--sidebar-width)' }
+            : undefined
+        }
         className={cn(
-          'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] md:flex',
+          'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width,box-shadow] duration-200 ease-linear data-[side=left]:left-0 data-[side=left]:group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)] data-[side=right]:right-0 data-[side=right]:group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)] group-data-[hovered=true]:w-(--sidebar-width) group-data-[hovered=true]:shadow-xl md:flex',
           // Adjust the padding for floating and inset variants.
           variant === 'floating' || variant === 'inset'
             ? 'p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]'
@@ -509,7 +541,7 @@ function SidebarMenuButton({
     isActive?: boolean;
     tooltip?: string | React.ComponentProps<typeof TooltipContent>;
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const { isMobile, state } = useSidebar();
+  const { isMobile, state, isHovered } = useSidebar();
   const comp = useRender({
     defaultTagName: 'button',
     props: mergeProps<'button'>(
@@ -543,7 +575,7 @@ function SidebarMenuButton({
       <TooltipContent
         side="right"
         align="center"
-        hidden={state !== 'collapsed' || isMobile}
+        hidden={state !== 'collapsed' || isMobile || isHovered}
         {...tooltip}
       />
     </Tooltip>

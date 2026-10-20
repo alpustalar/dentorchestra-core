@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { GlobalStatusType as GlobalStatus } from '@input-type-schemas/GlobalStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { GlobalStatusType as GlobalStatus, GlobalStatusSchema } from '@input-type-schemas/GlobalStatusSchema';
 
 const { INTERNAL, MANAGEMENT, ADMIN } = ResponseGroups;
 
@@ -25,6 +26,7 @@ export class OrganizationResponseDto {
 
   // --- Operasyonel Ayarlar ve Durum (İç Operasyon ve Üst Roller) ---
   @Expose({ groups: [INTERNAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: GlobalStatusSchema.options })
   status: GlobalStatus;
 
   @Expose({ groups: [INTERNAL, MANAGEMENT, ADMIN] })

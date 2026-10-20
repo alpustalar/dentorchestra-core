@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { revenueByMonth } from '@/lib/data';
 import { Card } from '@/components/ui/card';
+import { DateTimeManager } from '@shared/common';
 
 const series = [
   { key: 'fethiye', label: 'Fethiye', color: 'var(--chart-1)' },
@@ -20,9 +21,12 @@ const series = [
 
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
+  const year = payload[0]?.payload?.year ?? DateTimeManager.currentYear();
   return (
     <div className="rounded-lg border border-border bg-popover px-3 py-2 text-xs shadow-lg">
-      <p className="mb-1.5 font-medium text-popover-foreground">{label} 2026</p>
+      <p className="mb-1.5 font-medium text-popover-foreground">
+        {label} {year}
+      </p>
       {payload.map((p: any) => (
         <div key={p.dataKey} className="flex items-center gap-2 py-0.5">
           <span

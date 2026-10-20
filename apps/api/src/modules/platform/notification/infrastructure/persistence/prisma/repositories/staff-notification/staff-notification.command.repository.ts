@@ -8,7 +8,7 @@ import {
 } from '@input-type-schemas/NotificationDeliveryStatusSchema';
 import { StaffNotification } from '@modules/platform/notification/domain/entities/staff-notification.entity';
 import { IStaffNotificationCommandRepository } from '@modules/platform/notification/domain/repositories/staff-notification.repository';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @Injectable()
 export class StaffNotificationCommandRepository

@@ -20,7 +20,9 @@ const { TAXPARAMETER } = CAPABILITIES;
 export class TaxParameterQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
-  @Serialize<TaxParameter, TaxParameterResponseDto>(TaxParameterResponseDto)
+  @Serialize<TaxParameter, TaxParameterResponseDto>(TaxParameterResponseDto, {
+    isArray: true,
+  })
   list(@GetContext() ctx: IGetContext) {
     return this.queryBus.execute(
       new GetTaxParametersQuery(this.resolveClinicId(ctx), ctx)

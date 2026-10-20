@@ -23,7 +23,9 @@ const { JOURNALENTRY } = CAPABILITIES;
 export class JournalQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
-  @Serialize<JournalEntry, JournalEntryResponseDto>(JournalEntryResponseDto)
+  @Serialize<JournalEntry, JournalEntryResponseDto>(JournalEntryResponseDto, {
+    isArray: true,
+  })
   getEntries(
     @GetContext() ctx: IGetContext,
     @Query() pagination: PaginationDto,

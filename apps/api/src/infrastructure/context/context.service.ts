@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DomainEventMetadata } from '@common/interfaces';
 import { txStorage } from '@src/infrastructure/transaction/als-storage';
 import { IContextService } from '@src/infrastructure/context/context.service.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 type WithMetadata = {
   metadata?: Partial<DomainEventMetadata>;

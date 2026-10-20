@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { CurrencyType } from '@input-type-schemas/CurrencySchema';
-import { PurchaseInvoiceStatusType } from '@input-type-schemas/PurchaseInvoiceStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { CurrencyType, CurrencySchema } from '@input-type-schemas/CurrencySchema';
+import { PurchaseInvoiceStatusType, PurchaseInvoiceStatusSchema } from '@input-type-schemas/PurchaseInvoiceStatusSchema';
 
 const { INTERNAL, MANAGEMENT, FINANCIAL, ADMIN } = ResponseGroups;
 
@@ -20,6 +21,7 @@ export class PurchaseInvoiceResponseDto {
   invoiceDate: Date;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: PurchaseInvoiceStatusSchema.options })
   status: PurchaseInvoiceStatusType;
 
   /** Eşleştirildiği satın alma siparişi — null ise serbest fatura. */
@@ -31,6 +33,7 @@ export class PurchaseInvoiceResponseDto {
   lineAccountCode: string;
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: CurrencySchema.options })
   currency: CurrencyType;
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })

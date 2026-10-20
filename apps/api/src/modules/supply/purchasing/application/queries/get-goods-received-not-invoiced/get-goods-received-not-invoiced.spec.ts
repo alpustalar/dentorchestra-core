@@ -4,7 +4,7 @@ import { Decimal } from 'decimal.js';
 import { GetGoodsReceivedNotInvoicedHandler } from './get-goods-received-not-invoiced.handler';
 import { GetGoodsReceivedNotInvoicedQuery } from './get-goods-received-not-invoiced.query';
 import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { ActorContext } from '@common/interfaces';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import type { IGetContext } from '@common/decorators/get-context.decorator';

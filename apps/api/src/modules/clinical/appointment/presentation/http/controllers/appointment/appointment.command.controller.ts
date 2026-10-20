@@ -54,13 +54,11 @@ export class AppointmentCommandController {
 
   @Post('slots/release')
   @HasCapability(APPOINTMENT.create)
-  releaseSlot(
-    @Body() dto: AppointmentSlotDto,
-    @GetContext() ctx: IGetContext,
-    @Param('holderId') holderId: string
-  ) {
+  releaseSlot(@Body() dto: AppointmentSlotDto, @GetContext() ctx: IGetContext) {
+    // Kilit sahibi aktörün userId'sinden türer (handler fallback'i); hasta/AI
+    // akışı holderId'yi bus üzerinden açıkça geçer.
     return this.commandBus.execute(
-      new ReleaseAppointmentSlotCommand({ data: dto, ctx, holderId })
+      new ReleaseAppointmentSlotCommand({ data: dto, ctx })
     );
   }
 

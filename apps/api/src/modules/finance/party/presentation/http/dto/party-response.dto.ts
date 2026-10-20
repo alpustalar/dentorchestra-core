@@ -1,8 +1,9 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { PartyTypeType as PartyType } from '@input-type-schemas/PartyTypeSchema';
-import { PartyRoleType as PartyRole } from '@input-type-schemas/PartyRoleSchema';
-import { PartyOriginTypeType as PartyOriginType } from '@input-type-schemas/PartyOriginTypeSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { PartyTypeType as PartyType, PartyTypeSchema } from '@input-type-schemas/PartyTypeSchema';
+import { PartyRoleType as PartyRole, PartyRoleSchema } from '@input-type-schemas/PartyRoleSchema';
+import { PartyOriginTypeType as PartyOriginType, PartyOriginTypeSchema } from '@input-type-schemas/PartyOriginTypeSchema';
 
 const { INTERNAL, MANAGEMENT, FINANCIAL, ADMIN, DATA_OWNER } = ResponseGroups;
 
@@ -13,7 +14,9 @@ export class PartyResponseDto {
 
   // --- Temel Künye Bilgileri (Herkese Açık) ---
   @Expose() name: string;
+  @ApiProperty({ enum: PartyTypeSchema.options })
   @Expose() type: PartyType;
+  @ApiProperty({ enum: PartyRoleSchema.options, isArray: true })
   @Expose() roles: PartyRole[];
   @Expose() isActive: boolean;
 
@@ -53,6 +56,7 @@ export class PartyResponseDto {
 
   // --- Sistem ve Entegrasyon Kaynağı Verileri (Sadece Yönetim ve Admin) ---
   @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: PartyOriginTypeSchema.options })
   originType: PartyOriginType;
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })

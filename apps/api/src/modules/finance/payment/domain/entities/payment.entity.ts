@@ -9,6 +9,7 @@ import InstallmentStatusSchema from '@input-type-schemas/InstallmentStatusSchema
 import { Money } from '@src/domain/value-objects/money.vo';
 import {
   InstallmentNotCancellableException,
+  InstallmentNotChargeableBackException,
   InstallmentNotCollectibleException,
   InstallmentNotFailableException,
   InstallmentNotFoundException,
@@ -16,20 +17,23 @@ import {
   InstallmentTotalMismatchException,
   InvalidInstallmentPlanException,
   PaymentInvalidPrecisionException,
+  RecoveryInstallmentNotCancellableException,
 } from '@modules/finance/payment/domain/exceptions/payment.exceptions';
 import {
+  ChargeBackInstallmentProps,
   CompleteInstallmentProps,
   CreatePaymentProps,
   FailInstallmentProps,
   RefundInstallmentProps,
 } from '@modules/finance/payment/domain/contracts/payment';
 import { PaymentRefundedEvent } from '@modules/finance/payment/domain/events/payment-refunded.event';
+import { PaymentChargedBackEvent } from '@modules/finance/payment/domain/events/payment-charged-back.event';
 import { PaymentPaidEvent } from '@modules/finance/payment/domain/events/payment-paid.event';
 import { PaymentFailedEvent } from '@modules/finance/payment/domain/events/payment-failed.event';
 import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Guard } from '@common/domain/guards';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { PaymentRules } from '@modules/finance/payment/domain/rules/payment.rules';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';
 
@@ -119,6 +123,29 @@ export class Payment extends AggregateRoot {
   }
 
   /**
+   * Bu işlemde **eklenen** taksitler (telafi taksidi). Plan `create()`'te
+   * açıldığı için taksitler normalde yalnız güncellenir; ters ibraz ilk kez
+   * mevcut bir plana yeni taksit ekler. Repository bunları INSERT eder —
+   * aksi halde `update()` taksit listesini yalnız `UPDATE` ettiği için eklenen
+   * taksit **sessizce hiç yazılmazdı** (CLAUDE.md finans kuralı 9).
+   */
+  private _newInstallmentIds: Set<string> = new Set();
+
+  get newInstallmentIds(): ReadonlySet<string> {
+    return this._newInstallmentIds;
+  }
+
+  /**
+   * Repository yazımı bitirince çağırdığı tek kanca (`update()` → `flushEvents`):
+   * eklenen taksitler artık kalıcıdır. Temizlenmezse aynı entity ile ikinci bir
+   * `update()` taksiti yeniden INSERT etmeye çalışıp PK çakışmasıyla patlardı.
+   */
+  override flushEvents(): void {
+    super.flushEvents();
+    this._newInstallmentIds.clear();
+  }
+
+  /**
    * Durum yüklemleri **düz boolean** döner.
    *
    * Önceden `Guard<boolean>` dönüyorlardı; `PaymentRules` içinde `!guard`
@@ -200,6 +227,9 @@ export class Payment extends AggregateRoot {
           dueDate: inst.dueDate ?? null,
           paidAt: null,
           note: inst.note ?? null,
+          // Plan ilk açıldığında hiçbir taksit bir telafi değildir; telafi
+          // taksidi yalnız `chargeBackInstallment` ile doğar.
+          recoversInstallmentId: null,
           createdAt: now,
           updatedAt: now,
         };
@@ -228,7 +258,10 @@ export class Payment extends AggregateRoot {
 
     if (
       installment.status === InstallmentStatusSchema.enum.CANCELLED ||
-      installment.status === InstallmentStatusSchema.enum.REFUNDED
+      installment.status === InstallmentStatusSchema.enum.REFUNDED ||
+      // Ters ibraz edilmiş taksit yeniden "tahsil edildi" olamaz: o paranın
+      // yeniden tahsili telafi taksidi üzerinden yapılır.
+      installment.status === InstallmentStatusSchema.enum.CHARGED_BACK
     ) {
       throw new InstallmentNotCollectibleException({
         installmentId: props.installmentId,
@@ -265,11 +298,21 @@ export class Payment extends AggregateRoot {
 
     if (
       installment.status === InstallmentStatusSchema.enum.COMPLETED ||
-      installment.status === InstallmentStatusSchema.enum.REFUNDED
+      installment.status === InstallmentStatusSchema.enum.REFUNDED ||
+      installment.status === InstallmentStatusSchema.enum.CHARGED_BACK
     ) {
       throw new InstallmentNotCancellableException({
         installmentId,
         status: installment.status,
+      });
+    }
+
+    // Telafi taksidi borcun geçerliliğini temsil eder; iptali, 120'yi açık
+    // bırakıp planı "borç yok" göstermek olurdu (değersiz alacak akışı yok).
+    if (installment.recoversInstallmentId) {
+      throw new RecoveryInstallmentNotCancellableException({
+        installmentId,
+        recoversInstallmentId: installment.recoversInstallmentId,
       });
     }
 
@@ -326,6 +369,110 @@ export class Payment extends AggregateRoot {
   }
 
   /**
+   * Kart itirazı KAYBEDİLDİ (ters ibraz): taksit `CHARGED_BACK` olur ve **aynı
+   * tutarda bir telafi taksidi** açılır. Telafi taksidinin kimliğini döner.
+   *
+   * **İade değildir.** İade bizim kararımızla geri verilen paradır ve hasta
+   * borcunu kapatır (`REFUNDED`); ters ibraz sağlayıcının kart sahibi lehine
+   * geri aldığı paradır — hasta borcu yerinde durur. Bu yüzden:
+   *  - taksit `REFUNDED` değil `CHARGED_BACK` olur (cari defter ve raporlar iki
+   *    durumu ayırt eder; iade gelirden düşer, ters ibraz da düşer ama borcu
+   *    silmez),
+   *  - borcu temsil etmek üzere aynı tutarda `PENDING` bir telafi taksidi açılır
+   *    (`recoversInstallmentId` ile geri alınan taksidi gösterir). Böylece ödeme
+   *    planının toplamı değişmez (`Σ aktif taksit = toplam tutar`): `CHARGED_BACK`
+   *    taksit iptal edilmiş gibi aktif kümenin dışındadır, telafi içindedir.
+   *
+   * Yalnız `COMPLETED` taksit ters ibraz edilebilir: alınmamış parayı "geri
+   * alınmış" yazmak defterde karşılığı olmayan bir ters kayıt üretir. Bu bir
+   * invariant'tır, `systemOverride` ile atlanamaz.
+   *
+   * İdempotent: aynı taksit için tekrar çağrı (yeniden işleme) ikinci bir telafi
+   * taksidi AÇMAZ ve olay yeniden fırlatmaz; mevcut telafinin kimliğini döner.
+   */
+  chargeBackInstallment(props: ChargeBackInstallmentProps): string {
+    const installment = this.getInstallmentOrThrow(props.installmentId);
+
+    if (installment.status === InstallmentStatusSchema.enum.CHARGED_BACK) {
+      const existingRecovery = this._installments.find(
+        (i) => i.recoversInstallmentId === installment.id
+      );
+      if (existingRecovery) return existingRecovery.id;
+
+      // CHARGED_BACK ama telafisi yok: ikisi aynı işlemde atomik yazıldığı için
+      // bu bozuk bir veridir — onarmak insan kararıdır, sessizce telafi açmak değil.
+      throw new InstallmentNotChargeableBackException({
+        installmentId: props.installmentId,
+        status: installment.status,
+      });
+    }
+
+    if (installment.status !== InstallmentStatusSchema.enum.COMPLETED) {
+      throw new InstallmentNotChargeableBackException({
+        installmentId: props.installmentId,
+        status: installment.status,
+      });
+    }
+
+    this.mutateInstallment(props.installmentId, {
+      status: InstallmentStatusSchema.enum.CHARGED_BACK,
+    });
+
+    // `installmentNo` plan içinde tekildir (`@@unique([paymentId, installmentNo])`);
+    // ödeme satırı kilitliyken en büyüğün bir fazlası güvenlidir.
+    const now = DateTimeManager.create();
+    const recoveryNo =
+      this._installments.reduce(
+        (max, i) => (i.installmentNo > max ? i.installmentNo : max),
+        0
+      ) + 1;
+
+    const recovery: PaymentInstallment = {
+      id: UUID.create(props.recoveryInstallmentId).orThrow().value,
+      paymentId: this._id.value,
+      installmentNo: recoveryNo,
+      amount: installment.amount,
+      currency: installment.currency,
+      method: installment.method,
+      status: InstallmentStatusSchema.enum.PENDING,
+      dueDate: props.recoveryDueDate,
+      paidAt: null,
+      note: `Ters ibraz telafisi — vaka ${props.caseReference}`,
+      recoversInstallmentId: installment.id,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    this._installments = [...this._installments, recovery];
+    this._newInstallmentIds.add(recovery.id);
+    this._dirtyInstallmentIds.add(recovery.id);
+    this._updatedAt = now;
+
+    this.recalculateStatusAfterInstallmentChange();
+
+    this.addDomainEvent(
+      new PaymentChargedBackEvent({
+        installmentId: props.installmentId,
+        recoveryInstallmentId: recovery.id,
+        paymentId: this._id.value,
+        appointmentId: this._appointmentId?.value ?? null,
+        clinicId: this._clinicId.value,
+        actorId: props.actorId,
+        source: props.logSource,
+        action: LogAction.PAYMENT_CHARGED_BACK,
+        // Para geri ALINDI ve borç yeniden doğdu: operasyonun görmesi gereken
+        // bir olay, rutin bir tahsilat değil.
+        type: LogType.WARNING,
+        details:
+          props.details ??
+          `Kart itirazı kaybedildi (vaka ${props.caseReference}); telafi taksidi açıldı`,
+      })
+    );
+
+    return recovery.id;
+  }
+
+  /**
    * Tahsilat denemesi başarısız: taksit yeniden denenebilir olsun diye PENDING'e
    * döner ve `paidAt` **temizlenir**.
    *
@@ -338,7 +485,8 @@ export class Payment extends AggregateRoot {
 
     if (
       installment.status === InstallmentStatusSchema.enum.COMPLETED ||
-      installment.status === InstallmentStatusSchema.enum.REFUNDED
+      installment.status === InstallmentStatusSchema.enum.REFUNDED ||
+      installment.status === InstallmentStatusSchema.enum.CHARGED_BACK
     ) {
       throw new InstallmentNotFailableException({
         installmentId: props.installmentId,
@@ -403,11 +551,15 @@ export class Payment extends AggregateRoot {
    * yapıyordu).
    *
    * İptal edilmiş taksitler karar dışıdır: iptal, planın o satırının hiç
-   * olmadığı anlamına gelir.
+   * olmadığı anlamına gelir. **Ters ibraz edilmiş taksit de karar dışıdır**:
+   * yerini telafi taksidi almıştır (aynı tutar, `PENDING`); ikisini birlikte
+   * saymak planın toplamını iki kez sayardı (`Σ aktif taksit = toplam tutar`).
    */
   private recalculateStatusAfterInstallmentChange(): void {
     const active = this._installments.filter(
-      (i) => i.status !== InstallmentStatusSchema.enum.CANCELLED
+      (i) =>
+        i.status !== InstallmentStatusSchema.enum.CANCELLED &&
+        i.status !== InstallmentStatusSchema.enum.CHARGED_BACK
     );
 
     if (active.length === 0) {

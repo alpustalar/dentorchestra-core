@@ -45,7 +45,7 @@ export class ProjectQueryController {
 
   @HasCapability(PROJECT.read)
   @Get('projects')
-  @Serialize<Project, ProjectResponseDto>(ProjectResponseDto)
+  @Serialize<Project, ProjectResponseDto>(ProjectResponseDto, { isArray: true })
   list(
     @Query() dto: GetProjectsFilterDto,
     @Query() pagination: PaginationDto,
@@ -59,7 +59,9 @@ export class ProjectQueryController {
   /** Kendi görev listem — proje kırılımı olmadan, klinik geneli. */
   @HasCapability(PROJECTTASK.read)
   @Get('my-tasks')
-  @Serialize<ProjectTask, ProjectTaskResponseDto>(ProjectTaskResponseDto)
+  @Serialize<ProjectTask, ProjectTaskResponseDto>(ProjectTaskResponseDto, {
+    isArray: true,
+  })
   myTasks(
     @Query() dto: GetMyProjectTasksFilterDto,
     @Query() pagination: PaginationDto,
@@ -74,7 +76,8 @@ export class ProjectQueryController {
   @HasCapability(PROJECTRESOURCEALLOCATION.read)
   @Get('resources/schedule')
   @Serialize<ResourceScheduleRow, ResourceScheduleRowResponseDto>(
-    ResourceScheduleRowResponseDto
+    ResourceScheduleRowResponseDto,
+    { isArray: true }
   )
   resourceSchedule(
     @Query() dto: GetResourceScheduleFilterDto,
@@ -101,7 +104,9 @@ export class ProjectQueryController {
 
   @HasCapability(PROJECTTASK.read)
   @Get('projects/:projectId/board')
-  @Serialize<ProjectTask, ProjectTaskResponseDto>(ProjectTaskResponseDto)
+  @Serialize<ProjectTask, ProjectTaskResponseDto>(ProjectTaskResponseDto, {
+    isArray: true,
+  })
   board(
     @Param('projectId', ParseUUIDPipe) projectId: string,
     @Query() dto: GetProjectTasksFilterDto,

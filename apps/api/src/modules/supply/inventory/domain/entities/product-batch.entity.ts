@@ -15,7 +15,7 @@ import {
   DeductQuantityProps,
   RaiseStockQuantityChangedProps,
 } from '@modules/supply/inventory/domain/contracts';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { BatchExpiredException } from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
 
 export class ProductBatch extends AggregateRoot {

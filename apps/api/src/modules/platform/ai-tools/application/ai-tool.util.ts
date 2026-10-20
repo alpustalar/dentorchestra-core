@@ -1,4 +1,4 @@
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../packages/shared/common/constants/execution-source.constant';
 import {
   AppointmentStatusSchema,
   AppointmentStatusType as AppointmentStatus,

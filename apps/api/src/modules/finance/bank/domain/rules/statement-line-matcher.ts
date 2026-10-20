@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Ekstre satırı ↔ 102 (Bankalar) defter satırı oto-eşleştirme motoru.

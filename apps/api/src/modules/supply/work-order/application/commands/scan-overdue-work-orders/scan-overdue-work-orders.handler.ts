@@ -6,7 +6,7 @@ import {
   IExternalWorkOrderCommandRepository,
 } from '@modules/supply/work-order/domain/repositories/external-work/external-work-order.command.repository';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /** Tek taramada işlenecek azami iş emri (parti boyutu). */
 const OVERDUE_SCAN_BATCH_LIMIT = 500;
@@ -18,10 +18,9 @@ const OVERDUE_SCAN_BATCH_LIMIT = 500;
  * Sonuç mutasyona beslendiği için okuma Command repo'dan yapılır (CQRS).
  */
 @CommandHandler(ScanOverdueWorkOrdersCommand)
-export class ScanOverdueWorkOrdersHandler implements ICommandHandler<
-  ScanOverdueWorkOrdersCommand,
-  void
-> {
+export class ScanOverdueWorkOrdersHandler
+  implements ICommandHandler<ScanOverdueWorkOrdersCommand, void>
+{
   private readonly logger = new Logger(ScanOverdueWorkOrdersHandler.name);
 
   constructor(

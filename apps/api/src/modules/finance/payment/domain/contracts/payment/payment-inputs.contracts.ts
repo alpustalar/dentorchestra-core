@@ -64,6 +64,27 @@ export type FailInstallmentProps = InstallmentTransitionProps;
 /** Taksit iadesi. */
 export type RefundInstallmentProps = InstallmentTransitionProps;
 
+/**
+ * Kart itirazının kaybedilmesi (ters ibraz): taksit `CHARGED_BACK` olur ve aynı
+ * tutarda bir telafi taksidi açılır.
+ *
+ * Alanlar doğrudan yazılır (türetme yok): telafi taksidinin kimliği handler'da
+ * **önceden üretilir** (`UUID.generate()` — ID policy), entity yalnız kabul eder.
+ */
+export interface ChargeBackInstallmentProps {
+  /** Geri alınan (itirazı kaybedilen) taksit. */
+  installmentId: string;
+  actorId: string;
+  logSource: LogSource;
+  details?: string;
+  /** Telafi taksidinin önceden üretilmiş kimliği. */
+  recoveryInstallmentId: string;
+  /** Telafi taksidinin vadesi — itirazın kesinleştiği gün. */
+  recoveryDueDate: Date;
+  /** Sağlayıcının vaka numarası — telafi taksidinin notunda iz olarak kalır. */
+  caseReference: string;
+}
+
 // ==========================================
 // ÖDEME VE TAHSİLAT
 // ==========================================

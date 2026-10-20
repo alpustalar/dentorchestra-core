@@ -2,7 +2,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject } from '@nestjs/common';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
-import { FindPatientByIdQuery } from '@modules/crm/patient/application/queries/find-patient-by-id/find-patient-by-id.query';
+
 import { EnsurePartyCommand } from '@modules/finance/party/application/commands/ensure-party/ensure-party.command';
 import {
   EnsurePartyForPatientCommand,
@@ -14,12 +14,13 @@ import {
   ITenantScopeResolver,
   TENANT_SCOPE_RESOLVER,
 } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
+import { GetPatientByIdQuery } from '@modules/crm/patient/application/queries/get-patient-by-id/get-patient-by-id.query';
 
 @CommandHandler(EnsurePartyForPatientCommand)
-export class EnsurePartyForPatientHandler implements ICommandHandler<
-  EnsurePartyForPatientCommand,
-  EnsurePartyForPatientResult
-> {
+export class EnsurePartyForPatientHandler
+  implements
+    ICommandHandler<EnsurePartyForPatientCommand, EnsurePartyForPatientResult>
+{
   constructor(
     private readonly commandBus: TSCommandBus,
     private readonly queryBus: TSQueryBus,
@@ -33,7 +34,7 @@ export class EnsurePartyForPatientHandler implements ICommandHandler<
     const { patientId, clinicId, role, ctx } = command;
 
     const { data: patient } = await this.queryBus.execute(
-      new FindPatientByIdQuery(patientId, ctx)
+      new GetPatientByIdQuery(patientId, ctx)
     );
     if (!patient) {
       // `NotFoundException` (HTTP) application katmanında kullanılamaz.

@@ -104,7 +104,7 @@ function appendSearchParams(url: URL, source: unknown): void {
 }
 
 function buildUrl(
-  endpoint: AnyEndpoint,
+  endpoint: Pick<AnyEndpoint, 'method' | 'path'>,
   params: unknown,
   query: unknown,
   pagination: PaginationInput | undefined
@@ -140,10 +140,15 @@ async function readBody(response: Response): Promise<unknown> {
   }
 }
 
-async function execute<E extends AnyEndpoint>(
-  endpoint: E,
+/**
+ * Zarfı çözmeden ham gövdeyi döndürür (token, 401 yenileme ve `ApiError`
+ * dönüşümü dahil). Orval mutator'ı üretilen tiplerle birebir uyuşsun diye bunu
+ * kullanır; `api()` ise zarfı `execute` içinde normalize eder.
+ */
+export async function executeRaw(
+  endpoint: Pick<AnyEndpoint, 'method' | 'path'>,
   options: RequestOptions<AnyEndpoint>
-): Promise<ApiResult<ResponseOf<E>>> {
+): Promise<unknown> {
   const url = buildUrl(
     endpoint,
     options.params,
@@ -198,7 +203,14 @@ async function execute<E extends AnyEndpoint>(
     throw toApiError(response.status, payload, url);
   }
 
-  return normalizeEnvelope<ResponseOf<E>>(payload);
+  return payload;
+}
+
+async function execute<E extends AnyEndpoint>(
+  endpoint: E,
+  options: RequestOptions<AnyEndpoint>
+): Promise<ApiResult<ResponseOf<E>>> {
+  return normalizeEnvelope<ResponseOf<E>>(await executeRaw(endpoint, options));
 }
 
 /**

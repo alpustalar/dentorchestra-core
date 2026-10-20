@@ -21,12 +21,9 @@ import {
   HotelBookingCreatedEvent,
 } from '@modules/crm/health-tourism/hotel/domain/events';
 import { HotelbedsBookingInvalidDateRangeException } from '@modules/crm/health-tourism/hotel/domain/exceptions/hotelbeds-booking.exceptions';
-import {
-  LogAction,
-  LogType,
-} from '@src/domain/constants/log-action.constant';
+import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 import { Currency } from '@src/domain/value-objects/currency.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { HotelbedsBookingRules } from '@modules/crm/health-tourism/hotel/domain/rules/hotelbeds-booking.rules';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';
 import { Guard } from '@common/domain/guards';

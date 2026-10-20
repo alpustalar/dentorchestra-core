@@ -1,8 +1,5 @@
 import { IGetContext } from '@common/decorators/get-context.decorator';
-import {
-  ExecutionSource,
-  ExecutionSources,
-} from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource, ExecutionSources } from '@shared';
 import {
   SYSTEM_ACTOR,
   SYSTEM_PATIENT_ACTOR,

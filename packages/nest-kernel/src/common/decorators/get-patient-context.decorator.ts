@@ -2,7 +2,7 @@ import { IRequestWithPatient, PatientActorContext } from '@common/interfaces';
 import {
   ExecutionSource,
   ExecutionSources,
-} from '@src/domain/constants/execution-source.constant';
+} from '../../../../shared/common/constants/execution-source.constant';
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 export interface IGetPatientContext {

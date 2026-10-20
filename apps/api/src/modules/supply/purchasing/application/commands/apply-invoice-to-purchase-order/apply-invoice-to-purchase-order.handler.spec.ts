@@ -10,7 +10,7 @@ import {
 } from '@modules/supply/purchasing/domain/exceptions/purchasing.exceptions';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import CurrencySchema from '@input-type-schemas/CurrencySchema';
 
 describe('ApplyInvoiceToPurchaseOrderHandler — fatura eşleştirme (kilit + uyum)', () => {

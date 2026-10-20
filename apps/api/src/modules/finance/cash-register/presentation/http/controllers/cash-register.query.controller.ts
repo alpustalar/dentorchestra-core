@@ -33,7 +33,9 @@ export class CashRegisterQueryController {
 
   @HasCapability(CASHREGISTER.read)
   @Get()
-  @Serialize<ICashRegister, CashRegisterResponseDto>(CashRegisterResponseDto)
+  @Serialize<ICashRegister, CashRegisterResponseDto>(CashRegisterResponseDto, {
+    isArray: true,
+  })
   list(
     @Query() dto: GetCashRegistersFilterDto,
     @Query() pagination: PaginationDto,

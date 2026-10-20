@@ -44,6 +44,8 @@ describe('InitiateBookingPaymentHandler — iki link + FX', () => {
     iyzicoThrows?: boolean;
     stripeThrows?: boolean;
     serviceFeePercent?: number;
+    /** Varsayılan AÇIK: eski senaryolar iki link bekliyor; kapalı senaryosu bilerek false verir. */
+    stripeEnabled?: boolean;
   }) => {
     const saved: BookingPayment[] = [];
 
@@ -107,7 +109,8 @@ describe('InitiateBookingPaymentHandler — iki link + FX', () => {
         fx,
         serviceFee,
         repo,
-        txManager
+        txManager,
+        { stripeEnabled: opts?.stripeEnabled ?? true }
       ),
       iyzicoLink,
       stripeLink,
@@ -201,5 +204,35 @@ describe('InitiateBookingPaymentHandler — iki link + FX', () => {
     await expect(
       handler.execute(new InitiateBookingPaymentCommand(baseInput))
     ).rejects.toThrow();
+  });
+
+  describe('Stripe kanalı KAPALI (varsayılan; kapanış akışı yok — kural 16)', () => {
+    it('yabancı para satışında Stripe linki ÜRETİLMEZ, yalnız iyzico TRY gider', async () => {
+      const { handler, stripeLink, iyzicoLink, saved } = build({
+        stripeEnabled: false,
+      });
+
+      const res = await handler.execute(
+        new InitiateBookingPaymentCommand(baseInput)
+      );
+
+      expect(stripeLink.createLink).not.toHaveBeenCalled();
+      expect(iyzicoLink.createLink).toHaveBeenCalledTimes(1);
+      expect(res.stripe).toBeNull();
+      expect(res.iyzico?.currency).toBe('TRY');
+      expect(saved[0].stripeSessionId).toBeNull();
+    });
+
+    it('FX çözülemezse (iyzico de yok) link üretilemez → hata; Stripe sessizce devreye girmez', async () => {
+      const { handler, stripeLink } = build({
+        stripeEnabled: false,
+        fxThrows: true,
+      });
+
+      await expect(
+        handler.execute(new InitiateBookingPaymentCommand(baseInput))
+      ).rejects.toThrow();
+      expect(stripeLink.createLink).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,6 +1,6 @@
 import { ActorContext } from '@common/interfaces';
 import { Priority } from '@src/domain/value-objects/priority.vo';
-import { ExecutionSource } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource } from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { ExecutionPolicy } from '@src/domain/common/execution/execution.policy';
 
 export abstract class BasePolicy {

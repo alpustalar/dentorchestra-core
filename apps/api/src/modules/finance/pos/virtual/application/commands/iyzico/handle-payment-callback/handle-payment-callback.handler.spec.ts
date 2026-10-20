@@ -35,7 +35,7 @@ import {
   IyzicoTransactionStatusSchema,
   IyzicoTransactionStatusType,
 } from '@input-type-schemas/IyzicoTransactionStatusSchema';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 const makeTransaction = (
   status: IyzicoTransactionStatusType = IyzicoTransactionStatusSchema.enum

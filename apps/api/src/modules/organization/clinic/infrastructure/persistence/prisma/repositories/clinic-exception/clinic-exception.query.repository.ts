@@ -3,7 +3,7 @@ import { BaseRepository } from '@src/infrastructure/persistence/prisma/base.repo
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { IClinicExceptionQueryRepository } from '@modules/organization/clinic/domain/repositories/clinic-exception/clinic-exception.query.repository';
 import { ClinicException } from '@shared';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @Injectable()
 export class ClinicExceptionQueryRepository

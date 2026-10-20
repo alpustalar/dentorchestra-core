@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { FinanceResponseGroups } from '@modules/finance/shared/domain/finance.contracts';
-import { FinancialEventTypeType } from '@input-type-schemas/FinancialEventTypeSchema';
+import { FinancialEventTypeType, FinancialEventTypeSchema } from '@input-type-schemas/FinancialEventTypeSchema';
 
 const { FINANCIAL, MANAGEMENT, ADMIN } = FinanceResponseGroups;
 
@@ -14,6 +15,7 @@ const FIN = { groups: [FINANCIAL, MANAGEMENT, ADMIN] };
 export class FinancialEventResponseDto {
   @Expose(FIN) id: string;
   @Expose(FIN) clinicId: string;
+  @ApiProperty({ enum: FinancialEventTypeSchema.options })
   @Expose(FIN) type: FinancialEventTypeType;
 
   @Expose(FIN)

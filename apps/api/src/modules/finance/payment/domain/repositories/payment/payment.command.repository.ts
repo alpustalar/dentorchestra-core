@@ -11,4 +11,12 @@ export interface IPaymentCommandRepository extends IBaseCommandRepository<Paymen
    * üzerine yazar. Yalnız aktif transaction içinde çağrılır.
    */
   findByInstallmentIdForUpdate(installmentId: string): Promise<Payment | null>;
+
+  /**
+   * Ödemeyi satırı `FOR UPDATE` kilitleyerek yükler. Hangi taksit olduğu henüz
+   * bilinmeyen bir geçiş içindir (kart itirazında POS satışı bir plana bağlıdır
+   * ama hangi taksidi ödediği tutar eşleşmesiyle bulunur). Yalnız aktif
+   * transaction içinde çağrılır.
+   */
+  findByIdForUpdate(paymentId: string): Promise<Payment | null>;
 }

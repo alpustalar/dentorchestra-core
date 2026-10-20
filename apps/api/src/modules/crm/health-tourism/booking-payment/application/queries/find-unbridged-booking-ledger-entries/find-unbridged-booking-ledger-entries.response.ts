@@ -12,7 +12,8 @@ import { QueryResponse } from '@shared/common/response/response.interface';
 export interface UnbridgedBookingLedgerView {
   bookingPaymentId: string;
   clinicId: string;
-  bookingType: string;
+  /** İade / 336 hareketlerinde null: tür iade satırında tutulmaz. */
+  bookingType: string | null;
   /**
    * `SETTLED` → eksik olan tahsilat fişi (108/601/320 hiç yazılmadı: komisyon
    * geliri ve tedarikçi borcu kayıt dışı). `REFUNDED` → eksik olan ters kayıt
@@ -20,12 +21,25 @@ export interface UnbridgedBookingLedgerView {
    * göstermeye devam ediyor). İkisi zıt yönde yanlış: eksik tahsilat geliri
    * **eksik**, eksik iade geliri **fazla** gösterir.
    */
-  kind: 'SETTLED' | 'REFUNDED';
+  kind: UnbridgedBookingLedgerKind;
   /** Eksik olayın idempotency anahtarı — telafi aynı anahtarla yazar. */
   dedupeKey: string;
-  /** İlgili yönün tarihi: tahsilatta `paidAt`, iadede `refundedAt`. */
+  /** İlgili yönün tarihi: tahsilatta `paidAt`, iadede iadenin gerçekleştiği an. */
   occurredAt: Date | null;
+  /** İade yönlü / 336 hareketlerde dolu: telafi iade satırından yazılır. */
+  refundId: string | null;
 }
+
+/**
+ * `SETTLED` / `REFUNDED`: rezervasyonun kendi tahsilatı ve iptal iadesi.
+ * `RETURNABLE_RECEIVED` / `RETURNABLE_REFUNDED`: müşteriye iade edilecek tahsilat (çift
+ * çekim, başarısız rezervasyon) — `B 108 / A 336` ve kapanışı `B 336 / A 108`.
+ */
+export type UnbridgedBookingLedgerKind =
+  | 'SETTLED'
+  | 'REFUNDED'
+  | 'RETURNABLE_RECEIVED'
+  | 'RETURNABLE_REFUNDED';
 
 export type FindUnbridgedBookingLedgerEntriesResponse = QueryResponse<
   UnbridgedBookingLedgerView[]

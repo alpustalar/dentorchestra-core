@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { Bell, CalendarCheck, Check, CircleAlert, Wrench } from 'lucide-react';
+import { useParams } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +15,7 @@ import {
   type StaffNotification,
 } from '@/lib/notifications';
 import { useNotifications } from '../../../../providers/notification-provider';
+import { DateTimeManager } from '@shared/common';
 
 const icons = { appointment: CalendarCheck, work: Wrench, system: Bell };
 function iconFor(type: StaffNotification['type']) {
@@ -41,11 +43,13 @@ export function NotificationItem({
   const t = useTranslations('Notifications');
   const locale = useLocale();
   const router = useRouter();
+  const params = useParams<{ 'clinic-slug': string }>();
+  const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   const { markRead, markUnread } = useNotifications();
   const Icon = iconFor(item.type);
   const navigate = () => {
     markRead(item.id);
-    const result = resolveNotificationDeepLink(item.deepLink);
+    const result = resolveNotificationDeepLink(item.deepLink, clinicSlug);
     if (result.supported && result.href) router.push(result.href as never);
   };
   return (
@@ -113,6 +117,8 @@ export function NotificationItem({
 export function NotificationDropdown({ onClose }: { onClose: () => void }) {
   const t = useTranslations('Notifications');
   const router = useRouter();
+  const params = useParams<{ 'clinic-slug': string }>();
+  const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   const { notifications, markAllRead, unreadCount } = useNotifications();
   return (
     <div className="absolute right-0 top-12 z-40 w-[min(420px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-xl">
@@ -137,7 +143,7 @@ export function NotificationDropdown({ onClose }: { onClose: () => void }) {
         className="w-full border-t p-3 text-center text-sm font-medium text-primary hover:bg-muted"
         onClick={() => {
           onClose();
-          router.push('/notifications');
+          router.push(`/${clinicSlug}/platform/notification` as never);
         }}
       >
         {t('actions.viewAll')}
@@ -208,7 +214,7 @@ export function NotificationCenter() {
           date: new Intl.DateTimeFormat(locale, {
             dateStyle: 'medium',
             timeStyle: 'short',
-          }).format(new Date()),
+          }).format(DateTimeManager.create()),
         })}
       </p>
     </div>

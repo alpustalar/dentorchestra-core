@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { StockMovementTypeType } from '@input-type-schemas/StockMovementTypeSchema';
-import { StockMovementDirectionType } from '@input-type-schemas/StockMovementDirectionSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { StockMovementTypeType, StockMovementTypeSchema } from '@input-type-schemas/StockMovementTypeSchema';
+import { StockMovementDirectionType, StockMovementDirectionSchema } from '@input-type-schemas/StockMovementDirectionSchema';
 
 const { MANAGEMENT, ADMIN, FINANCIAL } = ResponseGroups;
 
@@ -13,7 +14,9 @@ export class StockMovementResponseDto {
   @Expose() batchId: string | null;
 
   // --- Hareketin Niteliği ---
+  @ApiProperty({ enum: StockMovementTypeSchema.options })
   @Expose() type: StockMovementTypeType; // ADJUSTMENT, SALE, PURCHASE vb.
+  @ApiProperty({ enum: StockMovementDirectionSchema.options })
   @Expose() direction: StockMovementDirectionType; // IN, OUT
 
   // --- Miktar (Hassas Sayı) ---

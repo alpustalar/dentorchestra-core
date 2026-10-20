@@ -13,7 +13,6 @@ import {
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { CONSENT_FORM_EVENTS } from '@src/domain/constants/events/consent-form.constant';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
-import { FindPatientByIdQuery } from '@modules/crm/patient/application/queries/find-patient-by-id/find-patient-by-id.query';
 import { PatientNotFoundException } from '@modules/crm/patient/domain/exceptions/patient.exceptions';
 import {
   CONSENT_FORM_SUBMISSION_COMMAND_REPOSITORY,
@@ -25,6 +24,7 @@ import {
 } from '@modules/clinical/consent-form/domain/repositories/consent-template/consent-template.command.repository';
 import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
 import { ITenantScopeResolver } from '@shared';
+import { GetPatientByIdQuery } from '@modules/crm/patient/application/queries/get-patient-by-id/get-patient-by-id.query';
 
 @CommandHandler(SignConsentFormCommand)
 export class SignConsentFormHandler
@@ -56,7 +56,7 @@ export class SignConsentFormHandler
       .orThrow(CONSENT_FORM_EVENTS.SIGN);
 
     const { data: patient } = await this.queryBus.execute(
-      new FindPatientByIdQuery(patientId, ctx)
+      new GetPatientByIdQuery(patientId, ctx)
     );
     if (!patient) throw new PatientNotFoundException();
 

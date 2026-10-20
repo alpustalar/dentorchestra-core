@@ -4,9 +4,9 @@
 //
 // Bir modüle/servise özgü sabitler (iş adları, retry sayıları, rate limitler) buraya
 // GİRMEZ; sahibinin yanında yaşar.
-export * from './api-config.constant';
+export * from '../../../../shared/common/constants/api-config.constant';
 export * from './env.constant';
-export * from './error-codes.constant';
+export * from '../../../../shared/common/constants/error-codes.constant';
 export * from './queues.constant';
-export * from './response-groups.constant';
+export * from '../../../../shared/common/constants/response-groups.constant';
 export * from './system-actor.constant';

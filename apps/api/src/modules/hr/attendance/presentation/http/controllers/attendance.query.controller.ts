@@ -33,7 +33,8 @@ export class AttendanceQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get('employees/:employeeId/attendance')
   @Serialize<AttendanceRecord, AttendanceRecordResponseDto>(
-    AttendanceRecordResponseDto
+    AttendanceRecordResponseDto,
+    { isArray: true }
   )
   list(
     @Param('employeeId', ParseUUIDPipe) employeeId: string,

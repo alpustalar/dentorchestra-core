@@ -2,10 +2,10 @@ import { LockAppointmentSlotHandler } from './lock-appointment-slot.handler';
 import { LockAppointmentSlotCommand } from './lock-appointment-slot.command';
 import { SlotTemporarilyHeldException } from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
 import { ClinicNotAssignedException } from '@src/domain/exceptions/clinic-not-assigned.exception';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 // DateTimeManager spy'ları için mock hazırlığı
-jest.mock('@common/infrastructure/date-time/date-time.manager');
+jest.mock('@shared/common/utils/date-time/date-time.manager');
 
 describe('LockAppointmentSlotHandler', () => {
   const mockNow = new Date('2026-03-01T10:00:00.000Z');

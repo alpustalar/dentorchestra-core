@@ -15,7 +15,7 @@ import {
   BatchQuantityDriftCurrencyTotal,
   BatchQuantityDriftLine,
 } from '@modules/supply/inventory/domain/contracts/stock-movement/stock-movement-queries.contracts';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Sapmayı gösterir, **onarmaz** (CLAUDE.md finans kuralı 11): miktarı
@@ -27,10 +27,10 @@ import { DateTimeManager } from '@common/infrastructure/date-time/date-time.mana
  * — envanter değerlemesiyle aynı ölçüt.
  */
 @QueryHandler(GetBatchQuantityDriftQuery)
-export class GetBatchQuantityDriftHandler implements IQueryHandler<
-  GetBatchQuantityDriftQuery,
-  GetBatchQuantityDriftResponse
-> {
+export class GetBatchQuantityDriftHandler
+  implements
+    IQueryHandler<GetBatchQuantityDriftQuery, GetBatchQuantityDriftResponse>
+{
   constructor(
     @Inject(STOCK_MOVEMENT_QUERY_REPOSITORY)
     private readonly stockMovementQueryRepo: IStockMovementQueryRepository,

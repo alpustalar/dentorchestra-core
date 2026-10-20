@@ -3,7 +3,7 @@ import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { IGetContext } from '@common/decorators';
 import { ActorContext } from '@common/interfaces';
 import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { InitializeChartOfAccountsCommand } from '@modules/finance/accounting/chart-of-accounts/application/commands/initialize-chart-of-accounts/initialize-chart-of-accounts.command';
 import {

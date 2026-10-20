@@ -2,7 +2,7 @@ import { ClinicException as IClinicException } from '@shared';
 import { ClinicExceptionCreateProps } from '@modules/organization/clinic/domain/contracts/clinic-exception';
 import { Guard } from '@common/domain/guards';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 export class ClinicException {
   // 🎯 Proje standardına uygun olarak PUBLIC constructor kalıyor

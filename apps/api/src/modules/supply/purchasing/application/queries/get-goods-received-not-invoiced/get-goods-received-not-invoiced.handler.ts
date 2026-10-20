@@ -11,7 +11,7 @@ import {
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { buildGoodsReceiptVarianceReport } from '@modules/supply/purchasing/domain/rules/purchase-order-billing.rules';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Entity hidrate edilmez: hesap saf `purchase-order-billing.rules` fonksiyonlarıyla
@@ -24,10 +24,13 @@ import { DateTimeManager } from '@common/infrastructure/date-time/date-time.mana
  * değerlemesiyle aynı ölçüt — bkz. `GetInventoryValuationQuery`).
  */
 @QueryHandler(GetGoodsReceivedNotInvoicedQuery)
-export class GetGoodsReceivedNotInvoicedHandler implements IQueryHandler<
-  GetGoodsReceivedNotInvoicedQuery,
-  GetGoodsReceivedNotInvoicedResponse
-> {
+export class GetGoodsReceivedNotInvoicedHandler
+  implements
+    IQueryHandler<
+      GetGoodsReceivedNotInvoicedQuery,
+      GetGoodsReceivedNotInvoicedResponse
+    >
+{
   constructor(
     @Inject(PURCHASE_ORDER_QUERY_REPOSITORY)
     private readonly poQueryRepo: IPurchaseOrderQueryRepository,

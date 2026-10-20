@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GetOrganizationAppointmentsSchema } from '@shared/modules/index';
+import { GetOrganizationAppointmentsSchema } from '../../schemas/queries';
 
 export type GetOrganizationAppointments = z.infer<
   typeof GetOrganizationAppointmentsSchema

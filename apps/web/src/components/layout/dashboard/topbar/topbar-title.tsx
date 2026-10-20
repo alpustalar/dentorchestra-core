@@ -1,3 +1,6 @@
+import { DateTimeManager } from '@shared/common';
+import { formatWeekdayDate } from '@/lib/date-time';
+
 export function TopbarTitle() {
   return (
     <div className="flex flex-col leading-tight">
@@ -5,7 +8,7 @@ export function TopbarTitle() {
         Genel Bakış
       </h1>
       <p className="hidden text-xs text-muted-foreground sm:block truncate">
-        Salı, 9 Ağustos 2026
+        {formatWeekdayDate(DateTimeManager.create())}
       </p>
     </div>
   );

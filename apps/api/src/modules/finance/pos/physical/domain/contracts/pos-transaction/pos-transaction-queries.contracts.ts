@@ -1,5 +1,7 @@
 import { Decimal } from 'decimal.js';
 import { PosTransactionKindType } from '@input-type-schemas/PosTransactionKindSchema';
+import { PosTransactionStatusType } from '@input-type-schemas/PosTransactionStatusSchema';
+import { PosProviderType } from '@input-type-schemas/PosProviderSchema';
 
 /**
  * PosTransaction domain kontratları — okuma modelleri.
@@ -27,6 +29,31 @@ export interface PendingTransactionForReconcile {
   currency: string;
   initiatedAt: Date;
   device: PendingTransactionDeviceSnapshot;
+}
+
+/**
+ * Bir POS işleminin **değişmeyen olguları** — başka modüllerin (kart itirazı)
+ * kaydı bağlayacağı kimlikler ve niteleyiciler.
+ *
+ * Yalnız SUCCESS bir satışta değişmeyen alanlar taşır (hasta, ödeme planı,
+ * sağlayıcı, para birimi, tutar). Bir para kararını **besleyen değişken** durum
+ * (canlı iadeler, iptal) bilerek burada YOKTUR: o okuma Command Repo'dan,
+ * satır kilidi altında yapılır (`POS_CARD_COLLECTION_SERVICE`).
+ */
+export interface PosTransactionSummary {
+  id: string;
+  clinicId: string;
+  kind: PosTransactionKindType;
+  status: PosTransactionStatusType;
+  /** Cihazın sağlayıcısı — itirazın sağlayıcısı bundan türer. */
+  provider: PosProviderType;
+  /** Hastasız kart çekimi deftere hiç köprülenmez; bu yüzden null olabilir. */
+  patientId: string | null;
+  /** Bağlı ödeme planı; null ise tahsilat bir plana yazılmamıştır. */
+  paymentId: string | null;
+  amount: Decimal;
+  currency: string;
+  completedAt: Date | null;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
 import { CurrencyType } from '@input-type-schemas/CurrencySchema';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { IFxRateProvider } from '../fx-rate.port';
 import { StaticEnvFxRateProvider } from './static-env-fx-rate.provider';
 

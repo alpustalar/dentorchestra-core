@@ -2,7 +2,7 @@ import { Decimal } from 'decimal.js';
 import { ClinicFinanceSettings as IClinicFinanceSettings } from '@shared';
 import { Currency } from '@src/domain/value-objects/currency.vo';
 import { VatRate } from '@src/domain/value-objects/vat-rate.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { CreateClinicFinanceSettingsProps } from '@modules/organization/clinic/domain/contracts/clinic-finance-settings';
 import {

@@ -1,7 +1,7 @@
 import { Catch, HttpStatus } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaErrorMap } from '@common/constants';
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../../packages/shared/common/constants/error-codes.constant';
 import { BaseExceptionFilter, MappedException } from '@src/http';
 
 /**

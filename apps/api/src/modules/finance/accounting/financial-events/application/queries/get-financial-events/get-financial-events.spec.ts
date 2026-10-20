@@ -5,7 +5,7 @@ import { FindFinancialEventsFilter } from '@modules/finance/accounting/financial
 import { IPolicyFactory } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { ITenantScopeResolver, Pagination } from '@shared';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 
 const CLINIC_ID = '11111111-1111-4111-8111-111111111111';

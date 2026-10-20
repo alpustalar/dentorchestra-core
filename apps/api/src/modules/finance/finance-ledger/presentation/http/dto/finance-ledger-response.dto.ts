@@ -1,9 +1,10 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { LedgerCategoryType as LedgerCategory } from '@input-type-schemas/LedgerCategorySchema';
-import { LedgerTypeType as LedgerType } from '@input-type-schemas/LedgerTypeSchema';
-import { LedgerSourceType as LedgerSource } from '@input-type-schemas/LedgerSourceSchema';
-import { LedgerStatusType as LedgerStatus } from '@input-type-schemas/LedgerStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { LedgerCategoryType as LedgerCategory, LedgerCategorySchema } from '@input-type-schemas/LedgerCategorySchema';
+import { LedgerTypeType as LedgerType, LedgerTypeSchema } from '@input-type-schemas/LedgerTypeSchema';
+import { LedgerSourceType as LedgerSource, LedgerSourceSchema } from '@input-type-schemas/LedgerSourceSchema';
+import { LedgerStatusType as LedgerStatus, LedgerStatusSchema } from '@input-type-schemas/LedgerStatusSchema';
 
 const { INTERNAL, MANAGEMENT, FINANCIAL, ADMIN } = ResponseGroups;
 
@@ -14,15 +15,19 @@ export class FinanceLedgerResponseDto {
   @Expose() patientId: string | null;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: LedgerTypeSchema.options })
   type: LedgerType;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: LedgerSourceSchema.options })
   source: LedgerSource;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: LedgerCategorySchema.options })
   category: LedgerCategory;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: LedgerStatusSchema.options })
   status: LedgerStatus;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
@@ -184,9 +189,11 @@ export class LedgerMismatchResponseDto {
   kind: string;
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: LedgerStatusSchema.options })
   expectedStatus: LedgerStatus;
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: LedgerStatusSchema.options, nullable: true })
   ledgerStatus: LedgerStatus | null;
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })

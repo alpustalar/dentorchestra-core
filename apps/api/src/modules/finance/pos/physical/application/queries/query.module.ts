@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { FindPosDevicesHandler } from './find-pos-devices/find-pos-devices.handler';
 import { FindStalePosTransactionsHandler } from './find-stale-pos-transactions/find-stale-pos-transactions.handler';
 import { FindUnbridgedPosTransactionsHandler } from './find-unbridged-pos-transactions/find-unbridged-pos-transactions.handler';
+import { GetPosTransactionByIdHandler } from './get-pos-transaction-by-id/get-pos-transaction-by-id.handler';
 import { PosDeviceRepositoryModule } from '@modules/finance/pos/physical/infrastructure/persistence/prisma/repositories/pos-device/pos-device.repository.module';
 import { PosTransactionRepositoryModule } from '@modules/finance/pos/physical/infrastructure/persistence/prisma/repositories/pos-transaction/pos-transaction.repository.module';
 import { FinancialEventQueryModule } from '@modules/finance/accounting/financial-events/application/queries/query.module';
@@ -10,6 +11,7 @@ export const POS_QUERY_HANDLERS = [
   FindPosDevicesHandler,
   FindStalePosTransactionsHandler,
   FindUnbridgedPosTransactionsHandler,
+  GetPosTransactionByIdHandler,
 ];
 
 @Module({

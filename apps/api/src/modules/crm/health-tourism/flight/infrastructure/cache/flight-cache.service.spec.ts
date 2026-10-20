@@ -1,7 +1,7 @@
 import Redis from 'ioredis';
 import { FlightCacheService } from './flight-cache.service';
 import { FlightOfferToken } from '@modules/crm/health-tourism/flight/domain/contracts';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 const tokenWithExpiry = (expiresAt: string): FlightOfferToken =>
   ({

@@ -1,6 +1,6 @@
 import { Expose, Type } from 'class-transformer';
 import { PatientPackageStatus } from '@shared';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 
 const { INTERNAL, MANAGEMENT, DATA_OWNER, ADMIN } = ResponseGroups;
 

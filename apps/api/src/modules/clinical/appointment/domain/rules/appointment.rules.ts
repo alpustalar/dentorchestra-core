@@ -12,7 +12,7 @@ import { BaseRules } from '@common/domain/rules/base.rules';
 import { DefaultValidateOptions } from '@common/domain/constants/default-options.constant';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';
 import { IAppointmentRules } from '@modules/clinical/appointment/domain/interfaces/appointment.rules.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { AppointmentStatusType } from '@input-type-schemas/AppointmentStatusSchema';
 import {
   AppointmentRuleSnapshot,
@@ -120,7 +120,7 @@ export class AppointmentRules extends BaseRules implements IAppointmentRules {
     const now = DateTimeManager.create();
     const isInvalid =
       DateTimeManager.isBefore(startTime, now) ||
-      DateTimeManager.isBeforeOrEqual(startTime, endTime);
+      DateTimeManager.isBeforeOrEqual(endTime, startTime);
 
     return this.evaluate(
       !isInvalid,

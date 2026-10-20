@@ -33,7 +33,9 @@ export class ProviderQueryController {
   //? ====================================================================================
 
   @Get()
-  @Serialize<Provider, ProviderResponseDto>(ProviderResponseDto)
+  @Serialize<Provider, ProviderResponseDto>(ProviderResponseDto, {
+    isArray: true,
+  })
   findAll(@Query() pagination: PaginationDto, @GetContext() ctx: IGetContext) {
     return this.queryBus.execute(new FindAllProvidersQuery(ctx, pagination));
   }

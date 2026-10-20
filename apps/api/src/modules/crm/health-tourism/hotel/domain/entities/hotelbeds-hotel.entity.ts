@@ -5,7 +5,7 @@ import { Coordinates } from '@src/domain/value-objects/coordinates.vo';
 import { CreateHotelbedsHotelProps } from '@modules/crm/health-tourism/hotel/domain/contracts';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Name } from '@src/domain/value-objects/name.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 export class HotelbedsHotel extends AggregateRoot {
   constructor(data: IHotelbedsHotel) {

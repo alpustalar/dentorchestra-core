@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 import { RoundingDirectionType as RoundingDirection } from '@input-type-schemas/RoundingDirectionSchema';
 import { PayoutTriggerType as PayoutTrigger } from '@input-type-schemas/PayoutTriggerSchema';
 

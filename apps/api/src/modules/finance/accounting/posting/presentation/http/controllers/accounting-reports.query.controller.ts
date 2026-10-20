@@ -17,7 +17,7 @@ import { GetIncomeStatementQuery } from '@modules/finance/accounting/posting/app
 import { GetBalanceSheetQuery } from '@modules/finance/accounting/posting/application/queries/get-balance-sheet/get-balance-sheet.query';
 import { GetCashFlowQuery } from '@modules/finance/accounting/posting/application/queries/get-cash-flow/get-cash-flow.query';
 import { GetVatDeclarationQuery } from '@modules/finance/accounting/posting/application/queries/get-vat-declaration/get-vat-declaration.query';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Serialize } from '@common/decorators/serialize.decorator';
 import {
   AccountLedgerReportResponseDto,
@@ -95,7 +95,8 @@ export class AccountingReportsQueryController {
 
   @Get('journal')
   @Serialize<JournalReportEntry, JournalReportEntryResponseDto>(
-    JournalReportEntryResponseDto
+    JournalReportEntryResponseDto,
+    { isArray: true }
   )
   journal(
     @GetContext() ctx: IGetContext,

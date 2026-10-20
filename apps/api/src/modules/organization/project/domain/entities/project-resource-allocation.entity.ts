@@ -2,7 +2,7 @@ import { ProjectResourceAllocation as IProjectResourceAllocation } from '@model-
 import { ProjectResourceKindType as ResourceKind } from '@input-type-schemas/ProjectResourceKindSchema';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { AllocateProjectResourceProps } from '@modules/organization/project/domain/contracts';
 import { ProjectAllocationInvalidRangeException } from '@modules/organization/project/domain/exceptions/project.exceptions';
 import { normalizeAllocationPercent } from '@modules/organization/project/domain/rules/resource-capacity.rules';

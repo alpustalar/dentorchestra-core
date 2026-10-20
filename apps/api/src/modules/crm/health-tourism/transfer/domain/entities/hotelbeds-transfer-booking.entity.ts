@@ -19,7 +19,7 @@ import { Name } from '@src/domain/value-objects/name.vo';
 import { LastName } from '@src/domain/value-objects/last-name.vo';
 import { Email } from '@src/domain/value-objects/email.vo';
 import { Phone } from '@src/domain/value-objects/phone.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { isDefined } from '@common/utils';
 import { HotelbedsTransferBookingRules } from '@modules/crm/health-tourism/transfer/domain/rules/hotelbeds-transfer-booking.rules';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';

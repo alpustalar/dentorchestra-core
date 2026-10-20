@@ -13,13 +13,12 @@ import {
 } from '@modules/channel-config/domain/repositories/clinic-whatsapp-channel.repository';
 import { ClinicWhatsappChannel } from '@modules/channel-config/domain/entities/clinic-whatsapp-channel.entity';
 import { ConnectClinicWhatsappChannelCommand } from './connect-clinic-whatsapp-channel.command';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @CommandHandler(ConnectClinicWhatsappChannelCommand)
-export class ConnectClinicWhatsappChannelHandler implements ICommandHandler<
-  ConnectClinicWhatsappChannelCommand,
-  string
-> {
+export class ConnectClinicWhatsappChannelHandler
+  implements ICommandHandler<ConnectClinicWhatsappChannelCommand, string>
+{
   private readonly logger = new Logger(
     ConnectClinicWhatsappChannelHandler.name
   );

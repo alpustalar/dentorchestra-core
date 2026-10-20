@@ -6,7 +6,7 @@ import { SerializationOptionsResponse } from '@common/interfaces/serialization-p
 import {
   ResponseGroup,
   ResponseGroups,
-} from '@common/constants/response-groups.constant';
+} from '../../../../../../../packages/shared/common/constants/response-groups.constant';
 
 @Injectable()
 export class EntityPolicy extends BasePolicy implements IEntityPolicy {

@@ -16,7 +16,7 @@ import { JsonValueType } from '@input-type-schemas/JsonValueSchema';
 import { Money } from '@src/domain/value-objects/money.vo';
 import { CreatePosTransactionProps } from '@modules/finance/pos/physical/domain/contracts/pos-transaction';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { JsonValue } from '@common/interfaces';
 import {

@@ -1,0 +1,36 @@
+diff --git a/dist/dto-DLdNo9rD.mjs b/dist/dto-DLdNo9rD.mjs
+index b8ce9bc48b739c9559d9140794c5271de12e1318..16d0820192d6b51bdae4c1f913a611bda8d13a1e 100644
+--- a/dist/dto-DLdNo9rD.mjs
++++ b/dist/dto-DLdNo9rD.mjs	
+@@ -341,7 +341,12 @@ function openApiMetadataFactory({ schema, io }) {
+ function generateJsonSchema(schema, io) {
+ 	const generatedJsonSchema = "_zod" in schema ? toJSONSchema(schema, {
+ 		io,
+-		override: ({ jsonSchema }) => {
++		unrepresentable: "any",
++		override: ({ zodSchema, jsonSchema }) => {
++			if (zodSchema._zod.def.type === "date") {
++				jsonSchema.type = "string";
++				jsonSchema.format = "date-time";
++			}
+ 			if (io === "output" && "id" in jsonSchema) jsonSchema.id = `${jsonSchema.id}_Output`;
+ 		}
+ 	}) : zodV3ToOpenAPI(schema);
+diff --git a/dist/dto-XwCwaTfM.cjs b/dist/dto-XwCwaTfM.cjs
+index 4cfb6f7d000463472aab022869b04f6ac3c33aa9..18da6d6545454e456dd0527241f97910c7cd4f8b 100644
+--- a/dist/dto-XwCwaTfM.cjs
++++ b/dist/dto-XwCwaTfM.cjs	
+@@ -369,7 +369,12 @@ function openApiMetadataFactory({ schema, io }) {
+ function generateJsonSchema(schema, io) {
+ 	const generatedJsonSchema = "_zod" in schema ? (0, zod_v4_core.toJSONSchema)(schema, {
+ 		io,
+-		override: ({ jsonSchema }) => {
++		unrepresentable: "any",
++		override: ({ zodSchema, jsonSchema }) => {
++			if (zodSchema._zod.def.type === "date") {
++				jsonSchema.type = "string";
++				jsonSchema.format = "date-time";
++			}
+ 			if (io === "output" && "id" in jsonSchema) jsonSchema.id = `${jsonSchema.id}_Output`;
+ 		}
+ 	}) : zodV3ToOpenAPI(schema);

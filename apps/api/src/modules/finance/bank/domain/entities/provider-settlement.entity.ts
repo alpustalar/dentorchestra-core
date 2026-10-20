@@ -5,7 +5,7 @@ import { CurrencyType } from '@input-type-schemas/CurrencySchema';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Money } from '@src/domain/value-objects/money.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   MarkSettlementPostedProps,
   RecordProviderSettlementProps,

@@ -10,7 +10,7 @@ import {
 } from '@modules/supply/work-order/domain/contracts';
 import { Paginated } from '@common/interfaces/paginated.type';
 import { ExternalWorkOrderStatusSchema } from '@input-type-schemas/ExternalWorkOrderStatusSchema';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { IExternalWorkOrderQueryRepository } from '@modules/supply/work-order/domain/repositories/external-work/external-work.query.repository';
 
 /** Teslim alınmamış — terminin hâlâ anlamlı olduğu durumlar (gecikme filtresi). */

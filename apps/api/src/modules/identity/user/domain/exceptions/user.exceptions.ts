@@ -1,4 +1,4 @@
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../../../../packages/shared/common/constants/error-codes.constant';
 import { DomainException } from '@src/domain/exceptions/domain.exception';
 import { HttpStatus } from '@nestjs/common';
 
@@ -54,10 +54,9 @@ export class PlatformCapabilityNotGrantableException extends DomainException<{
   readonly errorCode = ERROR_CODES.USER.CAPABILITY_PLATFORM_SCOPED;
   public override readonly httpStatus = HttpStatus.FORBIDDEN;
   constructor(capability: string) {
-    super(
-      `"${capability}" platform yetkisidir ve personele devredilemez.`,
-      { capability }
-    );
+    super(`"${capability}" platform yetkisidir ve personele devredilemez.`, {
+      capability,
+    });
   }
 }
 
@@ -71,10 +70,9 @@ export class CapabilityNotHeldByActorException extends DomainException<{
   readonly errorCode = ERROR_CODES.USER.CAPABILITY_NOT_HELD_BY_ACTOR;
   public override readonly httpStatus = HttpStatus.FORBIDDEN;
   constructor(capability: string) {
-    super(
-      `Sahip olmadığınız bir yetkiyi devredemezsiniz: ${capability}`,
-      { capability }
-    );
+    super(`Sahip olmadığınız bir yetkiyi devredemezsiniz: ${capability}`, {
+      capability,
+    });
   }
 }
 
@@ -88,9 +86,8 @@ export class CapabilityAlreadyInRoleException extends DomainException<{
   readonly errorCode = ERROR_CODES.USER.CAPABILITY_ALREADY_IN_ROLE;
   public override readonly httpStatus = HttpStatus.CONFLICT;
   constructor(capability: string) {
-    super(
-      `Bu yetki kullanıcının rolünde zaten var: ${capability}`,
-      { capability }
-    );
+    super(`Bu yetki kullanıcının rolünde zaten var: ${capability}`, {
+      capability,
+    });
   }
 }

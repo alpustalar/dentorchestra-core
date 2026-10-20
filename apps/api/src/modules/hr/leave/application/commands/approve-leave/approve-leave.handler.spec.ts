@@ -8,8 +8,8 @@ import {
 } from '@modules/hr/leave/domain/exceptions/leave.exceptions';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { IEmployeeLeaveEntitlementService } from '@modules/hr/employee/domain/services/leave-entitlement/leave-entitlement.service.interface';
 import { LeaveEntitlement } from '@modules/hr/employee/domain/value-objects/leave-entitlement.vo';
 import { AnnualLeavePeriod } from '@modules/hr/leave/domain/contracts/leave-request';
@@ -144,7 +144,9 @@ describe('ApproveLeaveHandler — bakiye kilidi (çalışan satırı çapası)',
 
   it('hak ediş kilitli okunur ve kullanım okumasından ÖNCE gelir', async () => {
     const leave = makeAnnualLeave(5);
-    const { handler, lockAndGetAnnualEntitlement, callOrder } = build({ leave });
+    const { handler, lockAndGetAnnualEntitlement, callOrder } = build({
+      leave,
+    });
 
     await handler.execute(command(leave.id.value));
 

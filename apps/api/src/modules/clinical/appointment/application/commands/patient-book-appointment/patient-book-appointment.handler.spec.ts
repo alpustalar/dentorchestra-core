@@ -5,7 +5,7 @@ import {
   AppointmentClinicOutsideOrganizationException,
   MaxActiveBookingsExceededException,
 } from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import type { IGetPatientContext } from '@common/decorators/get-patient-context.decorator';
 
 /**

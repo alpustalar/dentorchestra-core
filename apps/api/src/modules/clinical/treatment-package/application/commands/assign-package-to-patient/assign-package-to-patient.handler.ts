@@ -3,7 +3,7 @@ import { Inject } from '@nestjs/common';
 import { AssignPackageToPatientCommand } from './assign-package-to-patient.command';
 import type { AssignPackageToPatientResponse } from './assign-package-to-patient.response';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { CreatePaymentCommand } from '@modules/finance/payment/application/commands/create-payment/create-payment.command';
 import { TreatmentPackageNotFoundException } from '@modules/clinical/treatment-package/domain/exceptions/treatment-package.exceptions';

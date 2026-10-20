@@ -4,6 +4,7 @@ import {
   ScanStalePosTransactionsParams,
   StalePosTransactionRow,
   BridgeablePosTransactionRow,
+  PosTransactionSummary,
 } from '@modules/finance/pos/physical/domain/contracts/pos-transaction';
 
 export const POS_TRANSACTION_QUERY_REPOSITORY = Symbol(
@@ -17,6 +18,13 @@ export const POS_TRANSACTION_QUERY_REPOSITORY = Symbol(
  * besler ve kilit gerektirmez.
  */
 export interface IPosTransactionQueryRepository {
+  /**
+   * İşlemin **değişmeyen olguları** (hasta, plan, sağlayıcı, tutar). Başka bir
+   * modül bir kaydı bu işleme bağlarken kimlik toplamak için kullanır; para
+   * kararını besleyen değişken durum (iadeler, iptal) buradan OKUNMAZ.
+   */
+  findSummaryById(id: string): Promise<PosTransactionSummary | null>;
+
   /** Takılı kalmış PENDING işlemler — tüm sağlayıcılar (PAX dışı dahil). */
   findStalePending(
     filter: FindStalePosTransactionsFilter

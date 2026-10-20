@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { AI_MEMORY_WINDOW_SIZE } from '@messaging/constants/jobs.constant';
 import { AiChatMessage } from '@modules/ai-agent/domain/ports/ai-chat.port';
 import {

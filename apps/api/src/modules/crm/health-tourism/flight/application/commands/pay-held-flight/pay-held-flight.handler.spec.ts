@@ -14,10 +14,10 @@ import {
 } from '@modules/crm/health-tourism/flight/domain/exceptions/duffel-flight.exceptions';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { DuffelFlightBookingStatusType } from '@input-type-schemas/DuffelFlightBookingStatusSchema';
 
 const CLINIC_ID = '11111111-1111-4111-8111-111111111111';

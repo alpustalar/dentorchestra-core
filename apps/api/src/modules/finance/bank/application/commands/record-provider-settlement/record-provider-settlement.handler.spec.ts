@@ -18,7 +18,7 @@ import { TransactionManager } from '@src/infrastructure/persistence/prisma/trans
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import type { RecordProviderSettlement } from '@shared/modules/bank/types/commands';
 
 /**

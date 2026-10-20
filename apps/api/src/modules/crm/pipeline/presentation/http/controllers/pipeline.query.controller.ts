@@ -22,7 +22,9 @@ const { PIPELINE } = CAPABILITIES;
 export class PipelineQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
-  @Serialize<PipelineResponse, PipelineResponseDto>(PipelineResponseDto)
+  @Serialize<PipelineResponse, PipelineResponseDto>(PipelineResponseDto, {
+    isArray: true,
+  })
   getPipelines(@GetContext() ctx: IGetContext) {
     return this.queryBus.execute(new GetPipelinesQuery(ctx));
   }

@@ -172,6 +172,58 @@ describe('SyncInstallmentLedgerEntryHandler', () => {
     expect(updated.status).toBe(LedgerStatusSchema.enum.REFUNDED);
   });
 
+  it('ters ibraz edilmiş taksit CHARGED_BACK olarak yazılır — REFUNDED değil', async () => {
+    // Kaybedilen kart itirazı iade DEĞİLDİR: para bizim kararımızla geri verilmedi,
+    // sağlayıcı geri aldı. Cari kayıt kendi durumunu taşır; iade raporlarına karışmaz.
+    const { handler, ledgerRepo } = make({
+      installment: installmentRow(InstallmentStatusSchema.enum.CHARGED_BACK),
+    });
+
+    const result = await run(handler);
+
+    expect(result).toEqual({ outcome: 'RECORDED' });
+    expect(ledgerRepo.create.mock.calls[0][0].status).toBe(
+      LedgerStatusSchema.enum.CHARGED_BACK
+    );
+  });
+
+  it('tahsilat kaydı varsa ters ibrazda COMPLETED → CHARGED_BACK hizalanır (gelirden düşer)', async () => {
+    const { handler, ledgerRepo } = make({
+      installment: installmentRow(InstallmentStatusSchema.enum.CHARGED_BACK),
+      existing: existingEntry(LedgerStatusSchema.enum.COMPLETED),
+    });
+
+    const result = await run(handler);
+
+    expect(result).toEqual({ outcome: 'SYNCED' });
+    expect(ledgerRepo.update.mock.calls[0][0].status).toBe(
+      LedgerStatusSchema.enum.CHARGED_BACK
+    );
+  });
+
+  it('geç gelen tahsilat işi ters ibraz edilmiş kaydı gelire çeviremez', async () => {
+    const { handler, ledgerRepo } = make({
+      installment: installmentRow(InstallmentStatusSchema.enum.CHARGED_BACK),
+      existing: existingEntry(LedgerStatusSchema.enum.CHARGED_BACK),
+    });
+
+    const result = await run(handler);
+
+    expect(result).toEqual({ outcome: 'UNCHANGED' });
+    expect(ledgerRepo.update).not.toHaveBeenCalled();
+  });
+
+  it('telafi taksidi (PENDING) için kayıt yazılmaz — parası hareket etmemiş taksidin karşılığı olmaz', async () => {
+    const { handler, ledgerRepo } = make({
+      installment: installmentRow(InstallmentStatusSchema.enum.PENDING),
+    });
+
+    const result = await run(handler);
+
+    expect(result).toEqual({ outcome: 'SKIPPED' });
+    expect(ledgerRepo.create).not.toHaveBeenCalled();
+  });
+
   it('tahsil edilmemiş taksit için kayıt yazmaz', async () => {
     const { handler, ledgerRepo } = make({
       installment: installmentRow(InstallmentStatusSchema.enum.PENDING),

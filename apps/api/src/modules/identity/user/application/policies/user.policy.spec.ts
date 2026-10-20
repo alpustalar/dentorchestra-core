@@ -5,7 +5,7 @@ import { ActorContext } from '@common/interfaces';
 import {
   ExecutionSource,
   ExecutionSources,
-} from '@src/domain/constants/execution-source.constant';
+} from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 
 /**
  * Yetki devrinin iki kuralı burada sabitlenir. İkisi de güvenlik kuralıdır:

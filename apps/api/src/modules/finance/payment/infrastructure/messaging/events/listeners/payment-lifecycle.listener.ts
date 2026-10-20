@@ -3,11 +3,13 @@ import { AuditLogService } from '@modules/platform/audit-log/audit-log.service';
 import { LogType } from '@src/domain/constants/log-action.constant';
 import { PaymentPaidEvent } from '@modules/finance/payment/domain/events/payment-paid.event';
 import { PaymentRefundedEvent } from '@modules/finance/payment/domain/events/payment-refunded.event';
+import { PaymentChargedBackEvent } from '@modules/finance/payment/domain/events/payment-charged-back.event';
 import { PaymentFailedEvent } from '@modules/finance/payment/domain/events/payment-failed.event';
 import { OnDomainEvent } from '@common/decorators';
 
 /**
- * Para hareketlerinin denetim izi: tahsilat, iade ve başarısız tahsilat denemesi.
+ * Para hareketlerinin denetim izi: tahsilat, iade, ters ibraz (kaybedilen kart
+ * itirazı) ve başarısız tahsilat denemesi.
  *
  * Bu olaylar `IAuditLog` alanlarını (action/source/actorId/details) baştan beri
  * taşıyordu ama **hiçbir dinleyici** audit log'a yazmıyordu: para tahsil
@@ -41,6 +43,17 @@ export class PaymentLifecycleListener {
     });
   }
 
+  @OnDomainEvent(PaymentChargedBackEvent.NAME)
+  async handleChargedBack(event: PaymentChargedBackEvent): Promise<void> {
+    await this.write(event, {
+      paymentId: event.paymentId,
+      installmentId: event.installmentId,
+      recoveryInstallmentId: event.recoveryInstallmentId,
+      clinicId: event.clinicId,
+      appointmentId: event.appointmentId,
+    });
+  }
+
   @OnDomainEvent(PaymentFailedEvent.NAME)
   async handleFailed(event: PaymentFailedEvent): Promise<void> {
     await this.write(event, {
@@ -52,7 +65,11 @@ export class PaymentLifecycleListener {
   }
 
   private async write(
-    event: PaymentPaidEvent | PaymentRefundedEvent | PaymentFailedEvent,
+    event:
+      | PaymentPaidEvent
+      | PaymentRefundedEvent
+      | PaymentChargedBackEvent
+      | PaymentFailedEvent,
     details: Record<string, unknown>
   ): Promise<void> {
     const { log, metadata } = event;

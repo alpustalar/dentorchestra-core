@@ -7,7 +7,7 @@ import { AggregateRoot } from '@common/domain/aggregate-root';
 import { DateRange } from '@src/domain/value-objects/date-range.vo';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { CreateProviderExceptionProps } from '@modules/clinical/provider/domain/contracts';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 
 export class ProviderException extends AggregateRoot {

@@ -24,7 +24,7 @@ const { LEAD } = CAPABILITIES;
 export class LeadQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get('clinics/:clinicId/leads')
-  @Serialize<Lead, LeadResponseDto>(LeadResponseDto)
+  @Serialize<Lead, LeadResponseDto>(LeadResponseDto, { isArray: true })
   getLeads(
     @Param('clinicId', ParseUUIDPipe) clinicId: string,
     @Query() dto: GetLeadsDto,

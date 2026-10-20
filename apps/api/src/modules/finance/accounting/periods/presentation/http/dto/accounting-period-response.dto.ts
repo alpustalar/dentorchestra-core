@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { FinanceResponseGroups } from '@modules/finance/shared/domain/finance.contracts';
-import { AccountingPeriodStatusType } from '@input-type-schemas/AccountingPeriodStatusSchema';
+import { AccountingPeriodStatusType, AccountingPeriodStatusSchema } from '@input-type-schemas/AccountingPeriodStatusSchema';
 
 const { INTERNAL, FINANCIAL, MANAGEMENT, ADMIN } = FinanceResponseGroups;
 
@@ -20,6 +21,7 @@ export class AccountingPeriodResponseDto {
   year: number;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: AccountingPeriodStatusSchema.options })
   status: AccountingPeriodStatusType;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })

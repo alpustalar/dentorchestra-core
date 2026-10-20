@@ -7,11 +7,13 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
-import { FindPatientByIdQuery } from '@modules/crm/patient/application/queries/find-patient-by-id/find-patient-by-id.query';
+
 import { CreatePatientCommand } from '@modules/crm/patient/application/commands/create-patient/create-patient.command';
 import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
 import { Appointment } from '@modules/clinical/appointment/domain/entities/appointment.entity';
-import { GetClinicAppointmentSettingsQuery } from '@modules/organization/clinic/application/queries/get-clinic-appointment-settings/get-clinic-appointment-settings.query';
+import {
+  GetClinicAppointmentSettingsQuery
+} from '@modules/organization/clinic/application/queries/get-clinic-appointment-settings/get-clinic-appointment-settings.query';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
@@ -24,8 +26,15 @@ import {
   APPOINTMENT_CHECKER_SERVICE,
   IAppointmentCheckerService,
 } from '@modules/clinical/appointment/domain/interfaces/appointment-checker.service.interface';
-import { TENANT_SCOPE_RESOLVER } from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
-import { AppointmentPatientPhoneRequiredException } from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
+import {
+  TENANT_SCOPE_RESOLVER
+} from '@modules/organization/clinic/domain/services/tenant-scope/tenant-scope.resolver.interface';
+import {
+  AppointmentPatientPhoneRequiredException
+} from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
+import {
+  GetPatientByIdQuery
+} from '@modules/crm/patient/application/queries/get-patient-by-id/get-patient-by-id.query';
 
 const DEFAULT_DURATION_MINUTES = 30;
 
@@ -160,7 +169,7 @@ export class ScheduleAppointmentHandler
     // Mevcut hasta seçildiyse (patientId) kaydından oku.
     if (input.patientId) {
       const { data: patient } = await this.queryBus.execute(
-        new FindPatientByIdQuery(input.patientId, this.internalCtx)
+        new GetPatientByIdQuery(input.patientId, this.internalCtx)
       );
 
       if (patient) {

@@ -4,8 +4,8 @@ import { GetIncomeStatementQuery } from './get-income-statement.query';
 import { IJournalQueryRepository } from '@modules/finance/accounting/posting/domain/repositories/journal.repository';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Karşılaştırma, ekranda "geçen döneme göre" oklarını besler. Kritik olan iki şey:

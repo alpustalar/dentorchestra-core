@@ -1,4 +1,4 @@
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../packages/shared/common/constants/response-groups.constant';
 
 // ==========================================
 // Onam cevaplarının alan görünürlüğü. İmza görseli ve sözleşme metni hassastır;

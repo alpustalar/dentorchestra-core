@@ -3,7 +3,7 @@ import { ScanOverdueWorkOrdersHandler } from './scan-overdue-work-orders.handler
 import { ExternalWorkOrder } from '@modules/supply/work-order/domain/entities/external-work-order.entity';
 import { IExternalWorkOrderCommandRepository } from '@modules/supply/work-order/domain/repositories/external-work/external-work-order.command.repository';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { WorkOrderOverdueEvent } from '@modules/supply/work-order/domain/events/work-order-overdue.event';
 
 describe('ScanOverdueWorkOrdersHandler', () => {

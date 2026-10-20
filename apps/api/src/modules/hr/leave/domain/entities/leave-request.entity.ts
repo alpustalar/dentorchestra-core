@@ -9,7 +9,7 @@ import {
 } from '@input-type-schemas/LeaveStatusSchema';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { RequestLeaveProps } from '@modules/hr/leave/domain/contracts/leave-request';
 import { DateRange } from '@src/domain/value-objects/date-range.vo';
 import { Guard } from '@common/domain/guards';

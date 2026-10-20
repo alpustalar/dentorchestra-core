@@ -2,7 +2,7 @@ import { ProductUsage as IProductUsage } from '@shared';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Quantity } from '@src/domain/value-objects/quantity.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { CreateProductUsageProps } from '@modules/supply/inventory/domain/contracts';
 
 /**

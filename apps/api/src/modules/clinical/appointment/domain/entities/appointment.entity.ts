@@ -30,7 +30,7 @@ import {
   AppointmentPatientRequiredException,
   AppointmentRescheduleWindowExpiredException,
 } from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { endTimeCalculator } from '@common/utils';
 import { Name } from '@src/domain/value-objects/name.vo';

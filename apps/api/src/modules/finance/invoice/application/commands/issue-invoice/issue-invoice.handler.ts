@@ -33,7 +33,7 @@ import {
   IChargeTotalsService,
 } from '@modules/finance/treatment-charge/domain/services/charge-totals';
 import { AppointmentChargeTotals } from '@modules/finance/treatment-charge/domain/value-objects/appointment-charge-totals.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
 import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 import {
@@ -50,10 +50,9 @@ import type { CurrencyType } from '@input-type-schemas/CurrencySchema';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 
 @CommandHandler(IssueInvoiceCommand)
-export class IssueInvoiceHandler implements ICommandHandler<
-  IssueInvoiceCommand,
-  IssueInvoiceResponse
-> {
+export class IssueInvoiceHandler
+  implements ICommandHandler<IssueInvoiceCommand, IssueInvoiceResponse>
+{
   private readonly logger = new Logger(IssueInvoiceHandler.name);
 
   constructor(

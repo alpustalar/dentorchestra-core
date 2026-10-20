@@ -5,7 +5,7 @@ import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.ser
 import { IProductBatchCommandRepository } from '@modules/supply/inventory/domain/repositories/product-batch/product-batch.command.repository';
 import { ProductBatch } from '@modules/supply/inventory/domain/entities/product-batch.entity';
 import { txStorage } from '@src/infrastructure/persistence/prisma/transaction';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @Injectable()
 export class ProductBatchCommandRepository

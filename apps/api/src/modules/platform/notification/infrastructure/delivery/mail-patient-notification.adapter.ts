@@ -7,7 +7,7 @@ import {
   PatientNotificationInput,
   PatientNotificationPort,
 } from '@modules/platform/notification/domain/ports/patient-notification.port';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Hasta bildirimi adaptörü — strateji: WhatsApp template (öncelikli) + e-posta fallback.

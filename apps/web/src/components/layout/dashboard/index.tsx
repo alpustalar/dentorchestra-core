@@ -4,6 +4,7 @@ import * as React from 'react';
 import { SidebarInset } from '@/components/ui/sidebar';
 import { NavigationSidebar } from '@/components/layout/dashboard/sidebar';
 import { Topbar } from '@/components/layout/dashboard/topbar';
+import { PageTabs } from '@/components/layout/dashboard/page-tabs';
 
 type Props = {
   children: Readonly<React.ReactNode>;
@@ -16,6 +17,7 @@ function DashboardContent({ children }: Props) {
       <SidebarInset className="flex flex-col flex-1 min-w-0 min-h-screen">
         <header className="sticky top-0 z-30 w-full bg-background">
           <Topbar />
+          <PageTabs />
         </header>
 
         {/* Ana Sayfa İçeriği */}

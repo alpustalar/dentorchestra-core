@@ -3,7 +3,7 @@ import {
   PatientActorContext,
 } from '@common/interfaces/actor-context.type';
 import { Capability, Role, RoleCapability, User } from '@shared';
-import { ExecutionSource } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource } from '../../../../shared/common/constants/execution-source.constant';
 import { Request } from 'express';
 
 export type RoleWithCapabilities = Role & {

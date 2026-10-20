@@ -1,4 +1,11 @@
-import { Controller, Delete, Post, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@modules/identity/auth/auth/guards';
 import { SystemAdminGuard } from '@modules/identity/auth/auth/guards/system-admin/system-admin.guard';
 
@@ -10,6 +17,8 @@ export class OrganizationAdminCommandController {
   @Post()
   create() {}
 
-  @Delete(':organization-id')
-  softDelete() {}
+  @Delete(':organizationId')
+  softDelete(
+    @Param('organizationId', ParseUUIDPipe) organizationId: string
+  ) {}
 }

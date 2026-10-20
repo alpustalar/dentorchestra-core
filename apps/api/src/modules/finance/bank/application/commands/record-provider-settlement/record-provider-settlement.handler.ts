@@ -13,12 +13,8 @@ import {
   BANK_ACCOUNT_COMMAND_REPOSITORY,
   IBankAccountCommandRepository,
 } from '@modules/finance/bank/domain/repositories/bank-account/bank-account.command.repository';
-import {
-  BankAccountArchivedException,
-  BankAccountNotFoundException,
-  SettlementBankAccountMismatchException,
-} from '@modules/finance/bank/domain/exceptions/bank.exceptions';
-import { BankAccountStatusSchema } from '@input-type-schemas/BankAccountStatusSchema';
+import { SettlementBankAccountMismatchException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
+import { assertBankAccountUsableByClinic } from '@modules/finance/bank/domain/rules/assert-bank-account-usable';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
@@ -99,7 +95,13 @@ export class RecordProviderSettlementHandler implements ICommandHandler<
     const netAmount = new Decimal(data.netAmount);
 
     return this.txManager.outboxRun(async () => {
-      await this.assertBankAccountBelongsToClinic(data);
+      await assertBankAccountUsableByClinic({
+        bankAccountRepo: this.bankAccountRepo,
+        bankAccountId: data.bankAccountId,
+        clinicId: data.clinicId,
+        onClinicMismatch: (id) =>
+          new SettlementBankAccountMismatchException(id),
+      });
 
       // Payout tarihi belgenin kendi tarihidir: mühürlenmiş döneme düşen kayıt
       // hiç fişlenemez (CLAUDE.md finans kuralı 1).
@@ -165,29 +167,5 @@ export class RecordProviderSettlementHandler implements ICommandHandler<
 
       return created.id.value;
     });
-  }
-
-  /**
-   * Banka hesabı opsiyoneldir ama verildiyse **aynı kliniğin** olmak zorundadır:
-   * başka kiracının hesabı seçilirse kayıt o hesabın mutabakatına karışır.
-   */
-  private async assertBankAccountBelongsToClinic(data: {
-    bankAccountId?: string | null;
-    clinicId: string;
-  }): Promise<void> {
-    if (!data.bankAccountId) return;
-
-    const account = await this.bankAccountRepo.findById(data.bankAccountId);
-    if (!account) {
-      throw new BankAccountNotFoundException(data.bankAccountId);
-    }
-
-    if (account.clinicId.value !== data.clinicId) {
-      throw new SettlementBankAccountMismatchException(data.bankAccountId);
-    }
-
-    if (account.status === BankAccountStatusSchema.enum.ARCHIVED) {
-      throw new BankAccountArchivedException(account.id.value);
-    }
   }
 }

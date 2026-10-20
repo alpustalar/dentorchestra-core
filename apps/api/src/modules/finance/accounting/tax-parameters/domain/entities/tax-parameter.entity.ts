@@ -4,7 +4,7 @@ import { AggregateRoot } from '@common/domain/aggregate-root';
 import { CreateTaxParameterProps } from '@modules/finance/accounting/tax-parameters/domain/contracts/tax-parameter';
 import { TaxParameterKeyType as TaxParameterKey } from '@input-type-schemas/TaxParameterKeySchema';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   STATUTORY_VAT_RATES,
   TAX_RATE_MAX_DECIMAL_PLACES,

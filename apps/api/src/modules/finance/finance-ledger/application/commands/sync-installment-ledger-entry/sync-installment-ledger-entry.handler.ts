@@ -31,13 +31,16 @@ import {
 import { ledgerStatusForInstallment } from '@modules/finance/finance-ledger/domain/rules/installment-ledger-status.rule';
 import type { LedgerStatusType } from '@input-type-schemas/LedgerStatusSchema';
 import type { InstallmentLedgerRow } from '@modules/finance/payment/domain/contracts/payment';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @CommandHandler(SyncInstallmentLedgerEntryCommand)
-export class SyncInstallmentLedgerEntryHandler implements ICommandHandler<
-  SyncInstallmentLedgerEntryCommand,
-  SyncInstallmentLedgerEntryResponse
-> {
+export class SyncInstallmentLedgerEntryHandler
+  implements
+    ICommandHandler<
+      SyncInstallmentLedgerEntryCommand,
+      SyncInstallmentLedgerEntryResponse
+    >
+{
   private readonly logger = new Logger(SyncInstallmentLedgerEntryHandler.name);
 
   constructor(

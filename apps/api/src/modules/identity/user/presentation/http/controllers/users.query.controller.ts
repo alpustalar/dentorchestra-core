@@ -48,7 +48,7 @@ export class UserQueryController {
 
   @Get('all')
   @Version('1')
-  @Serialize<User, UserResponseDto>(UserResponseDto)
+  @Serialize<User, UserResponseDto>(UserResponseDto, { isArray: true })
   findAllUsers(
     @Query() paginationDto: PaginationDto,
     @GetContext() ctx: IGetContext
@@ -65,7 +65,8 @@ export class UserQueryController {
   @Get(':id/capabilities')
   @Version('1')
   @Serialize<EffectiveCapability, EffectiveCapabilityResponseDto>(
-    EffectiveCapabilityResponseDto
+    EffectiveCapabilityResponseDto,
+    { isArray: true }
   )
   getCapabilities(
     @Param('id', ParseUUIDPipe) targetUserId: string,

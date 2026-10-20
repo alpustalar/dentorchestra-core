@@ -39,7 +39,8 @@ export class InvoiceQueryController {
 
   @Get()
   @Serialize<InvoiceListItem, InvoiceListItemResponseDto>(
-    InvoiceListItemResponseDto
+    InvoiceListItemResponseDto,
+    { isArray: true }
   )
   list(
     @Query() pagination: PaginationDto,

@@ -2,7 +2,7 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Logger } from '@nestjs/common';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { GetClinicsWithUnpostedFinancialEventsQuery } from '@modules/finance/accounting/financial-events/application/queries/get-clinics-with-unposted-financial-events/get-clinics-with-unposted-financial-events.query';
@@ -22,10 +22,13 @@ import {
 const DEFAULT_LOOKBACK_DAYS = 45;
 
 @CommandHandler(SweepUnpostedFinancialEventsCommand)
-export class SweepUnpostedFinancialEventsHandler implements ICommandHandler<
-  SweepUnpostedFinancialEventsCommand,
-  SweepUnpostedFinancialEventsResult
-> {
+export class SweepUnpostedFinancialEventsHandler
+  implements
+    ICommandHandler<
+      SweepUnpostedFinancialEventsCommand,
+      SweepUnpostedFinancialEventsResult
+    >
+{
   private readonly logger = new Logger(
     SweepUnpostedFinancialEventsHandler.name
   );

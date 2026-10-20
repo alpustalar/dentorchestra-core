@@ -1,8 +1,9 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { LeadSourceType as LeadSource } from '@input-type-schemas/LeadSourceSchema';
-import { LeadMediumType as LeadMedium } from '@input-type-schemas/LeadMediumSchema';
-import { LeadStatusType as LeadStatus } from '@input-type-schemas/LeadStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { LeadSourceType as LeadSource, LeadSourceSchema } from '@input-type-schemas/LeadSourceSchema';
+import { LeadMediumType as LeadMedium, LeadMediumSchema } from '@input-type-schemas/LeadMediumSchema';
+import { LeadStatusType as LeadStatus, LeadStatusSchema } from '@input-type-schemas/LeadStatusSchema';
 
 const { INTERNAL, MANAGEMENT, DATA_OWNER, ADMIN } = ResponseGroups;
 
@@ -11,7 +12,9 @@ export class LeadResponseDto {
   @Expose() clinicId: string;
 
   // --- Temel Aday Bilgileri (Herkese Açık / Ortak CRM Görünümü) ---
+  @ApiProperty({ enum: LeadSourceSchema.options })
   @Expose() source: LeadSource;
+  @ApiProperty({ enum: LeadStatusSchema.options })
   @Expose() status: LeadStatus;
   @Expose() name: string | null;
 
@@ -51,6 +54,7 @@ export class LeadResponseDto {
 
   // --- Pazarlama & Meta Reklam İzleme Verileri (Sadece Yönetim ve Admin) ---
   @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: LeadMediumSchema.options, nullable: true })
   medium: LeadMedium | null;
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })

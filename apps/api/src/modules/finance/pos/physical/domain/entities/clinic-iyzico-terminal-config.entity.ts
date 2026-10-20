@@ -2,7 +2,7 @@ import { ClinicIyzicoTerminalConfig as IClinicIyzicoTerminalConfig } from '@shar
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { CreateClinicIyzicoTerminalConfigProps } from '@modules/finance/pos/physical/domain/contracts/clinic-iyzico-terminal-config';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Kliniğin iyzico Terminal (Host API) merchant kimliklerini barındıran 1:1

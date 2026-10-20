@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { MetaLeadStatusType as MetaLeadStatus } from '@input-type-schemas/MetaLeadStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { MetaLeadStatusType as MetaLeadStatus, MetaLeadStatusSchema } from '@input-type-schemas/MetaLeadStatusSchema';
 import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema';
 
 const { INTERNAL, MANAGEMENT, DATA_OWNER, ADMIN } = ResponseGroups;
@@ -8,6 +9,7 @@ const { INTERNAL, MANAGEMENT, DATA_OWNER, ADMIN } = ResponseGroups;
 export class MetaLeadResponseDto {
   @Expose() id: string;
   @Expose() metaAdAccountId: string;
+  @ApiProperty({ enum: MetaLeadStatusSchema.options })
   @Expose() status: MetaLeadStatus;
 
   // --- Temel Aday Künyesi (CRM Personeli, Adayın Kendisi ve Yönetici/Admin Görebilir) ---

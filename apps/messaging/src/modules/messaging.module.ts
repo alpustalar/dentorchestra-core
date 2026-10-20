@@ -24,6 +24,7 @@ import { AiReplyModule } from './ai-agent/infrastructure/ai-reply.module';
  * için tek başına `module:` yazımı sessizce etkisiz kalıyordu (ayrımdan önce de
  * öyleydi — rotalar `messaging` öneki olmadan yayınlanıyordu).
  */
+
 @Module({
   imports: [
     RouterModule.register([

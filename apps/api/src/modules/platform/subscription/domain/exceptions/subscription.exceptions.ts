@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { DomainException } from '@src/domain/exceptions/domain.exception';
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../../../../packages/shared/common/constants/error-codes.constant';
 import type { SubscriptionModuleRequiredMeta } from '@shared/modules/subscription/interfaces';
 
 /** Sahip (org veya klinik) için zaten aktif abonelik var. */

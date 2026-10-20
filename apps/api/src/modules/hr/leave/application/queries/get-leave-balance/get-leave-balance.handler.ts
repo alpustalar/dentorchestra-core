@@ -15,7 +15,7 @@ import {
 } from '@modules/hr/leave/domain/repositories/leave/leave.query.repository';
 import { LeaveEntitlement } from '@modules/hr/employee/domain/value-objects/leave-entitlement.vo';
 import { EmployeeNotFoundException } from '@modules/hr/employee/domain/exceptions/employee.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @QueryHandler(GetLeaveBalanceQuery)
 export class GetLeaveBalanceHandler

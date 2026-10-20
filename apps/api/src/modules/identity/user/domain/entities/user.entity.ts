@@ -10,7 +10,7 @@ import {
   InvalidUserDeletionException,
   InvalidUserUpdateException,
 } from '@modules/identity/user/domain/exceptions/user.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { FirebaseUid } from '@src/domain/value-objects/firebase-uid.vo';
 import { Email } from '@src/domain/value-objects/email.vo';
 import { UUID } from '@src/domain/value-objects/uuid.vo';

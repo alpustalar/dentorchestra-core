@@ -25,7 +25,9 @@ const { BANKACCOUNT } = CAPABILITIES;
 export class BankAccountQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
-  @Serialize<IBankAccount, BankAccountResponseDto>(BankAccountResponseDto)
+  @Serialize<IBankAccount, BankAccountResponseDto>(BankAccountResponseDto, {
+    isArray: true,
+  })
   list(
     @Query() dto: GetBankAccountsFilterDto,
     @Query() pagination: PaginationDto,

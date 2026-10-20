@@ -1,6 +1,6 @@
 import { DomainException } from '@src/domain/exceptions/domain.exception';
 import { HttpStatus } from '@nestjs/common';
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../packages/shared/common/constants/error-codes.constant';
 
 export class ClinicNotAssignedException extends DomainException {
   public readonly errorCode = ERROR_CODES.AUTH.CLINIC_NOT_ASSIGNED;

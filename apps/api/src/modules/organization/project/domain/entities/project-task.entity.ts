@@ -10,7 +10,7 @@ import {
 } from '@input-type-schemas/ProjectTaskPrioritySchema';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { isNotUndefined } from '@common/utils/is-not-undefined';
 import {
   CreateProjectTaskProps,

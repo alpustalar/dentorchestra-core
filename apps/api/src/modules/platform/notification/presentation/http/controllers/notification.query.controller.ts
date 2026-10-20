@@ -58,7 +58,6 @@ export class NotificationQueryController {
       );
     }
 
-
     const notifications$ = this.realtimeBridge
       .streamFor(staffId)
       .pipe(
@@ -77,7 +76,8 @@ export class NotificationQueryController {
   @HasCapability(STAFFNOTIFICATION.read)
   @Get()
   @Serialize<StaffNotificationListItem, StaffNotificationResponseDto>(
-    StaffNotificationResponseDto
+    StaffNotificationResponseDto,
+    { isArray: true }
   )
   list(
     @Query() pagination: PaginationDto,

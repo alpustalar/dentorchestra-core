@@ -15,7 +15,7 @@ import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetAdAttributedLeadsQuery } from '@modules/crm/lead/application/queries/get-ad-attributed-leads/get-ad-attributed-leads.query';
 import { GetRevenueByPatientsQuery } from '@modules/finance/finance-ledger/application/queries/get-revenue-by-patients/get-revenue-by-patients.query';
 import { GetClinicCurrencyQuery } from '@modules/organization/clinic/application/queries/get-clinic-currency/get-clinic-currency.query';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   RoiCampaignBreakdown,
   RoiPeriodTotals,
@@ -45,10 +45,9 @@ interface ComputePeriodInput {
 }
 
 @QueryHandler(GetAgencyRoiReportQuery)
-export class GetAgencyRoiReportHandler implements IQueryHandler<
-  GetAgencyRoiReportQuery,
-  GetAgencyRoiReportResponse
-> {
+export class GetAgencyRoiReportHandler
+  implements IQueryHandler<GetAgencyRoiReportQuery, GetAgencyRoiReportResponse>
+{
   constructor(
     @Inject(META_CAMPAIGN_METRIC_QUERY_REPOSITORY)
     private readonly metaCampaignMetricRepo: IMetaCampaignMetricQueryRepository,

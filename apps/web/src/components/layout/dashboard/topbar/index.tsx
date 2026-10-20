@@ -9,6 +9,7 @@ import { SettingsMenu } from './settings-menu';
 import { NotificationBell } from './notification-bell';
 import { ProfileSheet } from './profile-sheet';
 import { useTopbarSettings } from '@/components/layout/dashboard/hooks/use-topbar-settings';
+import { RoleSwitcher } from './role-switcher';
 
 export function Topbar() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -31,6 +32,7 @@ export function Topbar() {
 
       {/* Klinik Seçici */}
       <ClinicSelector />
+      <RoleSwitcher />
 
       {/* Sağ Taraf */}
       <div className="ml-auto flex items-center gap-2">

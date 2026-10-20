@@ -12,7 +12,7 @@ import { TaxSpecification } from '@modules/finance/shared/domain/value-objects/t
 import { CreateFinanceLedgerProps } from '@modules/finance/finance-ledger/domain/contracts/finance-ledger';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Currency } from '@src/domain/value-objects/currency.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';
 import { DefaultValidateOptions } from '@common/domain/constants/default-options.constant';
@@ -219,16 +219,19 @@ export class FinanceLedgerEntity extends AggregateRoot {
    * Kaydı kaynağın (taksit) nihai durumuna hizalar. İdempotent: aynı durum
    * tekrar verilirse hiçbir şey yapmaz ve `false` döner (gereksiz UPDATE yok).
    *
-   * Geçiş matrisi tek yerde: COMPLETED → REFUNDED/CANCELLED serbest; iade ya
-   * da iptal edilmiş bir kaydı tekrar gelire çevirmek **yasak** — telafi turu
-   * (backfill) geç gelen bir tahsilat olayıyla iadeyi geri alamaz.
+   * Geçiş matrisi tek yerde: COMPLETED → REFUNDED/CANCELLED/CHARGED_BACK
+   * serbest; iade, iptal ya da ters ibraz edilmiş bir kaydı tekrar gelire
+   * çevirmek **yasak** — telafi turu (backfill) geç gelen bir tahsilat olayıyla
+   * iadeyi geri alamaz. Ters ibraz edilen paranın yeniden tahsili AYNI kayda
+   * değil, telafi taksidinin kendi kaydına yazılır.
    */
   public syncStatus(target: LedgerStatus): boolean {
     if (this._status === target) return false;
 
     const isReversed =
       this._status === LedgerStatusSchema.enum.REFUNDED ||
-      this._status === LedgerStatusSchema.enum.CANCELLED;
+      this._status === LedgerStatusSchema.enum.CANCELLED ||
+      this._status === LedgerStatusSchema.enum.CHARGED_BACK;
 
     if (isReversed) {
       throw new LedgerInvalidStatusTransitionException(this._status, target);

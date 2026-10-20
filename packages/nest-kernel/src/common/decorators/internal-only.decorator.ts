@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../shared/common/constants/execution-source.constant';
 import { ForbiddenException } from '@nestjs/common';
 
 export function InternalOnly() {

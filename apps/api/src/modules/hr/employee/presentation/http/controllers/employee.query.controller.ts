@@ -24,7 +24,9 @@ const { EMPLOYEE } = CAPABILITIES;
 export class EmployeeQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
-  @Serialize<Employee, EmployeeResponseDto>(EmployeeResponseDto)
+  @Serialize<Employee, EmployeeResponseDto>(EmployeeResponseDto, {
+    isArray: true,
+  })
   list(
     @Query() dto: GetEmployeesDto,
     @Query() pagination: PaginationDto,

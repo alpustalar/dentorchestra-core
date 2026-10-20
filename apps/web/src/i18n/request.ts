@@ -20,6 +20,7 @@ export default getRequestConfig(async () => {
   return {
     locale,
     messages: locale_map[locale],
+    timeZone: 'Europe/Istanbul',
     formats: {
       dateTime: {
         short: {

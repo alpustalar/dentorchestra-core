@@ -5,7 +5,7 @@ import {
   HOTELBEDS_API_SERVICE,
   IHotelbedsApiService,
 } from '@modules/crm/health-tourism/hotel/domain/interfaces/hotelbeds-api.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   HOTELBEDS_HOTEL_COMMAND_REPOSITORY,
   IHotelbedsHotelCommandRepository,

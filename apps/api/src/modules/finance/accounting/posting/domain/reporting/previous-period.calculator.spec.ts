@@ -1,5 +1,5 @@
 import { resolvePreviousPeriod } from './previous-period.calculator';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 const at = (isoDate: string) => DateTimeManager.create(isoDate);
 

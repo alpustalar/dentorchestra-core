@@ -24,7 +24,9 @@ const { ACTIVITY } = CAPABILITIES;
 export class ActivityQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get('my-tasks')
-  @Serialize<Activity, ActivityResponseDto>(ActivityResponseDto)
+  @Serialize<Activity, ActivityResponseDto>(ActivityResponseDto, {
+    isArray: true,
+  })
   getMyTasks(
     @Query() dto: GetMyTasksDto,
     @Query() pagination: PaginationDto,
@@ -36,10 +38,12 @@ export class ActivityQueryController {
     );
   }
   @Get('lead/:leadId')
-  @Serialize<Activity, ActivityResponseDto>(ActivityResponseDto)
+  @Serialize<Activity, ActivityResponseDto>(ActivityResponseDto, {
+    isArray: true,
+  })
   getByLead(
     @Param('leadId', ParseUUIDPipe) leadId: string,
-    @Param('clinicId', ParseUUIDPipe) clinicId: string,
+    @Query('clinicId', ParseUUIDPipe) clinicId: string,
     @Query() pagination: PaginationDto,
     @GetContext() ctx: IGetContext
   ) {

@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CreateLeadHandler } from './create-lead.handler';
 import { CreateLeadCommand } from './create-lead.command';
 import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { ActorContext } from '@common/interfaces';
 import type { IGetContext } from '@common/decorators/get-context.decorator';

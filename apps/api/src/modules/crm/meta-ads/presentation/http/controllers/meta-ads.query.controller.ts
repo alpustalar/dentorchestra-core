@@ -43,7 +43,8 @@ export class MetaAdsQueryController {
   @HasCapability(METAADACCOUNT.read)
   @Get('clinics/:clinicId/accounts')
   @Serialize<MetaAdAccountResponse, MetaAdAccountResponseDto>(
-    MetaAdAccountResponseDto
+    MetaAdAccountResponseDto,
+    { isArray: true }
   )
   getAccounts(
     @Param('clinicId', ParseUUIDPipe) clinicId: string,
@@ -88,7 +89,9 @@ export class MetaAdsQueryController {
 
   @HasCapability(METALEAD.read)
   @Get('clinics/:clinicId/leads')
-  @Serialize<MetaLeadResponse, MetaLeadResponseDto>(MetaLeadResponseDto)
+  @Serialize<MetaLeadResponse, MetaLeadResponseDto>(MetaLeadResponseDto, {
+    isArray: true,
+  })
   getLeads(
     @Param('clinicId', ParseUUIDPipe) clinicId: string,
     @Query() dto: GetMetaLeadsDto,

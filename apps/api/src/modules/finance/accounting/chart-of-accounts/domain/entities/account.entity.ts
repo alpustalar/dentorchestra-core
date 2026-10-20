@@ -19,7 +19,7 @@ import {
 import { ChartTemplateIntegrity } from '@modules/finance/accounting/chart-of-accounts/domain/services/template-integrity/chart-template-integrity';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Name } from '@src/domain/value-objects/name.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 export interface BuildChartInput {
   clinicId: string;

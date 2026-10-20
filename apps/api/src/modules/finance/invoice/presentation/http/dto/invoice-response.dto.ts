@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { InvoiceStatusType as InvoiceStatus } from '@input-type-schemas/InvoiceStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { InvoiceStatusType as InvoiceStatus, InvoiceStatusSchema } from '@input-type-schemas/InvoiceStatusSchema';
 import { EDocumentTypeType as EDocumentType } from '@input-type-schemas/EDocumentTypeSchema';
 import { EDocumentStatusType as EDocumentStatus } from '@input-type-schemas/EDocumentStatusSchema';
 import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema';
@@ -101,6 +102,7 @@ export class InvoiceListItemResponseDto {
   patientId: string;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: InvoiceStatusSchema.options })
   status: InvoiceStatus;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
@@ -141,6 +143,7 @@ export class InvoiceViewResponseDto {
   patientId: string;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: InvoiceStatusSchema.options })
   status: InvoiceStatus;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })

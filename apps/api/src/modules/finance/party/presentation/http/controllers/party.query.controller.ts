@@ -27,7 +27,7 @@ export class PartyQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
 
   @Get()
-  @Serialize<Party, PartyResponseDto>(PartyResponseDto)
+  @Serialize<Party, PartyResponseDto>(PartyResponseDto, { isArray: true })
   findParties(
     @GetContext() ctx: IGetContext,
     @Query('clinicId', ParseUUIDPipe) clinicId: string,

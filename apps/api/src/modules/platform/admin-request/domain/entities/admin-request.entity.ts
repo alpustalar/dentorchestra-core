@@ -10,7 +10,7 @@ import { CreateAdminRequestProps } from '@modules/platform/admin-request/domain/
 import { AdminRequestTypeType as AdminRequestType } from '@input-type-schemas/AdminRequestTypeSchema';
 import { AdminRequestStatusType as AdminRequestStatus } from '@input-type-schemas/AdminRequestStatusSchema';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 export class AdminRequest extends AggregateRoot {
   constructor(data: IAdminRequest) {

@@ -9,5 +9,13 @@ export {
   useAnyCapability,
   useCapability,
 } from './use-capability';
-export { signIn, signOut, watchAuthState } from './auth-client';
+export {
+  confirmPhoneSignIn,
+  createPhoneSignInVerifier,
+  requestPhoneSignInCode,
+  signIn,
+  signInWithGoogle,
+  signOut,
+  watchAuthState,
+} from './auth-client';
 export { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS } from './session';

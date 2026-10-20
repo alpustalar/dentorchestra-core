@@ -23,7 +23,7 @@ import type {
   ExternalWorkOrderWithItems,
   WorkOrderSummary,
 } from '@modules/supply/work-order/domain/contracts';
-import { CAPABILITIES } from '@src/infrastructure/persistence/prisma/data/modules';
+import { CAPABILITIES } from '@shared/datasets';
 
 const { EXTERNALWORKORDER } = CAPABILITIES;
 @UseGuards(AuthGuard, CapabilityGuard)
@@ -34,7 +34,8 @@ export class WorkOrderQueryController {
 
   @Get()
   @Serialize<ExternalWorkOrderWithItems, ExternalWorkOrderResponseDto>(
-    ExternalWorkOrderResponseDto
+    ExternalWorkOrderResponseDto,
+    { isArray: true }
   )
   list(
     @Query() dto: GetWorkOrdersFilterDto,

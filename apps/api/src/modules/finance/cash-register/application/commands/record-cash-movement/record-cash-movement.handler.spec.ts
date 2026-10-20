@@ -9,7 +9,7 @@ import { ICashMovementCommandRepository } from '@modules/finance/cash-register/d
 import { InsufficientCashInDrawerException } from '@modules/finance/cash-register/domain/exceptions/cash-register.exceptions';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import CashMovementTypeSchema from '@input-type-schemas/CashMovementTypeSchema';
 import type { RecordCashMovement } from '@shared/modules/cash-register/types/commands';
 import CurrencySchema from '@input-type-schemas/CurrencySchema';

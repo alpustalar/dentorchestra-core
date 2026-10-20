@@ -16,11 +16,13 @@
   "pnpm": {
     "overrides": {
       "zod": "^4.3.6"
+    },
+    "patchedDependencies": {
+      "nestjs-zod@5.1.1": "patches/nestjs-zod@5.1.1.patch"
     }
   },
   "dependencies": {
-    "date-fns": "^4.1.0",
-    "date-fns-tz": "^3.2.0",
+    "dayjs": "^1.11.20",
     "rrule": "^2.8.1"
   }
 }

@@ -1,5 +1,6 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, ExposeOptions, Type } from 'class-transformer';
-import { ExternalWorkOrderStatusType } from '@input-type-schemas/ExternalWorkOrderStatusSchema';
+import { ExternalWorkOrderStatusType, ExternalWorkOrderStatusSchema } from '@input-type-schemas/ExternalWorkOrderStatusSchema';
 import { ResponseGroups } from '@common/constants';
 
 const OPS: ExposeOptions = {
@@ -34,6 +35,7 @@ export class ExternalWorkOrderResponseDto {
   @Expose(OPS) treatmentId: string | null;
   @Expose(OPS) providerId: string | null;
   @Expose(OPS) referenceNo: string | null;
+  @ApiProperty({ enum: ExternalWorkOrderStatusSchema.options })
   @Expose(OPS) status: ExternalWorkOrderStatusType;
 
   @Expose(OPS)

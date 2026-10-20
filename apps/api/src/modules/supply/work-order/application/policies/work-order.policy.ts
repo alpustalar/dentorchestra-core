@@ -1,11 +1,11 @@
 import { ActorContext } from '@common/interfaces';
 import { ClinicPolicy } from '@modules/organization/clinic/application/policies';
-import { ExecutionSource } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource } from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { SerializationOptionsResponse } from '@common/interfaces/serialization-policy.interface';
 import {
   ResponseGroup,
   ResponseGroups,
-} from '@common/constants/response-groups.constant';
+} from '../../../../../../../../packages/shared/common/constants/response-groups.constant';
 
 /**
  * Dış iş emri staff policy'si. İş emri açma, görüntüleme ve tedarikçideki ilerlemeyi

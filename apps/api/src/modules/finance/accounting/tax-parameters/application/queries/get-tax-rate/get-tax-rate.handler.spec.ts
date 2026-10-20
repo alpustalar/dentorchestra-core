@@ -3,7 +3,7 @@ import { GetTaxRateHandler } from './get-tax-rate.handler';
 import { GetTaxRateQuery } from './get-tax-rate.query';
 import { TaxParameterNotConfiguredException } from '@modules/finance/accounting/tax-parameters/domain/exceptions/tax-parameter-not-configured.exception';
 import { TaxParameterKeySchema } from '@shared';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 describe('GetTaxRateHandler', () => {
   const make = (effective: { rate: Decimal } | null) => {

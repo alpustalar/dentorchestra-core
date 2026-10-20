@@ -13,7 +13,7 @@ import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetLedgerByClinicIdQuery } from '@modules/finance/finance-ledger/application/queries/get-ledger-by-clinic-id/get-ledger-by-clinic-id.query';
 import { GetClinicFinanceSummaryQuery } from '@modules/finance/finance-ledger/application/queries/get-clinic-finance-summary/get-clinic-finance-summary.query';
 import { GetPatientFinanceSummaryQuery } from '@modules/finance/finance-ledger/application/queries/get-patient-finance-summary/get-patient-finance-summary.query';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Serialize } from '@common/decorators/serialize.decorator';
 import {
   FinanceLedgerResponseDto,
@@ -50,7 +50,8 @@ export class FinanceLedgerQueryController {
    */
   @Get('reconciliation/mismatches')
   @Serialize<LedgerMismatchRow, LedgerMismatchResponseDto>(
-    LedgerMismatchResponseDto
+    LedgerMismatchResponseDto,
+    { isArray: true }
   )
   getMismatches(
     @GetContext() ctx: IGetContext,
@@ -62,7 +63,10 @@ export class FinanceLedgerQueryController {
   }
 
   @Get('clinic/:clinicId')
-  @Serialize<FinanceLedger, FinanceLedgerResponseDto>(FinanceLedgerResponseDto)
+  @Serialize<FinanceLedger, FinanceLedgerResponseDto>(
+    FinanceLedgerResponseDto,
+    { isArray: true }
+  )
   getClinicLedger(
     @GetContext() ctx: IGetContext,
     @Param('clinicId', ParseUUIDPipe) clinicId: string,
@@ -107,7 +111,8 @@ export class FinanceLedgerQueryController {
   /** Hastanın cari hareket dökümü (sayfalı). */
   @Get('patient/:patientId')
   @Serialize<PatientLedgerItem, PatientLedgerItemResponseDto>(
-    PatientLedgerItemResponseDto
+    PatientLedgerItemResponseDto,
+    { isArray: true }
   )
   getPatientLedger(
     @GetContext() ctx: IGetContext,

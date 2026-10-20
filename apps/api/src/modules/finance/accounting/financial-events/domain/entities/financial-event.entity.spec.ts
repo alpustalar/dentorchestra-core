@@ -6,7 +6,7 @@ import {
 import { FinancialEventTypeSchema } from '@shared';
 import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
 import { FinancialEventRecordedEvent } from '@modules/finance/accounting/financial-events/domain/events/financial-event-recorded.event';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 
 const CLINIC_ID = '11111111-1111-4111-8111-111111111111';

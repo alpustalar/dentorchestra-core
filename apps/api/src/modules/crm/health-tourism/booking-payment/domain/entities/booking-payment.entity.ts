@@ -24,7 +24,7 @@ import {
 } from '@modules/crm/health-tourism/booking-payment/domain/exceptions/booking-payment.exceptions';
 import { PaymentProviders } from '@common/constants/payment-provider.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Url } from '@src/domain/value-objects/url.vo';
 import { Money } from '@src/domain/value-objects/money.vo';
 import { isNotUndefined } from '@common/utils/is-not-undefined';

@@ -1,6 +1,6 @@
 import { LeaveEntitlement } from './leave-entitlement.vo';
 import { EmployeeInvalidEntitlementException } from '@modules/hr/employee/domain/exceptions/employee.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 const day = (iso: string): Date =>
   DateTimeManager.fromLocalDateTime(iso, '09:00');

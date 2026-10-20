@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -20,6 +20,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import ManagedSheet from '@/components/ui/managed-sheet';
+import { DateTimeManager } from '@shared/common';
+import { formatShortDate } from '@/lib/date-time';
+
+const today = DateTimeManager.startOfDay(DateTimeManager.create());
+const currentYear = DateTimeManager.currentYear();
+const relativeDate = (days: number) =>
+  formatShortDate(
+    days < 0
+      ? DateTimeManager.subtractDays(today, Math.abs(days))
+      : DateTimeManager.addDays(today, days)
+  );
 
 const modules = {
   patients: {
@@ -30,15 +41,21 @@ const modules = {
     action: 'Yeni hasta',
     columns: ['Hasta', 'İletişim', 'Son ziyaret', 'Sonraki randevu', 'Durum'],
     rows: [
-      ['Elif Yıldız', '0532 481 22 18', '08 Ağu 2026', '12 Ağu 2026', 'Aktif'],
+      [
+        'Elif Yıldız',
+        '0532 481 22 18',
+        relativeDate(-5),
+        relativeDate(-1),
+        'Aktif',
+      ],
       [
         'James Miller',
         '+44 20 7946 0912',
-        '07 Ağu 2026',
-        '14 Ağu 2026',
+        relativeDate(-6),
+        relativeDate(1),
         'Tedavi sürüyor',
       ],
-      ['Ayşe Korkmaz', '0555 209 45 61', '02 Ağu 2026', '—', 'Takipte'],
+      ['Ayşe Korkmaz', '0555 209 45 61', relativeDate(-11), '—', 'Takipte'],
     ],
   },
   inventory: {
@@ -76,9 +93,27 @@ const modules = {
     action: 'Fatura oluştur',
     columns: ['Belge', 'Müşteri', 'Tarih', 'Tutar', 'Durum'],
     rows: [
-      ['FTR-2026-184', 'Elif Yıldız', '08 Ağu 2026', '₺42.500', 'Ödendi'],
-      ['FTR-2026-183', 'James Miller', '07 Ağu 2026', '€2.400', 'Bekliyor'],
-      ['FTR-2026-182', 'Sofia Rossi', '05 Ağu 2026', '€4.200', 'Kısmi'],
+      [
+        `FTR-${currentYear}-184`,
+        'Elif Yıldız',
+        relativeDate(-5),
+        '₺42.500',
+        'Ödendi',
+      ],
+      [
+        `FTR-${currentYear}-183`,
+        'James Miller',
+        relativeDate(-6),
+        '€2.400',
+        'Bekliyor',
+      ],
+      [
+        `FTR-${currentYear}-182`,
+        'Sofia Rossi',
+        relativeDate(-8),
+        '€4.200',
+        'Kısmi',
+      ],
     ],
   },
   crm: {
@@ -90,7 +125,7 @@ const modules = {
     rows: [
       ['Lucia Fernández', 'Meta Ads', 'Teklif', 'Bugün', 'Zeynep Ak'],
       ['Ahmed Hassan', 'WhatsApp', 'Konsültasyon', 'Dün', 'Mert Kaya'],
-      ['Sofia Rossi', 'Referans', 'Kazanıldı', '05 Ağu', 'Zeynep Ak'],
+      ['Sofia Rossi', 'Referans', 'Kazanıldı', relativeDate(-8), 'Zeynep Ak'],
     ],
   },
   marketing: {
@@ -178,6 +213,7 @@ const statusVariant = (value: string) =>
 
 export function ModuleTable({ module }: { module: string }) {
   const router = useRouter();
+  const params = useParams<{ locale: string; 'clinic-slug': string }>();
   const config =
     modules[(module in modules ? module : 'patients') as ModuleKey];
   const [query, setQuery] = React.useState('');
@@ -378,7 +414,7 @@ export function ModuleTable({ module }: { module: string }) {
               className="w-full"
               onClick={() =>
                 router.push(
-                  `../patients/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
+                  `/${params.locale}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
                 )
               }
             >

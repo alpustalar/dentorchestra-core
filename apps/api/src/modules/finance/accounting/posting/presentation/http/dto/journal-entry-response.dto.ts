@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { FinanceResponseGroups } from '@modules/finance/shared/domain/finance.contracts';
-import { JournalEntryStatusType } from '@input-type-schemas/JournalEntryStatusSchema';
+import { JournalEntryStatusType, JournalEntryStatusSchema } from '@input-type-schemas/JournalEntryStatusSchema';
 
 const { FINANCIAL, MANAGEMENT, ADMIN } = FinanceResponseGroups;
 
@@ -24,6 +25,7 @@ export class JournalEntryResponseDto {
   entryDate: Date;
 
   @Expose(FIN) description: string | null;
+  @ApiProperty({ enum: JournalEntryStatusSchema.options })
   @Expose(FIN) status: JournalEntryStatusType;
 
   // --- İzlenebilirlik (fişi kim/hangi olay üretti, ters kaydı var mı) ---

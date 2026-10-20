@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { ProductUnitType } from '@input-type-schemas/ProductUnitSchema';
-import { ProductConditionType } from '@input-type-schemas/ProductConditionSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { ProductUnitType, ProductUnitSchema } from '@input-type-schemas/ProductUnitSchema';
+import { ProductConditionType, ProductConditionSchema } from '@input-type-schemas/ProductConditionSchema';
 
 const { MANAGEMENT, ADMIN, FINANCIAL } = ResponseGroups;
 
@@ -16,7 +17,9 @@ export class ProductResponseDto {
   @Expose() brand: string | null;
   @Expose() description: string | null;
   @Expose() imageUrl: string | null;
+  @ApiProperty({ enum: ProductUnitSchema.options })
   @Expose() unit: ProductUnitType;
+  @ApiProperty({ enum: ProductConditionSchema.options, nullable: true })
   @Expose() condition: ProductConditionType | null;
   @Expose() isActive: boolean;
 

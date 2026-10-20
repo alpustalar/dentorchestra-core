@@ -5,7 +5,7 @@ import { BaseCommandRepository } from '@src/infrastructure/persistence/prisma/ba
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { txStorage } from '@src/infrastructure/transaction/als-storage';
 import { GlobalStatusSchema } from '@input-type-schemas/GlobalStatusSchema';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { IClinicCommandRepository } from '@modules/organization/clinic/domain/repositories/clinic/clinic.command.repository';
 
 @Injectable()

@@ -14,13 +14,16 @@ import {
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { PosProvider } from '@prisma/client';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @QueryHandler(FindStalePosTransactionsQuery)
-export class FindStalePosTransactionsHandler implements IQueryHandler<
-  FindStalePosTransactionsQuery,
-  FindStalePosTransactionsResponse
-> {
+export class FindStalePosTransactionsHandler
+  implements
+    IQueryHandler<
+      FindStalePosTransactionsQuery,
+      FindStalePosTransactionsResponse
+    >
+{
   constructor(
     @Inject(POS_TRANSACTION_QUERY_REPOSITORY)
     private readonly posTransactionQueryRepo: IPosTransactionQueryRepository,

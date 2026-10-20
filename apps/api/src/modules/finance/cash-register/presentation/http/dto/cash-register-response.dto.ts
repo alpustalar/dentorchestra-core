@@ -1,10 +1,11 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { FinanceResponseGroups } from '@modules/finance/shared/domain/finance.contracts';
-import { CurrencyType } from '@input-type-schemas/CurrencySchema';
-import { CashRegisterStatusType } from '@input-type-schemas/CashRegisterStatusSchema';
-import { CashSessionStatusType } from '@input-type-schemas/CashSessionStatusSchema';
-import { CashMovementTypeType } from '@input-type-schemas/CashMovementTypeSchema';
-import { CashMovementDirectionType } from '@input-type-schemas/CashMovementDirectionSchema';
+import { CurrencyType, CurrencySchema } from '@input-type-schemas/CurrencySchema';
+import { CashRegisterStatusType, CashRegisterStatusSchema } from '@input-type-schemas/CashRegisterStatusSchema';
+import { CashSessionStatusType, CashSessionStatusSchema } from '@input-type-schemas/CashSessionStatusSchema';
+import { CashMovementTypeType, CashMovementTypeSchema } from '@input-type-schemas/CashMovementTypeSchema';
+import { CashMovementDirectionType, CashMovementDirectionSchema } from '@input-type-schemas/CashMovementDirectionSchema';
 
 const { INTERNAL, FINANCIAL, MANAGEMENT, ADMIN } = FinanceResponseGroups;
 
@@ -20,7 +21,9 @@ export class CashRegisterResponseDto {
   @Expose(OPS) id: string;
   @Expose(OPS) clinicId: string;
   @Expose(OPS) name: string;
+  @ApiProperty({ enum: CurrencySchema.options })
   @Expose(OPS) currency: CurrencyType;
+  @ApiProperty({ enum: CashRegisterStatusSchema.options })
   @Expose(OPS) status: CashRegisterStatusType;
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })
@@ -43,13 +46,16 @@ export class CashMovementResponseDto {
   @Expose(OPS) id: string;
   @Expose(OPS) cashSessionId: string;
   @Expose(OPS) clinicId: string;
+  @ApiProperty({ enum: CashMovementTypeSchema.options })
   @Expose(OPS) type: CashMovementTypeType;
+  @ApiProperty({ enum: CashMovementDirectionSchema.options })
   @Expose(OPS) direction: CashMovementDirectionType;
 
   @Expose(OPS)
   @Type(() => String)
   amount: string;
 
+  @ApiProperty({ enum: CurrencySchema.options })
   @Expose(OPS) currency: CurrencyType;
   @Expose(OPS) description: string | null;
   @Expose(OPS) performedById: string;
@@ -79,7 +85,9 @@ export class CashSessionResponseDto {
   @Expose(OPS) id: string;
   @Expose(OPS) cashRegisterId: string;
   @Expose(OPS) clinicId: string;
+  @ApiProperty({ enum: CashSessionStatusSchema.options })
   @Expose(OPS) status: CashSessionStatusType;
+  @ApiProperty({ enum: CurrencySchema.options })
   @Expose(OPS) currency: CurrencyType;
 
   @Expose(OPS)

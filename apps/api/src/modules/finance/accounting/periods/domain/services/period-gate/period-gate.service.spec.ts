@@ -9,7 +9,7 @@ import { AccountingPeriod } from '@modules/finance/accounting/periods/domain/ent
 import { PeriodSealedForDateException } from '@modules/finance/accounting/periods/domain/exceptions/period.exceptions';
 import { AccountingPeriodStatusType } from '@input-type-schemas/AccountingPeriodStatusSchema';
 import { IAccountingPeriodCommandRepository } from '@modules/finance/accounting/periods/domain/repositories/accounting-period/accounting-period.command.repository';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 const CLINIC_ID = '11111111-1111-4111-8111-111111111111';
 

@@ -17,7 +17,7 @@ import { PurchasingPolicy } from '@modules/supply/purchasing/application/policie
 import { ConsentFormPolicy } from '@modules/clinical/consent-form/application/policies';
 import { WorkOrderPolicy } from '@modules/supply/work-order/application/policies';
 import { ProjectPolicy } from '@modules/organization/project/application/policies';
-import { ExecutionSource } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource } from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 
 @Injectable()
 export class PolicyFactory implements IPolicyFactory {

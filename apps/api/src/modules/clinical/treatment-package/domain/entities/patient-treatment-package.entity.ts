@@ -14,7 +14,7 @@ import {
 } from '@modules/clinical/treatment-package/domain/contracts';
 import { DateRange } from '@src/domain/value-objects/date-range.vo';
 import { InvalidTreatmentPackageResumeException } from '@modules/clinical/treatment-package/domain/exceptions/patient-treatment-package.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { isNotUndefined } from '@common/utils/is-not-undefined';
 import { Guard } from '@common/domain/guards';

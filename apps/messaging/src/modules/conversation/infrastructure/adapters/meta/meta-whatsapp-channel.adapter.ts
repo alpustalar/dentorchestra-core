@@ -12,7 +12,7 @@ import {
   WHATSAPP_GRAPH_API_BASE,
   WHATSAPP_SEND_TIMEOUT_MS,
 } from './whatsapp-graph.constants';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 interface GraphSendResponse {
   messages?: Array<{ id: string }>;

@@ -6,7 +6,7 @@ import {
 } from '@input-type-schemas/SubscriptionChargeStatusSchema';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Money } from '@src/domain/value-objects/money.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ClaimSubscriptionChargeProps } from '@modules/platform/subscription/domain/contracts';
 import { SubscriptionChargeNotPendingException } from '@modules/platform/subscription/domain/exceptions/subscription.exceptions';
 

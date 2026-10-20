@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UpdateUserByStaffHandler } from './update-user-by-staff.handler';
 import { UpdateUserByStaffCommand } from './update-user-by-staff.command';
 import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { Priority } from '@src/domain/value-objects/priority.vo';
 import { ActorContext } from '@common/interfaces';

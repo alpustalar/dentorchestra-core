@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { EmployeeResponseGroups } from '@modules/hr/employee/domain/contracts/employee.contracts';
-import { LeaveTypeType } from '@input-type-schemas/LeaveTypeSchema';
-import { LeaveStatusType } from '@input-type-schemas/LeaveStatusSchema';
+import { LeaveTypeType, LeaveTypeSchema } from '@input-type-schemas/LeaveTypeSchema';
+import { LeaveStatusType, LeaveStatusSchema } from '@input-type-schemas/LeaveStatusSchema';
 
 const { INTERNAL, MANAGEMENT, ADMIN } = EmployeeResponseGroups;
 
@@ -17,7 +18,9 @@ export class LeaveRequestResponseDto {
   @Expose(OPS) id: string;
   @Expose(OPS) employeeId: string;
   @Expose(OPS) clinicId: string;
+  @ApiProperty({ enum: LeaveTypeSchema.options })
   @Expose(OPS) type: LeaveTypeType;
+  @ApiProperty({ enum: LeaveStatusSchema.options })
   @Expose(OPS) status: LeaveStatusType;
 
   @Expose(OPS)

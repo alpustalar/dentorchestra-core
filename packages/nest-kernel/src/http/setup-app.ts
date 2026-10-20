@@ -1,8 +1,14 @@
 import helmet from 'helmet';
-import { ExceptionFilter, INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  INestApplication,
+  ValidationPipe,
+  VersioningType,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ZodValidationPipe } from 'nestjs-zod';
-import { API_CONFIG } from '@common/constants/api-config.constant';
+import { API_CONFIG } from '@shared/common/constants/api-config.constant';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 export interface SetupAppOptions {
   /**
@@ -19,9 +25,8 @@ export interface SetupAppOptions {
  */
 export const setupApp = (
   app: INestApplication,
-  options: SetupAppOptions,
+  options: SetupAppOptions
 ): void => {
-
   const configService = app.get(ConfigService);
   const isProduction = configService.get<string>('NODE_ENV') === 'production';
 
@@ -34,10 +39,9 @@ export const setupApp = (
   app.use(helmet());
 
   const allowedOrigins = configService
-      .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000')
-      .split(',')
-      .map((origin) => origin.trim());
-
+    .get<string>('ALLOWED_ORIGINS', 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim());
 
   app.enableCors({
     origin: allowedOrigins,
@@ -64,8 +68,28 @@ export const setupApp = (
 
   app.useGlobalPipes(
     new ZodValidationPipe(),
-    new ValidationPipe({ whitelist: true, transform: true }),
+    new ValidationPipe({ whitelist: true, transform: true })
   );
+
+  if (!isProduction) {
+    const config = new DocumentBuilder()
+      .setTitle('Core CRM API')
+      .setDescription('Core CRM B2B SaaS API Dokümantasyonu')
+      .setVersion(API_CONFIG.CURRENT_VERSION)
+      // nestjs-zod JSON Schema 2020 üretir (`type: 'null'`); 3.0 şeması bunu
+      // reddeder ve Orval doğrulamada düşer.
+      .setOpenAPIVersion('3.1.0')
+      .addBearerAuth()
+      .build();
+
+    const document = SwaggerModule.createDocument(app, config, {
+      ignoreGlobalPrefix: true,
+    });
+
+    SwaggerModule.setup('docs', app, document, {
+      jsonDocumentUrl: 'api-json',
+    });
+  }
 
   app.enableShutdownHooks();
 };

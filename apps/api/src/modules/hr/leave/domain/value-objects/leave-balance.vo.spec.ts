@@ -1,10 +1,11 @@
 import { LeaveBalance } from './leave-balance.vo';
 import { LeaveEntitlement } from '@modules/hr/employee/domain/value-objects/leave-entitlement.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { AnnualLeavePeriod } from '@modules/hr/leave/domain/contracts/leave-request';
 
 /** Tarihler klinik saat diliminde kurulur — takvim yılı sınırları tz'e duyarlı. */
-const day = (iso: string): Date => DateTimeManager.fromLocalDateTime(iso, '09:00');
+const day = (iso: string): Date =>
+  DateTimeManager.fromLocalDateTime(iso, '09:00');
 
 const leave = (from: string, to: string): AnnualLeavePeriod => ({
   startDate: day(from),

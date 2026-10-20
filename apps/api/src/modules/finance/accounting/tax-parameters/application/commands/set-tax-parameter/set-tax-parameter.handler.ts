@@ -3,7 +3,7 @@ import { Inject } from '@nestjs/common';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { TaxParameter } from '@modules/finance/accounting/tax-parameters/domain/entities/tax-parameter.entity';
 import { SetTaxParameterCommand } from './set-tax-parameter.command';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   ITaxParameterCommandRepository,
   TAX_PARAMETER_COMMAND_REPOSITORY,
@@ -16,10 +16,9 @@ import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
 import { InvalidTaxValidityRangeException } from '@modules/finance/accounting/tax-parameters/domain/exceptions';
 
 @CommandHandler(SetTaxParameterCommand)
-export class SetTaxParameterHandler implements ICommandHandler<
-  SetTaxParameterCommand,
-  string
-> {
+export class SetTaxParameterHandler
+  implements ICommandHandler<SetTaxParameterCommand, string>
+{
   constructor(
     @Inject(TAX_PARAMETER_COMMAND_REPOSITORY)
     private readonly taxParameterRepo: ITaxParameterCommandRepository,

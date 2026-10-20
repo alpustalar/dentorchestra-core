@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { IClinicCacheService } from '@modules/organization/clinic/domain/interfaces/clinic-cache.service.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { TimeZoneType } from '@input-type-schemas/TimeZoneSchema';
 
 const KEYS = {

@@ -16,7 +16,7 @@ import {
   MaxActiveBookingsExceededException,
   PatientBookingDisabledException,
 } from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { CreatePatientCommand } from '@modules/crm/patient/application/commands/create-patient/create-patient.command';
 import {
   APPOINTMENT_COMMAND_REPOSITORY,

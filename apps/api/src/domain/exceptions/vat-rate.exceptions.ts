@@ -1,5 +1,5 @@
 import { DomainException } from '@src/domain/exceptions/domain.exception';
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../packages/shared/common/constants/error-codes.constant';
 
 export class VatRateNegativeException extends DomainException {
   readonly errorCode = ERROR_CODES.VAT.NEGATIVE;

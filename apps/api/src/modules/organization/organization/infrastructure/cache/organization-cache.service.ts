@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import Redis from 'ioredis';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { IOrganizationCacheService } from '@modules/organization/organization/domain/interfaces/organization-cache.service.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 const KEYS = {
   ORGANIZATION_ID_BY_CLINIC_ID: (clinicId: string) =>

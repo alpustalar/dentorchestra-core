@@ -1,6 +1,6 @@
 import { MetaAdAccount as IMetaAdAccount } from '@shared';
 import { AggregateRoot } from '@common/domain/aggregate-root';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Name } from '@src/domain/value-objects/name.vo';

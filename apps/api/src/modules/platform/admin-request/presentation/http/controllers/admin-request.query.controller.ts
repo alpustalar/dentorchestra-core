@@ -17,7 +17,9 @@ const { ADMINREQUEST } = CAPABILITIES;
 export class AdminRequestQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
-  @Serialize<AdminRequest, AdminRequestResponseDto>(AdminRequestResponseDto)
+  @Serialize<AdminRequest, AdminRequestResponseDto>(AdminRequestResponseDto, {
+    isArray: true,
+  })
   findMany(
     @Query() dto: FindAdminRequestsDto,
     @Query() pagination: PaginationDto,

@@ -21,7 +21,7 @@ import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema'
 import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 import { VatRate } from '@src/domain/value-objects/vat-rate.vo';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   ApplyEDocumentResultProps,
   CancelInvoiceProps,

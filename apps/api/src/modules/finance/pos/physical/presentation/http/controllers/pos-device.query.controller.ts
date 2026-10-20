@@ -19,7 +19,9 @@ const { POSDEVICE } = CAPABILITIES;
 export class PosDeviceQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get(':clinicId')
-  @Serialize<PosDeviceItem, PosDeviceResponseDto>(PosDeviceResponseDto)
+  @Serialize<PosDeviceItem, PosDeviceResponseDto>(PosDeviceResponseDto, {
+    isArray: true,
+  })
   findByClinic(
     @Param('clinicId') clinicId: string,
     @GetContext() ctx: IGetContext

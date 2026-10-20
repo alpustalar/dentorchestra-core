@@ -1,4 +1,5 @@
 import { ICommand } from '@nestjs/cqrs';
+import { RefundBookingPaymentResponse } from './refund-booking-payment.response';
 import { SupplierRetainedCost } from '@modules/crm/health-tourism/booking-payment/domain/contracts/booking-payment';
 
 /**
@@ -20,6 +21,7 @@ import { SupplierRetainedCost } from '@modules/crm/health-tourism/booking-paymen
  * zorunda kalsın, cevap sessizce "ceza yok"a düşmesin.
  */
 export class RefundBookingPaymentCommand implements ICommand {
+  readonly __responseType!: RefundBookingPaymentResponse;
   constructor(
     public readonly payload: {
       readonly bookingId: string;

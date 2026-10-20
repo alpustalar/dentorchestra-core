@@ -1,4 +1,4 @@
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   AnnualLeavePeriod,
   LeaveBalance as ILeaveBalance,
@@ -101,7 +101,10 @@ export class LeaveBalance {
       .filter((year) => year < currentYear)
       .reduce(
         (carried, year) =>
-          Math.max(0, carried + props.entitlement.daysForYear(year) - usedIn(year)),
+          Math.max(
+            0,
+            carried + props.entitlement.daysForYear(year) - usedIn(year)
+          ),
         0
       );
 

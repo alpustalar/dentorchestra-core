@@ -7,7 +7,7 @@ import { Money } from '@src/domain/value-objects/money.vo';
 import { Currency } from '@src/domain/value-objects/currency.vo';
 import { Guard } from '@common/domain/guards';
 import { isDefined } from '@common/utils';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { CreateSubscriptionItemProps } from '@modules/platform/subscription/domain/contracts';
 
 export class SubscriptionItem extends AggregateRoot {

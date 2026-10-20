@@ -4,7 +4,7 @@ import { Product } from './product.entity';
 import { ProductBatch } from './product-batch.entity';
 import { StockQuantityChangedEvent } from '@modules/supply/inventory/domain/events';
 import { Product as IProduct, ProductBatch as IProductBatch } from '@shared';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   NoLotToDeductException,
   ProductNotUsableInClinicException,

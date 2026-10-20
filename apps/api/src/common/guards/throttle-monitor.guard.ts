@@ -3,7 +3,7 @@ import { ExecutionContext, Inject, Injectable } from '@nestjs/common';
 import { ThrottlerGuard, ThrottlerLimitDetail } from '@nestjs/throttler';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { THROTTLE_EVENTS } from '@src/domain/constants/events';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { emitDetached } from '@common/utils';
 
 export interface RateLimitExceededPayload {

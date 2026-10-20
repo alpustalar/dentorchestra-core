@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { PosProviderType as PosProvider } from '@input-type-schemas/PosProviderSchema';
+import { ResponseGroups } from '../../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { PosProviderType as PosProvider, PosProviderSchema } from '@input-type-schemas/PosProviderSchema';
 
 const { INTERNAL, MANAGEMENT, FINANCIAL, ADMIN } = ResponseGroups;
 
@@ -13,6 +14,7 @@ export class PosDeviceResponseDto {
   label: string;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: PosProviderSchema.options })
   provider: PosProvider;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })

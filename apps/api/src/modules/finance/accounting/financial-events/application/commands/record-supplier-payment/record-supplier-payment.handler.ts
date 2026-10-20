@@ -22,7 +22,7 @@ import {
   IPeriodGateService,
   PERIOD_GATE_SERVICE,
 } from '@modules/finance/accounting/periods/domain/services/period-gate/period-gate.service.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Satıcıya ödeme kaydeder. İşin tamamı bir `FinancialEvent` yazmaktır; fişi
@@ -34,10 +34,9 @@ import { DateTimeManager } from '@common/infrastructure/date-time/date-time.mana
  * birleştirmek veri kaybı olur.
  */
 @CommandHandler(RecordSupplierPaymentCommand)
-export class RecordSupplierPaymentHandler implements ICommandHandler<
-  RecordSupplierPaymentCommand,
-  string
-> {
+export class RecordSupplierPaymentHandler
+  implements ICommandHandler<RecordSupplierPaymentCommand, string>
+{
   constructor(
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,

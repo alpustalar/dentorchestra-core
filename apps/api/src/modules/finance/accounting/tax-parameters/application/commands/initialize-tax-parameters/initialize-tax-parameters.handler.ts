@@ -4,7 +4,7 @@ import { TransactionManager } from '@src/infrastructure/persistence/prisma/trans
 import { TaxParameter } from '@modules/finance/accounting/tax-parameters/domain/entities/tax-parameter.entity';
 import { TAX_PARAMETER_DEFAULTS } from '@modules/finance/accounting/tax-parameters/domain/constants/tax-parameter-defaults';
 import { InitializeTaxParametersCommand } from './initialize-tax-parameters.command';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   ITaxParameterCommandRepository,
   TAX_PARAMETER_COMMAND_REPOSITORY,
@@ -17,10 +17,9 @@ import { ITenantScopeResolver } from '@shared';
  * zaten varsa hiçbir şey yapmaz (register-clinic saga'sından çağrılır).
  */
 @CommandHandler(InitializeTaxParametersCommand)
-export class InitializeTaxParametersHandler implements ICommandHandler<
-  InitializeTaxParametersCommand,
-  void
-> {
+export class InitializeTaxParametersHandler
+  implements ICommandHandler<InitializeTaxParametersCommand, void>
+{
   constructor(
     @Inject(TAX_PARAMETER_COMMAND_REPOSITORY)
     private readonly taxParameterRepo: ITaxParameterCommandRepository,

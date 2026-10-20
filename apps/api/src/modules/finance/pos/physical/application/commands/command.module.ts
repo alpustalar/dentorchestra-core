@@ -25,6 +25,7 @@ import { PosAccountingBridgeService } from '@modules/finance/pos/physical/applic
 import { ResolveIyzicoTerminalCredentialsService } from '@modules/finance/pos/physical/application/services/resolve-iyzico-terminal-credentials.service';
 import { PosInfrastructureModule } from '@src/infrastructure/payment/pos/pos.infrastructure.module';
 import { PhysicalPosQueryModule } from '@modules/finance/pos/physical/application/queries/query.module';
+import { BankDomainServicesModule } from '@modules/finance/bank/domain/services/services.module';
 
 export const POS_COMMAND_HANDLERS = [
   RegisterPosDeviceHandler,
@@ -56,6 +57,9 @@ export const POS_COMMAND_HANDLERS = [
     // Telafi komutu `FindUnbridgedPosTransactionsQuery`'yi bus ile çağırır;
     // handler'ın kayıtlı olduğu modül burada da import edilir.
     PhysicalPosQueryModule,
+    // İade/iptal kart itirazını da hesaba katan kümülatif tavana bakar: yaprak
+    // domain-servis modülü (banka modülünün tamamı çekilmez).
+    BankDomainServicesModule,
   ],
   providers: [
     ...POS_COMMAND_HANDLERS,

@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../packages/shared/common/constants/response-groups.constant';
 import { MessageDirectionType as MessageDirection } from '@shared';
 import { MessageStatusType as MessageStatus } from '@shared';
 import { MessageTypeType as MessageType } from '@shared';

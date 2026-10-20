@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { ActivityResponseGroups } from '@modules/crm/activity/domain/contracts/activity';
-import { ActivityTypeType as ActivityType } from '@input-type-schemas/ActivityTypeSchema';
-import { ActivityStatusType as ActivityStatus } from '@input-type-schemas/ActivityStatusSchema';
+import { ActivityTypeType as ActivityType, ActivityTypeSchema } from '@input-type-schemas/ActivityTypeSchema';
+import { ActivityStatusType as ActivityStatus, ActivityStatusSchema } from '@input-type-schemas/ActivityStatusSchema';
 
 const { INTERNAL, MANAGEMENT, ADMIN } = ActivityResponseGroups;
 
@@ -13,7 +14,9 @@ export class ActivityResponseDto {
   // --- Liste ızgarası ---
   @Expose() id: string;
   @Expose() clinicId: string;
+  @ApiProperty({ enum: ActivityTypeSchema.options })
   @Expose() type: ActivityType;
+  @ApiProperty({ enum: ActivityStatusSchema.options })
   @Expose() status: ActivityStatus;
   @Expose() subject: string;
 

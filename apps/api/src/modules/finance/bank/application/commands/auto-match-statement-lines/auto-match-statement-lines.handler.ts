@@ -2,7 +2,7 @@ import { Inject, Logger } from '@nestjs/common';
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Decimal } from 'decimal.js';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import {
   IPolicyFactory,
@@ -35,10 +35,13 @@ import { AutoMatchStatementLinesResponse } from './auto-match-statement-lines.re
  * (102 zaten payment/kasa köprüsünden besleniyor; postlamak mükerrer olurdu).
  */
 @CommandHandler(AutoMatchStatementLinesCommand)
-export class AutoMatchStatementLinesHandler implements ICommandHandler<
-  AutoMatchStatementLinesCommand,
-  AutoMatchStatementLinesResponse
-> {
+export class AutoMatchStatementLinesHandler
+  implements
+    ICommandHandler<
+      AutoMatchStatementLinesCommand,
+      AutoMatchStatementLinesResponse
+    >
+{
   private readonly logger = new Logger(AutoMatchStatementLinesHandler.name);
 
   constructor(

@@ -6,7 +6,7 @@ import { Money } from '@src/domain/value-objects/money.vo';
 import { Currency } from '@src/domain/value-objects/currency.vo';
 import { Quantity } from '@src/domain/value-objects/quantity.vo';
 import { VatRate } from '@src/domain/value-objects/vat-rate.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { CreateStockMovementProps } from '@modules/supply/inventory/domain/contracts';
 

@@ -44,6 +44,10 @@ export const ROUTE_PATHS = {
     // Platform defteri mutabakatı: eksik fiş raporu + telafi turu.
     UNBRIDGED: 'unbridged',
     BACKFILL_LEDGER: 'backfill-ledger',
+    // Doğrulanamamış / reddedilmiş rezervasyon iadeleri: liste + elle karar + yeniden deneme.
+    REFUNDS_UNRESOLVED: 'refunds/unresolved',
+    REFUND_RESOLVE: 'refunds/:refundId/resolve',
+    REFUND_RETRY: 'refunds/:refundId/retry',
     IYZICO_FULL_CALLBACK_PATH: `${BASE_PATHS.HEALTH_TOURISM}/${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.IYZICO}/${BASE_PATHS.CALLBACK}`,
     STRIPE_FULL_WEBHOOK_PATH: `${BASE_PATHS.HEALTH_TOURISM}/${BASE_PATHS.BOOKING_PAYMENTS}/${BASE_PATHS.STRIPE}/${BASE_PATHS.WEBHOOK}`,
   },

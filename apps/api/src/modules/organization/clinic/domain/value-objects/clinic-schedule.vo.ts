@@ -1,5 +1,5 @@
 import { DayMinuteRange } from '@src/domain/value-objects/day-minute-range.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ClinicAvailability } from '@modules/organization/clinic/domain/entities/clinic-availability.entity';
 import { ClinicException } from '@modules/organization/clinic/domain/entities/clinic-exception.entity';
 import {

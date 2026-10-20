@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { FlightOfferToken } from '@modules/crm/health-tourism/flight/domain/contracts';
 import { IFlightCacheService } from '@modules/crm/health-tourism/flight/domain/interfaces/flight-cache.service.interface';
 

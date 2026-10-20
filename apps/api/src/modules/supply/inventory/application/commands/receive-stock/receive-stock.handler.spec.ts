@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ReceiveStockHandler } from './receive-stock.handler';
 import { ReceiveStockCommand } from './receive-stock.command';
 import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import {
   ProductNotFoundException,
   ProductNotUsableInClinicException,

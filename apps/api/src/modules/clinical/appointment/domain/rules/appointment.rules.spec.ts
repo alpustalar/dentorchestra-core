@@ -3,6 +3,7 @@ import { AppointmentRules } from './appointment.rules';
 import { AppointmentStatusSchema } from '@shared';
 import { AppointmentStatusType } from '@input-type-schemas/AppointmentStatusSchema';
 import { DefaultValidateOptions } from '@common/domain/constants/default-options.constant';
+import { DateTimeManager } from '@shared/common';
 
 /**
  * Kurallar entity'ye değil düz snapshot'a bağlı olduğu için burada hiçbir
@@ -61,6 +62,37 @@ describe('AppointmentRules (snapshot tabanlı)', () => {
     const future = new Date(Date.now() + 60 * 60 * 1000);
 
     expect(rulesFor(PENDING).schedule({ startTime: past }).isValid).toBe(false);
-    expect(rulesFor(PENDING).schedule({ startTime: future }).isValid).toBe(true);
+    expect(rulesFor(PENDING).schedule({ startTime: future }).isValid).toBe(
+      true
+    );
+  });
+
+  it('reschedule → gelecekteki bir randevunun bitişi 15 dakika uzatılabilir', () => {
+    const start = DateTimeManager.addDays(DateTimeManager.create(), 1);
+    const end = DateTimeManager.addMinutes(start, 60);
+    const extendedEnd = DateTimeManager.addMinutes(end, 15);
+
+    expect(rulesFor(CONFIRMED).reschedule(start, end).isValid).toBe(true);
+    expect(() =>
+      rulesFor(CONFIRMED).reschedule(start, extendedEnd).orThrow()
+    ).not.toThrow();
+  });
+
+  it('reschedule → geçmiş, sıfır süreli ve ters aralıklar reddedilir', () => {
+    const now = DateTimeManager.create();
+    const start = DateTimeManager.addDays(now, 1);
+    expect(rulesFor(CONFIRMED).reschedule(start, start).isValid).toBe(false);
+    expect(
+      rulesFor(CONFIRMED).reschedule(
+        start,
+        DateTimeManager.subtractMinutes(start, 5)
+      ).isValid
+    ).toBe(false);
+    expect(
+      rulesFor(CONFIRMED).reschedule(
+        DateTimeManager.subtractMinutes(now, 5),
+        start
+      ).isValid
+    ).toBe(false);
   });
 });

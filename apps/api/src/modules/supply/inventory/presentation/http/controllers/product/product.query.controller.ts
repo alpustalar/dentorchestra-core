@@ -23,7 +23,7 @@ export class ProductQueryController {
 
   @HasCapability(PRODUCT.read)
   @Get()
-  @Serialize<Product, ProductResponseDto>(ProductResponseDto)
+  @Serialize<Product, ProductResponseDto>(ProductResponseDto, { isArray: true })
   list(
     @Query() pagination: PaginationDto,
     @Query('clinicId', ParseUUIDPipe) clinicId: string,

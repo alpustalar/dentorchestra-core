@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { HotelbedsTransferBookingStatusType as HotelbedsTransferBookingStatus } from '@input-type-schemas/HotelbedsTransferBookingStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { HotelbedsTransferBookingStatusType as HotelbedsTransferBookingStatus, HotelbedsTransferBookingStatusSchema } from '@input-type-schemas/HotelbedsTransferBookingStatusSchema';
 import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema';
 
 const { INTERNAL, MANAGEMENT, DATA_OWNER, FINANCIAL, ADMIN } = ResponseGroups;
@@ -13,6 +14,7 @@ export class HotelbedsTransferBookingResponseDto {
   @Expose() leadId: string | null;
 
   // --- Transfer Temel Bilgileri (Herkese Açık) ---
+  @ApiProperty({ enum: HotelbedsTransferBookingStatusSchema.options })
   @Expose() status: HotelbedsTransferBookingStatus;
   @Expose() transfers: JsonValue;
 

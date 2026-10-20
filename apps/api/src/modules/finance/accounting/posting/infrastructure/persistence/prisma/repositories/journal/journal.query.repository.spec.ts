@@ -4,7 +4,7 @@
 import { Prisma } from '@prisma/client';
 import { JournalQueryRepository } from './journal.query.repository';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { INCOME_STATEMENT_ENTRY_KINDS } from '@modules/finance/accounting/posting/domain/posting/ledger-entry-kind.constant';
 
 /**

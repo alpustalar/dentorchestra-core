@@ -17,7 +17,8 @@ export class PurchaseInvoiceQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
   @Serialize<PurchaseInvoice, PurchaseInvoiceResponseDto>(
-    PurchaseInvoiceResponseDto
+    PurchaseInvoiceResponseDto,
+    { isArray: true }
   )
   list(@Query() pagination: PaginationDto, @GetContext() ctx: IGetContext) {
     return this.queryBus.execute(new GetPurchaseInvoicesQuery(pagination, ctx));

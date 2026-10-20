@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 import { PaymentStatusType as PaymentStatus } from '@input-type-schemas/PaymentStatusSchema';
 import { PaymentMethodType as PaymentMethod } from '@input-type-schemas/PaymentMethodSchema';
 import { InstallmentStatusType as InstallmentStatus } from '@input-type-schemas/InstallmentStatusSchema';

@@ -7,7 +7,7 @@ import { GetInventoryLedgerReconciliationResponse } from './get-inventory-ledger
 import { GetInventoryValuationQuery } from '@modules/supply/inventory/application/queries/get-inventory-valuation/get-inventory-valuation.query';
 import { GetTrialBalanceQuery } from '@modules/finance/accounting/posting/application/queries/get-trial-balance/get-trial-balance.query';
 import { INVENTORY_STOCK_ACCOUNT_CODE } from '@modules/finance/shared/domain/constants/stock-movement-ledger.constant';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 const FUNCTIONAL_CURRENCY = CurrencySchema.enum.TRY;
 
@@ -24,10 +24,13 @@ const FUNCTIONAL_CURRENCY = CurrencySchema.enum.TRY;
  * (çevrilmediği için karşılaştırmaya girmez) ve silinmiş ürün üzerindeki stok.
  */
 @QueryHandler(GetInventoryLedgerReconciliationQuery)
-export class GetInventoryLedgerReconciliationHandler implements IQueryHandler<
-  GetInventoryLedgerReconciliationQuery,
-  GetInventoryLedgerReconciliationResponse
-> {
+export class GetInventoryLedgerReconciliationHandler
+  implements
+    IQueryHandler<
+      GetInventoryLedgerReconciliationQuery,
+      GetInventoryLedgerReconciliationResponse
+    >
+{
   constructor(private readonly queryBus: TSQueryBus) {}
 
   async execute(

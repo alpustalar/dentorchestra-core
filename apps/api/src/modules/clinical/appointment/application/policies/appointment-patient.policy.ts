@@ -1,7 +1,7 @@
 import { PatientActorContext } from '@common/interfaces';
 import { PatientBasePolicy } from '@modules/platform/policy/patient/application/patient-base.policy';
 import { Appointment } from '@shared';
-import { ExecutionSource } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource } from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import {
   AppointmentResponseGroup,
   AppointmentsResponseGroups,

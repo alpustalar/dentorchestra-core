@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 import { JsonValueType } from '@input-type-schemas/JsonValueSchema';
 import { IyzicoTransactionStatusType as IyzicoTransactionStatus } from '@input-type-schemas/IyzicoTransactionStatusSchema';
 

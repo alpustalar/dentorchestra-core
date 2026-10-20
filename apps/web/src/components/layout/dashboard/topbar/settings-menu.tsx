@@ -1,6 +1,15 @@
 'use client';
 
-import { Check, Computer, Languages, Moon, Settings, Sun } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Check,
+  Computer,
+  Expand,
+  Languages,
+  Moon,
+  Settings,
+  Sun,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useLocale } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
@@ -17,6 +26,7 @@ const accents = [
 interface SettingsMenuProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  buttonSize?: 'default' | 'lg';
   accent: string;
   setAccent: (accent: string) => void;
   contrast: string;
@@ -28,6 +38,7 @@ interface SettingsMenuProps {
 export function SettingsMenu({
                                open,
                                onOpenChange,
+                               buttonSize = 'default',
                                accent,
                                setAccent,
                                contrast,
@@ -35,25 +46,76 @@ export function SettingsMenu({
                                persistSettings,
                                updatePersistence,
                              }: SettingsMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
 
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    syncFullscreenState();
+    document.addEventListener('fullscreenchange', syncFullscreenState);
+    return () =>
+      document.removeEventListener('fullscreenchange', syncFullscreenState);
+  }, []);
+
+  const toggleFullscreen = async (enabled: boolean) => {
+    try {
+      if (enabled) {
+        await document.documentElement.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Keep the switch in sync with the browser's fullscreen state.
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        menuRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+
+      onOpenChange(false);
+    };
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open, onOpenChange]);
+
   return (
-    <div className="relative">
+    <div ref={menuRef} className="relative">
     <button
       type="button"
   onClick={() => onOpenChange(!open)}
   aria-expanded={open}
   aria-label="Uygulama ayarlarını aç"
-  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+  className={cn(
+    'flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+    buttonSize === 'lg' && 'h-10 w-10'
+  )}
   >
-  <Settings className="animate-settings-spin h-[1.15rem] w-[1.15rem]" />
+  <Settings
+    className={cn(
+      'animate-settings-spin h-[1.15rem] w-[1.15rem]',
+      buttonSize === 'lg' && 'h-6 w-6'
+    )}
+  />
     </button>
 
   {open && (
-    <div className="absolute right-0 top-12 z-40 w-72 rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-xl">
+    <div className="absolute right-0 top-12 z-40 max-h-[calc(100vh-5rem)] w-72 overflow-y-auto rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-xl">
     <div className="flex items-start justify-between gap-3 border-b border-border pb-3">
     <div>
       <p className="text-sm font-semibold">Uygulama ayarları</p>
@@ -94,6 +156,28 @@ export function SettingsMenu({
   );
   })}
     </div>
+    </div>
+
+    {/* Fullscreen */}
+    <div className="mt-4 border-t border-border pt-3">
+      <label className="flex cursor-pointer items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-xs font-medium text-foreground">
+          <Expand className="size-4 text-primary" />
+          Tam ekran modu
+        </span>
+        <span className="relative flex size-9 shrink-0 items-center justify-center">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={isFullscreen}
+            onChange={(event) => void toggleFullscreen(event.target.checked)}
+            className="peer sr-only"
+            aria-label="Tam ekran modunu aç veya kapat"
+          />
+          <span className="pointer-events-none absolute h-5 w-9 rounded-full bg-muted transition-colors peer-checked:bg-primary" />
+          <span className="pointer-events-none absolute left-1 size-3.5 rounded-full border border-border bg-background shadow-sm transition-transform peer-checked:translate-x-4" />
+        </span>
+      </label>
     </div>
 
     {/* Dil */}

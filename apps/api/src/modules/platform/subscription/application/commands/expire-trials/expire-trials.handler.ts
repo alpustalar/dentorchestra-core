@@ -2,17 +2,16 @@ import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
 import { Inject, Logger } from '@nestjs/common';
 import { ExpireTrialsCommand } from './expire-trials.command';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   ISubscriptionCommandRepository,
   SUBSCRIPTION_COMMAND_REPOSITORY,
 } from '@modules/platform/subscription/domain/repositories/subscription/subscription.command.repository';
 
 @CommandHandler(ExpireTrialsCommand)
-export class ExpireTrialsHandler implements ICommandHandler<
-  ExpireTrialsCommand,
-  void
-> {
+export class ExpireTrialsHandler
+  implements ICommandHandler<ExpireTrialsCommand, void>
+{
   private readonly logger = new Logger(ExpireTrialsHandler.name);
 
   constructor(

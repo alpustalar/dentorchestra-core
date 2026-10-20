@@ -3,7 +3,7 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import {
   ExecutionSource,
   ExecutionSources,
-} from '@src/domain/constants/execution-source.constant';
+} from '../../../../shared/common/constants/execution-source.constant';
 
 export interface IGetContext {
   actor: ActorContext;

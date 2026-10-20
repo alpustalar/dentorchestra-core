@@ -36,15 +36,17 @@ describe('BookingPaymentQueryRepository — aday süzgeci kilidi', () => {
     expect(where?.bookingReference).toEqual({ not: null });
   });
 
-  it('pencere paidAt VEYA refundedAt’e uygulanır', async () => {
+  it('pencere YALNIZ paidAt’e uygulanır (iade yönü iade satırlarından gelir)', async () => {
+    // `refundedAt` rezervasyon satırında "iade TALEP edildi" demekti ve sağlayıcı reddetse de
+    // dolardı; ona bakan pencere doğrulanmamış iadeyi "ters fiş borçlu" diye getirirdi (P0-3).
     const { repo, findMany } = build();
 
     await repo.findBridgeable({ from, to });
 
-    expect(findMany.mock.calls[0][0].where?.OR).toEqual([
-      { paidAt: { gte: from, lte: to } },
-      { refundedAt: { gte: from, lte: to } },
-    ]);
+    const where = findMany.mock.calls[0][0].where;
+    expect(where?.paidAt).toEqual({ gte: from, lte: to });
+    expect(where).not.toHaveProperty('OR');
+    expect(JSON.stringify(where)).not.toContain('refundedAt');
   });
 
   it('klinik daraltması verilmezse where’e hiç girmez', async () => {

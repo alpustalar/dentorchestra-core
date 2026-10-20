@@ -1,11 +1,12 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 
 import { TimeZone } from '@src/domain/value-objects/timezone.vo';
-import { AppointmentStatusType } from '@input-type-schemas/AppointmentStatusSchema';
-import { AppointmentSourceType } from '@input-type-schemas/AppointmentSourceSchema';
-import { VisitTypeType } from '@input-type-schemas/VisitTypeSchema';
-import { ExaminationTypeType as ExaminationType } from '@input-type-schemas/ExaminationTypeSchema';
-import { AppointmentCreatorTypeType as AppointmentCreatorType } from '@input-type-schemas/AppointmentCreatorTypeSchema';
+import { AppointmentStatusType, AppointmentStatusSchema } from '@input-type-schemas/AppointmentStatusSchema';
+import { AppointmentSourceType, AppointmentSourceSchema } from '@input-type-schemas/AppointmentSourceSchema';
+import { VisitTypeType, VisitTypeSchema } from '@input-type-schemas/VisitTypeSchema';
+import { ExaminationTypeType as ExaminationType, ExaminationTypeSchema } from '@input-type-schemas/ExaminationTypeSchema';
+import { AppointmentCreatorTypeType as AppointmentCreatorType, AppointmentCreatorTypeSchema } from '@input-type-schemas/AppointmentCreatorTypeSchema';
 import { AppointmentsResponseGroups } from '@modules/clinical/appointment/domain/contracts/appointment';
 
 const { PROVIDER_DATA_OWNER, PATIENT_DATA_OWNER, INTERNAL, ADMIN, MANAGEMENT } =
@@ -25,8 +26,6 @@ const INTERNAL_ONLY = {
   groups: [INTERNAL, PROVIDER_DATA_OWNER, ADMIN, MANAGEMENT],
 };
 
-const MANAGEMENT_ONLY = { groups: [MANAGEMENT, ADMIN] };
-
 export class AppointmentRelationalDto {
   @Expose() id: string;
 }
@@ -45,6 +44,7 @@ export class AppointmentResponseDto {
   endTime: Date;
 
   @Expose()
+  @ApiProperty({ enum: AppointmentStatusSchema.options })
   status: AppointmentStatusType;
 
   @Expose()
@@ -69,15 +69,18 @@ export class AppointmentResponseDto {
   // Operational Details (Klinik İçi, Hekim ve Yönetim)
   // --------------------
   @Expose(INTERNAL_ONLY)
+  @ApiProperty({ enum: AppointmentSourceSchema.options })
   source: AppointmentSourceType;
 
   @Expose(INTERNAL_ONLY)
   treatmentType?: string;
 
   @Expose(INTERNAL_ONLY)
+  @ApiProperty({ enum: ExaminationTypeSchema.options })
   examinationType?: ExaminationType;
 
   @Expose(INTERNAL_ONLY)
+  @ApiProperty({ enum: VisitTypeSchema.options })
   visitType?: VisitTypeType;
 
   @Expose(INTERNAL_ONLY)
@@ -87,6 +90,7 @@ export class AppointmentResponseDto {
   // Audit & Creation Logs (Sadece Personel ve Yönetim)
   // --------------------
   @Expose(INTERNAL_ONLY)
+  @ApiProperty({ enum: AppointmentCreatorTypeSchema.options })
   creatorType: AppointmentCreatorType;
 
   @Expose(INTERNAL_ONLY)

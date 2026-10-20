@@ -5,7 +5,7 @@ import { BloodTypeType as BloodType } from '@input-type-schemas/BloodTypeSchema'
 import { PatientStatusType as PatientStatus } from '@input-type-schemas/PatientStatusSchema';
 import { PatientTypeType as PatientType } from '@input-type-schemas/PatientTypeSchema';
 import { CreatePatientProps } from '@modules/crm/patient/domain/contracts/patient';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import {
   Email,

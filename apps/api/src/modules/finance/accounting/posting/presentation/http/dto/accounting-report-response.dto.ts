@@ -1,8 +1,9 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { FinanceResponseGroups } from '@modules/finance/shared/domain/finance.contracts';
-import { AccountSideType } from '@input-type-schemas/AccountSideSchema';
-import { CurrencyType } from '@input-type-schemas/CurrencySchema';
-import { JournalEntryStatusType } from '@input-type-schemas/JournalEntryStatusSchema';
+import { AccountSideType, AccountSideSchema } from '@input-type-schemas/AccountSideSchema';
+import { CurrencyType, CurrencySchema } from '@input-type-schemas/CurrencySchema';
+import { JournalEntryStatusType, JournalEntryStatusSchema } from '@input-type-schemas/JournalEntryStatusSchema';
 
 const { FINANCIAL, MANAGEMENT, ADMIN } = FinanceResponseGroups;
 
@@ -61,6 +62,7 @@ export class LedgerAccountHeaderResponseDto {
   @Expose(FIN) id: string;
   @Expose(FIN) code: string;
   @Expose(FIN) name: string;
+  @ApiProperty({ enum: AccountSideSchema.options })
   @Expose(FIN) normalSide: AccountSideType;
 }
 
@@ -81,6 +83,7 @@ export class LedgerMovementResponseDto {
 
 export class AccountLedgerReportResponseDto {
   @Expose(FIN) clinicId: string;
+  @ApiProperty({ enum: CurrencySchema.options })
   @Expose(FIN) currency: CurrencyType;
 
   @Expose(FIN)
@@ -127,6 +130,7 @@ export class JournalReportEntryResponseDto {
   entryDate: Date;
 
   @Expose(FIN) description: string | null;
+  @ApiProperty({ enum: JournalEntryStatusSchema.options })
   @Expose(FIN) status: JournalEntryStatusType;
 
   @Expose(FIN)

@@ -12,7 +12,7 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   InventoryValuationCurrencyTotal,
   InventoryValuationLine,
@@ -22,10 +22,10 @@ import {
 const FUNCTIONAL_CURRENCY = CurrencySchema.enum.TRY;
 
 @QueryHandler(GetInventoryValuationQuery)
-export class GetInventoryValuationHandler implements IQueryHandler<
-  GetInventoryValuationQuery,
-  GetInventoryValuationResponse
-> {
+export class GetInventoryValuationHandler
+  implements
+    IQueryHandler<GetInventoryValuationQuery, GetInventoryValuationResponse>
+{
   constructor(
     @Inject(PRODUCT_QUERY_REPOSITORY)
     private readonly productQueryRepo: IProductQueryRepository,

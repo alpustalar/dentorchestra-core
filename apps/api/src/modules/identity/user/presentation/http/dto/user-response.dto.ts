@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { ProviderResponseDto } from '@modules/clinical/provider/presentation/http/dto/provider-response.dto';
 import { Role, UserResponse } from '@shared';
-import { GlobalStatusType as GlobalStatus } from '@input-type-schemas/GlobalStatusSchema';
+import { GlobalStatusType as GlobalStatus, GlobalStatusSchema } from '@input-type-schemas/GlobalStatusSchema';
 import { UserResponseGroups } from '@modules/identity/user/domain/contracts';
 
 export class RelationalDto {
@@ -46,6 +47,7 @@ export class UserResponseDto implements UserResponse {
   // Management & Operational (Internal Team)
   // --------------------
   @Expose({ groups: [ADMIN, MANAGEMENT, INTERNAL] })
+  @ApiProperty({ enum: GlobalStatusSchema.options })
   status: GlobalStatus;
 
   @Expose({ groups: [ADMIN, MANAGEMENT] })

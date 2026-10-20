@@ -6,7 +6,7 @@ import { Appointment } from '@modules/clinical/appointment/domain/entities/appoi
 import { IAppointmentCommandRepository } from '@modules/clinical/appointment/domain/repositories/appointment/appointment.command.repository';
 import { BatchPayload } from '@common/interfaces/batch-payload.type';
 import { txStorage } from '@src/infrastructure/persistence/prisma/transaction';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ConcurrencyConflictException } from '@common/domain/exceptions/concurrency-conflict.exception';
 import {
   CancelProviderAppointmentsData,

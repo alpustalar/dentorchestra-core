@@ -5,7 +5,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-return */
 import { randomUUID } from 'crypto';
 import { Decimal } from 'decimal.js';
-import { PaymentCommandRepository } from './payment.command.repository';
+import {
+  PaymentCommandRepository,
+  toInstallmentCreateData,
+} from './payment.command.repository';
+import { PaymentInstallmentSchema } from '@shared/generated-zod/modelSchema/PaymentInstallmentSchema';
 import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.service';
 import { Payment } from '@modules/finance/payment/domain/entities/payment.entity';
 import { Money } from '@src/domain/value-objects/money.vo';
@@ -154,5 +158,148 @@ describe('PaymentCommandRepository (mapping + kilit)', () => {
 
     expect(payment).toBeNull();
     expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('findByIdForUpdate: ödeme satırını önce kilitler, sonra okur', async () => {
+    const db = buildDb();
+    db.payment.findUnique.mockResolvedValue({
+      id: randomUUID(),
+      clinicId,
+      patientId,
+      appointmentId: null,
+      providerId: null,
+      totalAmount: new Decimal('100.00'),
+      currency: 'TRY',
+      status: 'PENDING',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      installments: [],
+    });
+    const repo = buildRepo(db);
+
+    const order: string[] = [];
+    db.$queryRaw.mockImplementation(() => {
+      order.push('lock');
+      return Promise.resolve([{ id: 'pay-1' }]);
+    });
+    db.payment.findUnique.mockImplementationOnce(() => {
+      order.push('read');
+      return Promise.resolve({
+        id: randomUUID(),
+        clinicId,
+        patientId,
+        appointmentId: null,
+        providerId: null,
+        totalAmount: new Decimal('100.00'),
+        currency: 'TRY',
+        status: 'PENDING',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        installments: [],
+      });
+    });
+
+    const payment = await inTransaction(db, () =>
+      repo.findByIdForUpdate('pay-1')
+    );
+
+    expect(order).toEqual(['lock', 'read']);
+    expect(payment).toBeInstanceOf(Payment);
+  });
+
+  describe('ters ibraz (CHARGED_BACK) — telafi taksidi mapping kilidi', () => {
+    const chargeBackFirstInstallment = () => {
+      const payment = buildPayment();
+      const original = payment.installments[0];
+
+      payment.completeInstallment({
+        installmentId: original.id,
+        actorId: 'user-1',
+        logSource: LogSource.WEB,
+      });
+      const recoveryId = payment.chargeBackInstallment({
+        installmentId: original.id,
+        actorId: 'user-1',
+        logSource: LogSource.WEB,
+        recoveryInstallmentId: randomUUID(),
+        recoveryDueDate: new Date('2026-10-19T00:00:00Z'),
+        caseReference: 'CB-1001',
+      });
+
+      return { payment, original, recoveryId };
+    };
+
+    it('eklenen telafi taksidi UPDATE değil INSERT edilir; mevcut taksit UPDATE edilir', async () => {
+      // Regresyon: `update()` taksit listesini yalnız `UPDATE` ediyordu ("taksitler
+      // create()'te açılır"). Ters ibrazın telafi taksidi ilk kez mevcut bir plana
+      // YENİ satır ekler — `UPDATE` olsaydı satır olmadığı için sessizce hiçbir
+      // şey yazmaz (ya da P2025 ile patlar) ve hasta borcu defterde var, planda
+      // yok olurdu (CLAUDE.md finans kuralı 9).
+      const db = buildDb();
+      const repo = buildRepo(db);
+      const { payment, original, recoveryId } = chargeBackFirstInstallment();
+
+      await inTransaction(db, () => repo.update(payment));
+
+      const inserted = db.paymentInstallment.create.mock.calls.map(
+        ([arg]) => arg.data
+      );
+      expect(inserted).toHaveLength(1);
+      expect(inserted[0]).toMatchObject({
+        id: recoveryId,
+        paymentId: payment.id.value,
+        status: 'PENDING',
+        recoversInstallmentId: original.id,
+        currency: 'TRY',
+      });
+      expect(inserted[0].amount.toFixed(2)).toBe('500.50');
+      expect(inserted[0].installmentNo).toBe(3);
+
+      const updated = db.paymentInstallment.update.mock.calls.find(
+        ([arg]) => arg.where.id === original.id
+      )?.[0].data;
+      expect(updated.status).toBe('CHARGED_BACK');
+      // Telafi taksidi için UPDATE denenmez.
+      expect(
+        db.paymentInstallment.update.mock.calls.some(
+          ([arg]) => arg.where.id === recoveryId
+        )
+      ).toBe(false);
+    });
+
+    it('ikinci update eklenen taksiti yeniden INSERT etmez (PK çakışması olmaz)', async () => {
+      const db = buildDb();
+      const repo = buildRepo(db);
+      const { payment, recoveryId } = chargeBackFirstInstallment();
+
+      await inTransaction(db, () => repo.update(payment));
+      db.paymentInstallment.create.mockClear();
+      db.paymentInstallment.update.mockClear();
+
+      await inTransaction(db, () => repo.update(payment));
+
+      expect(db.paymentInstallment.create).not.toHaveBeenCalled();
+      expect(
+        db.paymentInstallment.update.mock.calls.some(
+          ([arg]) => arg.where.id === recoveryId
+        )
+      ).toBe(true);
+    });
+
+    it('taksit INSERT mapping’i şemadaki her kolonu taşır (kural 9 kilidi)', () => {
+      // Mapping kilidi: `PaymentInstallment` şemasına yeni bir kolon eklenip
+      // `toInstallmentCreateData`'ya eklenmezse bu test düşer. `createdAt` /
+      // `updatedAt` DB varsayılanıdır (bilinçli olarak yazılmaz).
+      const { payment } = chargeBackFirstInstallment();
+      const recovery = payment.installments[payment.installments.length - 1];
+
+      const mapped = new Set(Object.keys(toInstallmentCreateData(recovery)));
+      const DB_DEFAULTS = new Set(['createdAt', 'updatedAt']);
+      const missing = Object.keys(PaymentInstallmentSchema.shape).filter(
+        (column) => !DB_DEFAULTS.has(column) && !mapped.has(column)
+      );
+
+      expect(missing).toEqual([]);
+    });
   });
 });

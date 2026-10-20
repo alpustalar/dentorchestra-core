@@ -15,7 +15,7 @@ import { IPolicyFactory } from '@modules/platform/policy/staff/domain/interfaces
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { PartyRoleSchema } from '@shared';
 import type { RecordSupplierPayment } from '@shared/modules/financial-event/types/commands';

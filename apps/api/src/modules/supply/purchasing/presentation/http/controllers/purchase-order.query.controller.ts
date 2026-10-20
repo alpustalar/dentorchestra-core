@@ -28,7 +28,8 @@ export class PurchaseOrderQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
   @Serialize<PurchaseOrderWithItems, PurchaseOrderResponseDto>(
-    PurchaseOrderResponseDto
+    PurchaseOrderResponseDto,
+    { isArray: true }
   )
   list(
     @Query() dto: GetPurchaseOrdersFilterDto,

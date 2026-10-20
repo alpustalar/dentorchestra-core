@@ -4,7 +4,7 @@ import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { IGetContext } from '@common/decorators';
 import { ActorContext } from '@common/interfaces';
 import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../packages/shared/common/constants/execution-source.constant';
 import { MessageChannelSchema } from '@shared';
 import { CreateLeadDto } from '@shared/modules/lead/dto/commands';
 import {

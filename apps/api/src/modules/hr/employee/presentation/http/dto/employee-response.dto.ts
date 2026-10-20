@@ -1,13 +1,15 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { EmployeeResponseGroups } from '@modules/hr/employee/domain/contracts/employee.contracts';
-import { EmploymentTypeType as EmploymentType } from '@input-type-schemas/EmploymentTypeSchema';
-import { EmployeeStatusType as EmployeeStatus } from '@input-type-schemas/EmployeeStatusSchema';
+import { EmploymentTypeType as EmploymentType, EmploymentTypeSchema } from '@input-type-schemas/EmploymentTypeSchema';
+import { EmployeeStatusType as EmployeeStatus, EmployeeStatusSchema } from '@input-type-schemas/EmployeeStatusSchema';
 
 const { INTERNAL, MANAGEMENT, FINANCIAL, ADMIN } = EmployeeResponseGroups;
 
 /** Sözleşme (maaş) — yalnızca finansal/yönetim gruplarında görünür. */
 export class EmployeeContractResponseDto {
   @Expose() id: string;
+  @ApiProperty({ enum: EmploymentTypeSchema.options })
   @Expose() type: EmploymentType;
   @Expose() @Type(() => Date) startDate: Date;
   @Expose() @Type(() => Date) endDate: Date | null;
@@ -32,7 +34,9 @@ export class EmployeeResponseDto {
   @Expose() phone: string | null;
   @Expose() title: string | null;
   @Expose() department: string | null;
+  @ApiProperty({ enum: EmploymentTypeSchema.options })
   @Expose() employmentType: EmploymentType;
+  @ApiProperty({ enum: EmployeeStatusSchema.options })
   @Expose() status: EmployeeStatus;
   @Expose({ groups: [INTERNAL, MANAGEMENT, ADMIN] })
   @Type(() => Date)

@@ -34,7 +34,8 @@ export class ConsentFormQueryController {
   @HasCapability(CONSENTFORMTEMPLATE.read)
   @Get('consent-templates')
   @Serialize<ConsentFormTemplate, ConsentFormTemplateResponseDto>(
-    ConsentFormTemplateResponseDto
+    ConsentFormTemplateResponseDto,
+    { isArray: true }
   )
   list(
     @Query() dto: GetConsentTemplatesFilterDto,
@@ -65,7 +66,7 @@ export class ConsentFormQueryController {
   @Serialize<
     ConsentFormSubmissionListItem,
     ConsentFormSubmissionListItemResponseDto
-  >(ConsentFormSubmissionListItemResponseDto)
+  >(ConsentFormSubmissionListItemResponseDto, { isArray: true })
   listByPatient(
     @Param('patientId', ParseUUIDPipe) patientId: string,
     @Query() pagination: PaginationDto,

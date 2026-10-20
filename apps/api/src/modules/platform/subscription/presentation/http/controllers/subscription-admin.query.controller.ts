@@ -22,7 +22,8 @@ export class SubscriptionAdminQueryController {
   @HasCapability(MODULE.read)
   @Get('modules')
   @Serialize<SubscriptionModule, SubscriptionModuleResponseDto>(
-    SubscriptionModuleResponseDto
+    SubscriptionModuleResponseDto,
+    { isArray: true }
   )
   listModules(@GetContext() ctx: IGetContext) {
     return this.queryBus.execute(new ListModulesQuery(ctx));
@@ -30,7 +31,7 @@ export class SubscriptionAdminQueryController {
 
   @HasCapability(PLAN.read)
   @Get('plans')
-  @Serialize<PlanReadModel, PlanResponseDto>(PlanResponseDto)
+  @Serialize<PlanReadModel, PlanResponseDto>(PlanResponseDto, { isArray: true })
   listPlans(@GetContext() ctx: IGetContext) {
     return this.queryBus.execute(new ListPlansQuery(ctx));
   }

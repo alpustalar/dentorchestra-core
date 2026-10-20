@@ -2,7 +2,7 @@ import { GetInventoryLedgerReconciliationHandler } from './get-inventory-ledger-
 import { GetInventoryLedgerReconciliationQuery } from './get-inventory-ledger-reconciliation.query';
 import { GetInventoryValuationQuery } from '@modules/supply/inventory/application/queries/get-inventory-valuation/get-inventory-valuation.query';
 import { GetTrialBalanceQuery } from '@modules/finance/accounting/posting/application/queries/get-trial-balance/get-trial-balance.query';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import type { IGetContext } from '@common/decorators/get-context.decorator';
 import type {
   InventoryValuationCurrencyTotal,

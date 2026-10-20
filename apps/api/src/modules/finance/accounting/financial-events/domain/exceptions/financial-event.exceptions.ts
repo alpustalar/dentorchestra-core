@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { DomainException } from '@src/domain/exceptions/domain.exception';
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../../../../../packages/shared/common/constants/error-codes.constant';
 
 /**
  * Aynı `dedupeKey` ile eşzamanlı ikinci bir kayıt denendi ve kazananı okuma da
@@ -140,6 +140,28 @@ export class UnpostedFinancialEventsException extends DomainException<{
       `Dönem kapatılamaz: ${meta.unpostedCount} ekonomik olay henüz fişlenmedi. ` +
         'Önce fişlenmemiş olayları işleyin.',
       meta
+    );
+  }
+}
+
+/**
+ * Beklenen ekonomik olay olay defterinde YOK.
+ *
+ * Bir kaydı (ör. kart itirazı) defterdeki başka bir olaya dayandırmadan önce o
+ * olayın yazıldığı kanıtlanır: defterde olmayan bir tahsilatı geri almak, gelir
+ * eksiği değil **olmayan paranın düşülmesi** olurdu. Genellikle muhasebe köprüsü
+ * (best-effort) başarısız olmuştur; telafi yolu kaynağa göre değişir.
+ */
+export class FinancialEventNotRecordedException extends DomainException<{
+  dedupeKey: string;
+}> {
+  readonly errorCode = ERROR_CODES.ACCOUNTING.EVENT_NOT_RECORDED;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(dedupeKey: string) {
+    super(
+      'Bu hareketin ekonomik olayı olay defterinde yok; önce muhasebe köprüsü telafi edilmeli.',
+      { dedupeKey }
     );
   }
 }

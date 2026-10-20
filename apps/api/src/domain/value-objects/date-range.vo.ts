@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { TimeConflictException } from '@src/domain/exceptions';
 import { Guard } from '@common/domain/guards';
 import {

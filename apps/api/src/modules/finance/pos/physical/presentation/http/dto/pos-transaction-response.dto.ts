@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 import { PosTransactionStatusType as PosTransactionStatus } from '@input-type-schemas/PosTransactionStatusSchema';
 import { JsonValueType } from '@input-type-schemas/JsonValueSchema';
 

@@ -31,7 +31,7 @@ export class PatientQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
 
   @Get()
-  @Serialize<Patient, PatientResponseDto>(PatientResponseDto)
+  @Serialize<Patient, PatientResponseDto>(PatientResponseDto, { isArray: true })
   list(
     @Query() dto: GetPatientsFilterDto,
     @Query() pagination: PaginationDto,

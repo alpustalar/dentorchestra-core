@@ -2,7 +2,7 @@ import { GlobalStatusType } from '@input-type-schemas/GlobalStatusSchema';
 import { RoleWithCapabilities } from '@common/interfaces';
 import { Pagination } from '@shared/common';
 import { Paginated } from '@common/interfaces/paginated.type';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 
 // ==========================================
 // 1. SORGULAMA VE PASAPORT SÖZLEŞMELERİ (RESPONSES & DATA)

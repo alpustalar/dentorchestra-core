@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { AccountTypeType as AccountType } from '@input-type-schemas/AccountTypeSchema';
-import { AccountSideType as AccountSide } from '@input-type-schemas/AccountSideSchema';
+import { ResponseGroups } from '../../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { AccountTypeType as AccountType, AccountTypeSchema } from '@input-type-schemas/AccountTypeSchema';
+import { AccountSideType as AccountSide, AccountSideSchema } from '@input-type-schemas/AccountSideSchema';
 
 const { INTERNAL, MANAGEMENT, FINANCIAL, ADMIN } = ResponseGroups;
 
@@ -21,6 +22,7 @@ export class AccountResponseDto {
   parentId: string | null;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: AccountTypeSchema.options })
   type: AccountType; // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
@@ -28,6 +30,7 @@ export class AccountResponseDto {
 
   // --- Finansal ve Muhasebe Çalışma Kuralları (Sadece Finans, Yönetim ve Admin) ---
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: AccountSideSchema.options })
   normalSide: AccountSide; // DEBIT (Borç) veya CREDIT (Alacak) karakterli hesap
 
   @Expose({ groups: [FINANCIAL, MANAGEMENT, ADMIN] })

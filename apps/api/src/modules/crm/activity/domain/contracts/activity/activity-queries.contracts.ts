@@ -1,4 +1,4 @@
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 import { ActivityStatusType as ActivityStatus } from '@input-type-schemas/ActivityStatusSchema';
 import { Pagination } from '@shared/common';
 

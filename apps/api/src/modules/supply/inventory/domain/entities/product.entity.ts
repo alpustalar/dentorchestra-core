@@ -8,7 +8,7 @@ import { Quantity } from '@src/domain/value-objects/quantity.vo';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Barcode } from '@src/domain/value-objects/barcode.vo';
 import { StockCode } from '@src/domain/value-objects/stock-code.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Img } from '@src/domain/value-objects/img.vo';
 import { Name } from '@src/domain/value-objects/name.vo';
 import { isNotUndefined } from '@common/utils/is-not-undefined';

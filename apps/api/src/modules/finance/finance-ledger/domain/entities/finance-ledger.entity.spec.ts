@@ -88,6 +88,32 @@ describe('FinanceLedgerEntity', () => {
     expect(entry.status).toBe(LedgerStatusSchema.enum.REFUNDED);
   });
 
+  it('COMPLETED → CHARGED_BACK geçişine izin verir (kaybedilen kart itirazı)', () => {
+    const entry = FinanceLedgerEntity.create({
+      ...base(),
+      money: Money.create('100.00', 'TRY').orThrow(),
+    });
+
+    expect(entry.syncStatus(LedgerStatusSchema.enum.CHARGED_BACK)).toBe(true);
+    expect(entry.status).toBe(LedgerStatusSchema.enum.CHARGED_BACK);
+  });
+
+  it('ters ibraz edilmiş kaydı tekrar gelire çevirmez — yeniden tahsil telafi taksidinin kendi kaydına yazılır', () => {
+    const entry = FinanceLedgerEntity.create({
+      ...base(),
+      money: Money.create('100.00', 'TRY').orThrow(),
+      status: LedgerStatusSchema.enum.CHARGED_BACK,
+    });
+
+    expect(() => entry.syncStatus(LedgerStatusSchema.enum.COMPLETED)).toThrow(
+      LedgerInvalidStatusTransitionException
+    );
+    expect(() => entry.syncStatus(LedgerStatusSchema.enum.REFUNDED)).toThrow(
+      LedgerInvalidStatusTransitionException
+    );
+    expect(entry.status).toBe(LedgerStatusSchema.enum.CHARGED_BACK);
+  });
+
   it('iptal edilmiş kaydı tekrar gelire çevirmez', () => {
     const entry = FinanceLedgerEntity.create({
       ...base(),

@@ -2,7 +2,7 @@ import { BaseRules } from '@common/domain/rules/base.rules';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';
 import { ProviderShift } from '@modules/clinical/provider/domain/entities/provider-shift.entity';
 import { UpdateHoursAndDateProps } from '@modules/clinical/provider/domain/contracts';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { isDefined } from '@common/utils';
 import { DayMinute } from '@src/domain/value-objects/day-minute.vo';
 import { DayMinuteRange } from '@src/domain/value-objects/day-minute-range.vo';

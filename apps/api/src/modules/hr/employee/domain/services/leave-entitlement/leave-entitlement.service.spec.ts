@@ -2,7 +2,7 @@ import { EmployeeLeaveEntitlementService } from './leave-entitlement.service';
 import { IEmployeeCommandRepository } from '@modules/hr/employee/domain/repositories/employee/employee.command.repository';
 import { Employee } from '@modules/hr/employee/domain/entities/employee.entity';
 import { EmployeeNotFoundException } from '@modules/hr/employee/domain/exceptions/employee.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 describe('EmployeeLeaveEntitlementService', () => {
   const EMPLOYEE_ID = '33333333-3333-4333-8333-333333333333';
@@ -28,8 +28,7 @@ describe('EmployeeLeaveEntitlementService', () => {
       annualLeaveEntitlement: 20,
     } as Employee);
 
-    const entitlement =
-      await service.lockAndGetAnnualEntitlement(EMPLOYEE_ID);
+    const entitlement = await service.lockAndGetAnnualEntitlement(EMPLOYEE_ID);
 
     expect(entitlement.annualDays).toBe(20);
     expect(entitlement.firstAccrualYear).toBe(2025);

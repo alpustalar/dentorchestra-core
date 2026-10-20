@@ -13,7 +13,7 @@ import { IPolicyFactory } from '@modules/platform/policy/staff/domain/interfaces
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { CriticalFailurePayload } from '@common/observability/critical-failure.event';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { BookFlight } from '@shared/modules/health-tourism/types/commands';

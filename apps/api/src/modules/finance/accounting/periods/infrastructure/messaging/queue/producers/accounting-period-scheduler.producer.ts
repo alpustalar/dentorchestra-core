@@ -3,6 +3,8 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { ACCOUNTING_JOBS, QUEUES } from '@common/constants';
 
+const BOOT_JOB_DELAY_MS = 30_000;
+
 /**
  * Defter dönemlerini zamanlanmış olarak garanti eder.
  *
@@ -28,6 +30,26 @@ export class AccountingPeriodSchedulerProducer implements OnModuleInit {
         removeOnFail: false,
       }
     );
-    this.logger.log('Muhasebe dönemi kontrolü zamanlandı (aylık 03:00 TRT)');
+    // Aylık cron yüzünden yeni bir dağıtım (ör. platform defteri ilk kez kapsama
+    // girdiğinde) 31 güne kadar dönemsiz kalırdı → açılışta bir kerelik de çalıştır.
+    // Sabit jobId: art arda yeniden başlatmalar kuyrukta tek iş bırakır.
+    // Gecikme: worker, CQRS handler kaydı bitmeden işi alırsa "No handler found" ile
+    // düşer (ölçüldü: ilk denemede böyle düştü). Başarısız iş de silinir; aksi halde
+    // aynı jobId sonraki açılışlarda sessizce reddedilir ve iş bir daha hiç eklenmez.
+    await this.queue.add(
+      ACCOUNTING_JOBS.OPEN_NEXT_YEAR_PERIODS,
+      {},
+      {
+        jobId: 'open-next-year-periods-on-boot',
+        delay: BOOT_JOB_DELAY_MS,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: BOOT_JOB_DELAY_MS },
+        removeOnComplete: true,
+        removeOnFail: true,
+      }
+    );
+    this.logger.log(
+      'Muhasebe dönemi kontrolü zamanlandı (aylık 03:00 TRT + açılışta bir kerelik)'
+    );
   }
 }

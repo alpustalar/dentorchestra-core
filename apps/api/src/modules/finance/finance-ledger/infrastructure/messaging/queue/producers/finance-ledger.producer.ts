@@ -9,7 +9,7 @@ import { FINANCE_JOBS, QUEUES } from '@common/constants';
  * işlerdir — tek bir `jobId` kullanmak, tahsilat işi kuyrukta beklerken gelen
  * iade işini sessizce yok sayardı.
  */
-export type LedgerSyncReason = 'PAID' | 'REFUNDED';
+export type LedgerSyncReason = 'PAID' | 'REFUNDED' | 'CHARGED_BACK';
 
 /**
  * İşin yükü yalnız kimliklerden oluşur: tutar/para birimi/durum kaydın

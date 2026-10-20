@@ -1,8 +1,9 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { PurchaseRequestStatusType } from '@input-type-schemas/PurchaseRequestStatusSchema';
-import { PurchaseOrderStatusType } from '@input-type-schemas/PurchaseOrderStatusSchema';
-import { PurchaseOrderBillingStatusType } from '@input-type-schemas/PurchaseOrderBillingStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { PurchaseRequestStatusType, PurchaseRequestStatusSchema } from '@input-type-schemas/PurchaseRequestStatusSchema';
+import { PurchaseOrderStatusType, PurchaseOrderStatusSchema } from '@input-type-schemas/PurchaseOrderStatusSchema';
+import { PurchaseOrderBillingStatusType, PurchaseOrderBillingStatusSchema } from '@input-type-schemas/PurchaseOrderBillingStatusSchema';
 
 const { INTERNAL, FINANCIAL, MANAGEMENT, ADMIN } = ResponseGroups;
 
@@ -35,6 +36,7 @@ export class PurchaseRequestItemResponseDto {
 export class PurchaseRequestResponseDto {
   @Expose(OPS) id: string;
   @Expose(OPS) clinicId: string;
+  @ApiProperty({ enum: PurchaseRequestStatusSchema.options })
   @Expose(OPS) status: PurchaseRequestStatusType;
   @Expose(OPS) requestedById: string;
 
@@ -115,6 +117,7 @@ export class PurchaseOrderResponseDto {
   @Expose(OPS) clinicId: string;
   @Expose(OPS) supplierId: string;
   @Expose(OPS) purchaseRequestId: string | null;
+  @ApiProperty({ enum: PurchaseOrderStatusSchema.options })
   @Expose(OPS) status: PurchaseOrderStatusType;
 
   @Expose(OPS)
@@ -151,6 +154,7 @@ export class PurchaseOrderResponseDto {
   @Type(() => String)
   invoicedTotal: string;
 
+  @ApiProperty({ enum: PurchaseOrderBillingStatusSchema.options })
   @Expose(OPS) billingStatus: PurchaseOrderBillingStatusType;
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })

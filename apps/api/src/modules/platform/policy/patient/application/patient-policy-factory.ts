@@ -5,7 +5,7 @@ import { PatientActorContext } from '@common/interfaces';
 import { AppointmentPatientPolicy } from '@modules/clinical/appointment/application/policies/appointment-patient.policy';
 import { PatientBasePolicy } from '@modules/platform/policy/patient/application/patient-base.policy';
 import { PatientPolicyEvaluator } from '@modules/platform/policy/patient/application/patient-policy-evaluator';
-import { ExecutionSource } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource } from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 
 @Injectable()
 export class PatientPolicyFactory implements IPatientPolicyFactory {

@@ -28,7 +28,9 @@ export class ChartOfAccountsQueryController {
    * kümesidir (fiş girişinde hesap seçimi bu listeden yapılır).
    */
   @Get()
-  @Serialize<IAccount, AccountResponseDto>(AccountResponseDto)
+  @Serialize<IAccount, AccountResponseDto>(AccountResponseDto, {
+    isArray: true,
+  })
   list(
     @Query('clinicId', ParseUUIDPipe) clinicId: string,
     @GetContext() ctx: IGetContext

@@ -6,7 +6,7 @@ import {
 } from '@input-type-schemas/BankAccountStatusSchema';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { Currency, UUID } from '@src/domain/value-objects';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { CreateBankAccountProps } from '@modules/finance/bank/domain/contracts';
 import { BankAccountArchivedException } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
 

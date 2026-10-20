@@ -2,7 +2,7 @@ import { Inject } from '@nestjs/common';
 import { IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 import { Decimal } from 'decimal.js';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   BANK_STATEMENT_LINE_COMMAND_REPOSITORY,
   IBankStatementLineCommandRepository,
@@ -29,10 +29,13 @@ import {
  * görür ve seçimi kendisi yapar.
  */
 @QueryHandler(GetLineMatchSuggestionsQuery)
-export class GetLineMatchSuggestionsHandler implements IQueryHandler<
-  GetLineMatchSuggestionsQuery,
-  GetLineMatchSuggestionsResponse
-> {
+export class GetLineMatchSuggestionsHandler
+  implements
+    IQueryHandler<
+      GetLineMatchSuggestionsQuery,
+      GetLineMatchSuggestionsResponse
+    >
+{
   constructor(
     @Inject(BANK_STATEMENT_LINE_COMMAND_REPOSITORY)
     private readonly bankStatementLineRepo: IBankStatementLineCommandRepository,

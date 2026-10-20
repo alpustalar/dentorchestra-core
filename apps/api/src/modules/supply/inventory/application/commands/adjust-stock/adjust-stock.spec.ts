@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { AdjustStockHandler } from './adjust-stock.handler';
 import { AdjustStockCommand } from './adjust-stock.command';
 import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { ProductNotUsableInClinicException } from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
 import { ActorContext } from '@common/interfaces';
 import { LogSource } from '@src/domain/constants/log-action.constant';

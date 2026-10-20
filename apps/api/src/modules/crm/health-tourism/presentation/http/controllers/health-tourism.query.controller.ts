@@ -57,7 +57,8 @@ export class HealthTourismQueryController {
   @HasCapability(HOTELBEDSBOOKING.read)
   @Get('health-tourism/bookings')
   @Serialize<HotelbedsBooking, HotelbedsBookingResponseDto>(
-    HotelbedsBookingResponseDto
+    HotelbedsBookingResponseDto,
+    { isArray: true }
   )
   getBookings(
     @Query() dto: GetHotelBookingsDto,
@@ -92,7 +93,8 @@ export class HealthTourismQueryController {
   @HasCapability(HOTELBEDSTRANSFERBOOKING.read)
   @Get('health-tourism/transfers/bookings')
   @Serialize<HotelbedsTransferBooking, HotelbedsTransferBookingResponseDto>(
-    HotelbedsTransferBookingResponseDto
+    HotelbedsTransferBookingResponseDto,
+    { isArray: true }
   )
   getTransferBookings(
     @Query() dto: GetTransferBookingsDto,
@@ -129,7 +131,8 @@ export class HealthTourismQueryController {
   @HasCapability(DUFFELFLIGHTBOOKING.read)
   @Get('health-tourism/flights/bookings')
   @Serialize<DuffelFlightBooking, DuffelFlightBookingResponseDto>(
-    DuffelFlightBookingResponseDto
+    DuffelFlightBookingResponseDto,
+    { isArray: true }
   )
   getFlightBookings(
     @Query() dto: GetFlightBookingsDto,

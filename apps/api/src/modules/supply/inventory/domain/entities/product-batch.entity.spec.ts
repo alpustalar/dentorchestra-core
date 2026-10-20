@@ -3,7 +3,7 @@ import { Decimal } from 'decimal.js';
 import { ProductBatch } from './product-batch.entity';
 import { StockQuantityChangedEvent } from '@modules/supply/inventory/domain/events';
 import { ProductBatch as IProductBatch } from '@shared';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 describe('ProductBatch — miktar değişimi olayı', () => {
   const productId = randomUUID();

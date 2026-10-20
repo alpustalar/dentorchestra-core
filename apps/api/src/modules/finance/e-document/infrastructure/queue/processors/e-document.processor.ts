@@ -24,7 +24,7 @@ import {
 import { ClaimInvoiceEDocumentDispatchCommand } from '@modules/finance/invoice/application/commands/claim-invoice-edocument-dispatch/claim-invoice-edocument-dispatch.command';
 import { MarkInvoiceEDocumentFailedCommand } from '@modules/finance/invoice/application/commands/mark-invoice-edocument-failed/mark-invoice-edocument-failed.command';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 interface SendJobData {
   invoiceId: string;

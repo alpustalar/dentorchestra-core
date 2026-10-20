@@ -7,7 +7,7 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ATTENDANCE_EVENTS } from '@src/domain/constants/events/attendance.constant';
 import {
   ATTENDANCE_COMMAND_REPOSITORY,

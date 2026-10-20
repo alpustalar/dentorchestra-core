@@ -5,7 +5,7 @@ import {
 } from '@input-type-schemas/CashRegisterStatusSchema';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { CreateCashRegisterProps } from '@modules/finance/cash-register/domain/contracts';
 import { CashRegisterArchivedException } from '@modules/finance/cash-register/domain/exceptions/cash-register.exceptions';
 import { Currency } from '@src/domain/value-objects';

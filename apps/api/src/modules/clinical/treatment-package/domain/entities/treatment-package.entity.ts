@@ -17,7 +17,7 @@ import {
   UpdateTreatmentPackageProps,
 } from '@modules/clinical/treatment-package/domain/contracts';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { isNotUndefined } from '@common/utils/is-not-undefined';
 import { Currency } from '@src/domain/value-objects/currency.vo';
 import { Guard } from '@common/domain/guards';

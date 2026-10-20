@@ -6,12 +6,17 @@ import { FinanceLedgerPresentationModule } from './presentation/presentation.mod
 import { FinanceLedgerProducer } from '@modules/finance/finance-ledger/infrastructure/messaging/queue/producers/finance-ledger.producer';
 import { FinanceLedgerProcessor } from '@modules/finance/finance-ledger/infrastructure/messaging/queue/processors/finance-ledger.proccessor';
 import {
+  PaymentChargedBackListener,
   PaymentCompletedListener,
   PaymentRefundedListener,
 } from '@modules/finance/finance-ledger/infrastructure/messaging/events/listeners';
 import { FinanceLedgerCommandModule } from '@modules/finance/finance-ledger/application/commands/command.module';
 
-const Listeners = [PaymentCompletedListener, PaymentRefundedListener];
+const Listeners = [
+  PaymentCompletedListener,
+  PaymentRefundedListener,
+  PaymentChargedBackListener,
+];
 
 @Module({
   imports: [

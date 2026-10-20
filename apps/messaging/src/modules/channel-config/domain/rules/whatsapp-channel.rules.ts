@@ -1,5 +1,5 @@
 import { ClinicWhatsappChannel as IClinicWhatsappChannel } from '@shared';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Kanal kuralları entity'den bağımsız, saf fonksiyonlar olarak durur: yazma tarafı

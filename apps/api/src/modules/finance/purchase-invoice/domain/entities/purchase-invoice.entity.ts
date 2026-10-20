@@ -4,7 +4,7 @@ import { Money } from '@src/domain/value-objects/money.vo';
 import { VatRate } from '@src/domain/value-objects/vat-rate.vo';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { CurrencyType } from '@input-type-schemas/CurrencySchema';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Currency } from '@src/domain/value-objects/currency.vo';
 import { PurchaseInvoiceStatusSchema } from '@shared';
 import { PurchaseInvoiceStatusType } from '@input-type-schemas/PurchaseInvoiceStatusSchema';

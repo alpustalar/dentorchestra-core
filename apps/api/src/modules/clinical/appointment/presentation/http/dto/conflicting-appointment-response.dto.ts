@@ -1,5 +1,6 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { AppointmentStatusType } from '@input-type-schemas/AppointmentStatusSchema';
+import { AppointmentStatusType, AppointmentStatusSchema } from '@input-type-schemas/AppointmentStatusSchema';
 import { AppointmentsResponseGroups } from '@modules/clinical/appointment/domain/contracts/appointment';
 
 const { INTERNAL, MANAGEMENT, PROVIDER_DATA_OWNER, ADMIN } =
@@ -21,6 +22,7 @@ export class ConflictingAppointmentResponseDto {
   @Type(() => Date)
   endTime: Date;
 
+  @ApiProperty({ enum: AppointmentStatusSchema.options })
   @Expose() status: AppointmentStatusType;
 
   @Expose({ groups: [PROVIDER_DATA_OWNER, INTERNAL, MANAGEMENT, ADMIN] })

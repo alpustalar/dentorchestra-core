@@ -2,6 +2,9 @@
 
 import { useState } from 'react';
 import { UserRound } from 'lucide-react';
+import { useAuth } from '@/data/auth/auth-context';
+import { useCurrentUser } from '@/data/auth/use-current-user';
+import { clinics } from '@/features/organization/clinic/data/mock-clinic';
 import {
   Sheet,
   SheetContent,
@@ -13,6 +16,9 @@ import {
 
 export function ProfileSheet() {
   const [profileOpen, setProfileOpen] = useState(false);
+  const { claims, selectedClinicId } = useAuth();
+  const { displayName, email, initials } = useCurrentUser();
+  const activeClinic = clinics.find((clinic) => clinic.id === selectedClinicId);
 
   return (
     <Sheet open={profileOpen} onOpenChange={setProfileOpen}>
@@ -26,9 +32,9 @@ export function ProfileSheet() {
         }
       >
         <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">
-          ZK
+          {initials}
         </span>
-        <span className="hidden md:inline">Zeynep Kaya</span>
+        <span className="hidden md:inline">{displayName}</span>
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-md">
         <SheetHeader className="border-b border-border px-5 py-5">
@@ -40,11 +46,11 @@ export function ProfileSheet() {
         <div className="flex flex-col gap-6 overflow-y-auto px-5 py-6">
           <div className="flex items-center gap-4">
             <div className="flex size-16 items-center justify-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">
-              ZK
+              {initials}
             </div>
             <div>
-              <p className="font-semibold text-foreground">Zeynep Kaya</p>
-              <p className="text-sm text-muted-foreground">Klinik yöneticisi</p>
+              <p className="font-semibold text-foreground">{displayName}</p>
+              <p className="text-sm text-muted-foreground">{claims.role.name}</p>
             </div>
           </div>
           <div className="grid gap-3 rounded-xl border border-border bg-card p-4">
@@ -53,14 +59,16 @@ export function ProfileSheet() {
                 E-posta
               </p>
               <p className="mt-1 text-sm text-foreground">
-                zeynep.kaya@novaclinic.com
+                {email || '—'}
               </p>
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground">
                 Aktif klinik
               </p>
-              <p className="mt-1 text-sm text-foreground">Tüm klinikler</p>
+              <p className="mt-1 text-sm text-foreground">
+                {activeClinic?.name ?? 'Tüm klinikler'}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-border bg-muted/40 p-4">

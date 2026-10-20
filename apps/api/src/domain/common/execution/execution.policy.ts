@@ -1,7 +1,7 @@
 import {
   ExecutionSource,
   ExecutionSources,
-} from '@src/domain/constants/execution-source.constant';
+} from '../../../../../../packages/shared/common/constants/execution-source.constant';
 
 export class ExecutionPolicy {
   static isUserInitiated(source: ExecutionSource): boolean {

@@ -18,12 +18,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DateTimeManager } from '@shared/common';
+import { formatLongDate } from '@/lib/date-time';
+
+const today = DateTimeManager.startOfDay(DateTimeManager.create());
+const currentYear = DateTimeManager.currentYear();
 
 const patients = {
   'elif-yildiz': {
     name: 'Elif Yıldız',
     initials: 'EY',
-    protocol: 'MD-2026-0184',
+    protocol: `MD-${currentYear}-0184`,
     status: 'ACTIVE',
     type: 'ACTIVE',
     phone: '0532 481 22 18',
@@ -38,12 +43,12 @@ const patients = {
     address: 'Nilüfer, Bursa',
     allergies: 'Penisilin',
     chronicDiseases: 'Yok',
-    checkupDate: '12 Ağustos 2026',
+    checkupDate: formatLongDate(DateTimeManager.addDays(today, 7)),
   },
   'james-miller': {
     name: 'James Miller',
     initials: 'JM',
-    protocol: 'MD-2026-0183',
+    protocol: `MD-${currentYear}-0183`,
     status: 'ACTIVE',
     type: 'POTENTIAL',
     phone: '+44 20 7946 0912',
@@ -58,7 +63,7 @@ const patients = {
     address: 'London, United Kingdom',
     allergies: 'Bilinmiyor',
     chronicDiseases: 'Yok',
-    checkupDate: '14 Ağustos 2026',
+    checkupDate: formatLongDate(DateTimeManager.addDays(today, 9)),
   },
 } as const;
 
@@ -258,7 +263,8 @@ export function PatientProfileWorkspace({ patientId }: { patientId: string }) {
                       <div>
                         <div className="font-medium">{item.type}</div>
                         <div className="mt-1 text-sm text-muted-foreground">
-                          13 Ağustos 2026 · {item.time} · {item.doctor}
+                          {formatLongDate(item.startTime)} · {item.time} ·{' '}
+                          {item.doctor}
                         </div>
                       </div>
                       <Badge variant="secondary">
@@ -289,7 +295,10 @@ export function PatientProfileWorkspace({ patientId }: { patientId: string }) {
               <div className="grid gap-4 md:grid-cols-3">
                 <Info label="Toplam tahsilat" value="₺42.500" />
                 <Info label="Açık bakiye" value="₺18.000" />
-                <Info label="Son işlem" value="08 Ağustos 2026" />
+                <Info
+                  label="Son işlem"
+                  value={formatLongDate(DateTimeManager.subtractDays(today, 5))}
+                />
               </div>
               <EmptyState text="Finans hareketleri mevcut backend bağlantısı üzerinden burada listelenir." />
             </ProfileSection>

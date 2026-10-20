@@ -3,7 +3,7 @@ import { CreateClinicHandler } from './create-clinic.handler';
 import { CreateClinicCommand } from './create-clinic.command';
 import { AttachClinicToOrganizationOwnersCommand } from '@modules/identity/user/application/commands/attach-clinic-to-organization-owners/attach-clinic-to-organization-owners.command';
 import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { ActorContext } from '@common/interfaces';
 import type { IGetContext } from '@common/decorators/get-context.decorator';

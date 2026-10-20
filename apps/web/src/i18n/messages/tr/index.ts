@@ -4,6 +4,7 @@ import auth from './auth.json';
 import notifications from './notifications.json';
 import appointment from './appointment.json';
 import patients from './patients.json';
+import dashboard from './dashboard.json';
 
 export const trMessages = {
   ...common,
@@ -12,4 +13,5 @@ export const trMessages = {
   ...notifications,
   ...appointment,
   ...patients,
+  ...dashboard,
 } as const;

@@ -3,7 +3,7 @@
 // Event mekanizması veritabanı-bağımsız kalmalı (messaging Mongo kullanıyor).
 import { txStorage } from '@src/infrastructure/transaction/als-storage';
 import { IAuditLog } from '@common/interfaces/audit-log.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 export interface EventMetadata {
   eventId: string;

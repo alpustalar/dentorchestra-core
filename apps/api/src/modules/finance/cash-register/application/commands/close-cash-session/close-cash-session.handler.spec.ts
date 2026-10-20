@@ -9,7 +9,7 @@ import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import type { CriticalFailurePayload } from '@common/observability/critical-failure.event';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import CurrencySchema from '@input-type-schemas/CurrencySchema';
 
 /**

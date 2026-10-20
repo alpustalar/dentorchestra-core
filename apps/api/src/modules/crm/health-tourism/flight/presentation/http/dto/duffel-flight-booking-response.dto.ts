@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { DuffelFlightBookingStatusType as DuffelFlightBookingStatus } from '@input-type-schemas/DuffelFlightBookingStatusSchema';
-import { DuffelFlightBookingModeType as DuffelFlightBookingMode } from '@input-type-schemas/DuffelFlightBookingModeSchema';
+import { ResponseGroups } from '../../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { DuffelFlightBookingStatusType as DuffelFlightBookingStatus, DuffelFlightBookingStatusSchema } from '@input-type-schemas/DuffelFlightBookingStatusSchema';
+import { DuffelFlightBookingModeType as DuffelFlightBookingMode, DuffelFlightBookingModeSchema } from '@input-type-schemas/DuffelFlightBookingModeSchema';
 import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema';
 
 const { INTERNAL, MANAGEMENT, DATA_OWNER, FINANCIAL, ADMIN } = ResponseGroups;
@@ -14,6 +15,7 @@ export class DuffelFlightBookingResponseDto {
   @Expose() leadId: string | null;
 
   // --- Uçuş Temel Bilgileri (Herkese Açık) ---
+  @ApiProperty({ enum: DuffelFlightBookingStatusSchema.options })
   @Expose() status: DuffelFlightBookingStatus;
   @Expose() slices: JsonValue;
 
@@ -34,6 +36,7 @@ export class DuffelFlightBookingResponseDto {
   offerId: string;
 
   @Expose({ groups: [INTERNAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: DuffelFlightBookingModeSchema.options })
   mode: DuffelFlightBookingMode;
 
   @Expose({ groups: [INTERNAL, MANAGEMENT, ADMIN] })

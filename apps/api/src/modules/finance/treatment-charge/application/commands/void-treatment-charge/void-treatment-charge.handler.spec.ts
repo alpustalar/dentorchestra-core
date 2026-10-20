@@ -10,7 +10,7 @@ import { TransactionManager } from '@src/infrastructure/persistence/prisma/trans
 import { Money } from '@src/domain/value-objects/money.vo';
 import { VatRate } from '@src/domain/value-objects/vat-rate.vo';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 
 describe('VoidTreatmentChargeHandler — satır iptali (kilit + fatura kapısı)', () => {
   const CLINIC_ID = '11111111-1111-4111-8111-111111111111';

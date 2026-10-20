@@ -39,7 +39,9 @@ export class StockQueryController {
 
   @HasCapability(STOCKMOVEMENT.read)
   @Get()
-  @Serialize<StockLevel, StockLevelResponseDto>(StockLevelResponseDto)
+  @Serialize<StockLevel, StockLevelResponseDto>(StockLevelResponseDto, {
+    isArray: true,
+  })
   productStock(
     @Param('clinicId') clinicId: string,
     @GetContext() ctx: IGetContext
@@ -49,7 +51,9 @@ export class StockQueryController {
 
   @HasCapability(STOCKMOVEMENT.read)
   @Get('low-alerts')
-  @Serialize<StockLevel, StockLevelResponseDto>(StockLevelResponseDto)
+  @Serialize<StockLevel, StockLevelResponseDto>(StockLevelResponseDto, {
+    isArray: true,
+  })
   lowStockAlerts(
     @Param('clinicId') clinicId: string,
     @GetContext() ctx: IGetContext
@@ -59,7 +63,10 @@ export class StockQueryController {
 
   @HasCapability(STOCKMOVEMENT.read)
   @Get('movements')
-  @Serialize<StockMovement, StockMovementResponseDto>(StockMovementResponseDto)
+  @Serialize<StockMovement, StockMovementResponseDto>(
+    StockMovementResponseDto,
+    { isArray: true }
+  )
   movements(
     @Param('clinicId') clinicId: string,
     @Query() dto: GetStockMovementsDto,

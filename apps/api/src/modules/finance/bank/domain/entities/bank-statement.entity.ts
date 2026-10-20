@@ -2,7 +2,7 @@ import { Decimal } from 'decimal.js';
 import { BankStatement as IBankStatement } from '@model-schema/BankStatementSchema';
 import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ImportBankStatementProps } from '@modules/finance/bank/domain/contracts';
 import { BankStatementLine } from '@modules/finance/bank/domain/entities/bank-statement-line.entity';
 import {

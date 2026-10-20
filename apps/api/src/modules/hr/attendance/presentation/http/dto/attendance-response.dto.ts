@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { EmployeeResponseGroups } from '@modules/hr/employee/domain/contracts/employee.contracts';
-import { AttendanceStatusType } from '@input-type-schemas/AttendanceStatusSchema';
+import { AttendanceStatusType, AttendanceStatusSchema } from '@input-type-schemas/AttendanceStatusSchema';
 
 const { INTERNAL, MANAGEMENT, ADMIN } = EmployeeResponseGroups;
 
@@ -30,6 +31,7 @@ export class AttendanceRecordResponseDto {
   checkOutAt: Date | null;
 
   @Expose(OPS) workedMinutes: number | null;
+  @ApiProperty({ enum: AttendanceStatusSchema.options })
   @Expose(OPS) status: AttendanceStatusType;
 
   // --- Bordroyu besleyen değerlendirme (yönetim) ---

@@ -4,7 +4,7 @@ import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { ClientSession, Connection, Model } from 'mongoose';
 import { DomainEvent } from '@common/interfaces';
 import { emitDetached } from '@common/utils/emit-detached';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   TransactionContext,
   txStorage,

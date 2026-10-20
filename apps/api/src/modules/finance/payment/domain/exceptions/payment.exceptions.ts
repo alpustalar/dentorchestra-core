@@ -1,6 +1,6 @@
 import { HttpStatus } from '@nestjs/common';
 import { DomainException } from '@src/domain/exceptions/domain.exception';
-import { ERROR_CODES } from '@common/constants/error-codes.constant';
+import { ERROR_CODES } from '../../../../../../../../packages/shared/common/constants/error-codes.constant';
 import { CurrencyType } from '@input-type-schemas/CurrencySchema';
 
 export class PaymentNotFoundException extends DomainException {
@@ -22,11 +22,14 @@ export class InstallmentNotFoundException extends DomainException {
 }
 
 /**
- * Taksit tahsil edilebilir durumda değil (iptal edilmiş veya iade edilmiş).
+ * Taksit tahsil edilebilir durumda değil (iptal edilmiş, iade edilmiş ya da
+ * ters ibraz edilmiş).
  *
  * Bu bir **invariant**'tır, politika değil: iade edilmiş bir taksiti yeniden
- * "tahsil edildi" yapmak aynı parayı ikinci kez gelir yazar. Bu yüzden entity
- * içinde zorlanır ve `systemOverride` ile atlanamaz.
+ * "tahsil edildi" yapmak aynı parayı ikinci kez gelir yazar. Ters ibraz edilmiş
+ * taksit için de aynısı geçerlidir — o paranın yeniden tahsili yeni (telafi)
+ * taksit üzerinden yapılır. Bu yüzden entity içinde zorlanır ve
+ * `systemOverride` ile atlanamaz.
  */
 export class InstallmentNotCollectibleException extends DomainException<{
   installmentId: string;
@@ -93,6 +96,52 @@ export class InstallmentNotFailableException extends DomainException<{
   constructor(meta: { installmentId: string; status: string }) {
     super(
       `Tahsil edilmiş veya iade edilmiş taksit başarısız olarak işaretlenemez (durum: ${meta.status}).`,
+      meta
+    );
+  }
+}
+
+/**
+ * Yalnız tahsil edilmiş (COMPLETED) taksit ters ibraz edilebilir: sağlayıcı
+ * olmayan bir tahsilatı geri alamaz; alınmamış parayı "geri alınmış" yazmak
+ * defterde karşılığı olmayan bir ters kayıt üretir.
+ */
+export class InstallmentNotChargeableBackException extends DomainException<{
+  installmentId: string;
+  status: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.PAYMENT.INSTALLMENT_NOT_CHARGEABLE_BACK;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { installmentId: string; status: string }) {
+    super(
+      `Yalnız tahsil edilmiş (COMPLETED) taksit ters ibraz edilebilir (durum: ${meta.status}).`,
+      meta
+    );
+  }
+}
+
+/**
+ * Telafi taksidi iptal edilemez.
+ *
+ * Telafi taksidi, ters ibrazla geri alınan paranın hâlâ **geçerli hasta borcu**
+ * olduğunu temsil eder. Bu borcun silinmesi (değersiz alacak: 128/129/654 ya da
+ * 689) ayrı bir muhasebe kararıdır ve henüz bir akışı yoktur — taksidi iptal
+ * etmek, 120'yi açık bırakıp ödeme planını "borç yok" göstermek demektir.
+ */
+export class RecoveryInstallmentNotCancellableException extends DomainException<{
+  installmentId: string;
+  recoversInstallmentId: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.PAYMENT.RECOVERY_INSTALLMENT_NOT_CANCELLABLE;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { installmentId: string; recoversInstallmentId: string }) {
+    super(
+      'Ters ibrazın telafi taksidi iptal edilemez: borç geçerliliğini koruyor. ' +
+        'Değersiz alacak olarak silmek ayrı bir muhasebe kararıdır.',
       meta
     );
   }

@@ -8,7 +8,7 @@ import {
 } from '@input-type-schemas/GlobalStatusSchema';
 import { normalizeArray } from '@common/utils/normalize-array';
 import { Priority } from '@src/domain/value-objects/priority.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { UsersBulkSoftDeletedEvent } from '@modules/identity/user/domain/events/user-bulk-soft-deleted.event';
 import { ChangeUsersStatusEvent } from '@modules/identity/user/domain/events/change-users-status.event';

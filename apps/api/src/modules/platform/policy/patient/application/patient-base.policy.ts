@@ -1,5 +1,5 @@
 import { PatientActorContext } from '@common/interfaces';
-import { ExecutionSource } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSource } from '../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { ExecutionPolicy } from '@src/domain/common/execution/execution.policy';
 
 export abstract class PatientBasePolicy {

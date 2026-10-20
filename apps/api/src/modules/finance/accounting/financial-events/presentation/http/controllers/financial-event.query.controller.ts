@@ -27,7 +27,8 @@ export class FinancialEventQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
   @Serialize<FinancialEvent, FinancialEventResponseDto>(
-    FinancialEventResponseDto
+    FinancialEventResponseDto,
+    { isArray: true }
   )
   getEvents(
     @GetContext() ctx: IGetContext,
@@ -56,7 +57,8 @@ export class FinancialEventQueryController {
    */
   @Get('unposted')
   @Serialize<FinancialEvent, FinancialEventResponseDto>(
-    FinancialEventResponseDto
+    FinancialEventResponseDto,
+    { isArray: true }
   )
   getUnposted(
     @GetContext() ctx: IGetContext,

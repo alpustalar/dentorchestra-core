@@ -9,7 +9,7 @@ import {
   CreateSupplierProps,
   UpdateSupplierProps,
 } from '@modules/supply/inventory/domain/contracts';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 export class Supplier extends AggregateRoot {
   constructor(data: ISupplier) {

@@ -6,7 +6,12 @@ import { useParams, usePathname, useRouter } from 'next/navigation';
 import { Activity, ChevronDown, ChevronLeft } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { navGroups } from '@/constants/navigation/sidebar-nav';
+import {
+  navGroups,
+  type RoleSlug,
+} from '@/constants/navigation/sidebar-nav';
+import { useAuth } from '@/data/auth/auth-context';
+import { useCurrentUser } from '@/data/auth/use-current-user';
 
 import {
   Sidebar,
@@ -27,9 +32,17 @@ import {
 } from '@/components/ui/sidebar';
 import { APP } from '@/constants';
 
-const user = {
-  name: 'Zeynep Ak',
-  role: 'Klinik Yöneticisi',
+const roleTranslationKeys: Record<RoleSlug, string> = {
+  admin: 'Common.roles.admin',
+  organization_owner: 'Common.roles.organizationOwner',
+  branch_manager: 'Common.roles.branchManager',
+  clinic_owner: 'Common.roles.clinicOwner',
+  provider: 'Common.roles.provider',
+  assistant: 'Common.roles.assistant',
+  accountant: 'Common.roles.accountant',
+  receptionist: 'Common.roles.receptionist',
+  inventory_manager: 'Common.roles.inventoryManager',
+  staff: 'Common.roles.staff',
 };
 
 function SidebarProvider({ children }: { children: React.ReactNode }) {
@@ -40,68 +53,40 @@ function SidebarProvider({ children }: { children: React.ReactNode }) {
 
 function SidebarMain() {
   const t = useTranslations();
+  const { claims } = useAuth();
+  const { displayName, initials } = useCurrentUser();
 
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isHovered } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
-  const params = useParams<{ locale: string }>();
-  const isCollapsed = state === 'collapsed';
+  const params = useParams<{ locale: string; 'clinic-slug': string }>();
+  const isCollapsed = state === 'collapsed' && !isHovered;
+  const isHoverExpanded = state === 'collapsed' && isHovered;
   const locale = params.locale ?? 'en';
-
-  const routeSlugs: Record<string, string> = {
-    'Navigation.items.overview': '',
-    'Navigation.items.patients': 'patients',
-    'Navigation.items.appointments': 'appointments',
-    'Navigation.items.medicalFiles': 'medical-files',
-    'Navigation.items.consentForms': 'consent-forms',
-    'Navigation.items.treatmentsAndPackages': 'treatments',
-    'Navigation.items.specialists': 'specialists',
-    'Navigation.items.omnichannelMessaging': 'inbox',
-    'Navigation.items.leadAndMetaAds': 'leads',
-    'Navigation.items.salesPipeline': 'sales-pipeline',
-    'Navigation.items.crmActivities': 'crm-activities',
-    'Navigation.items.healthTourism': 'health-tourism',
-    'Navigation.items.generalLedger': 'general-ledger',
-    'Navigation.items.invoicesAndFees': 'invoices',
-    'Navigation.items.paymentsAndPos': 'payments',
-    'Navigation.items.cashAndBank': 'cash-bank',
-    'Navigation.items.payroll': 'payroll',
-    'Navigation.items.stockAndInventory': 'inventory',
-    'Navigation.items.procurement': 'procurement',
-    'Navigation.items.workOrders': 'work-orders',
-    'Navigation.items.staffList': 'staff',
-    'Navigation.items.timeAndAttendance': 'attendance',
-    'Navigation.items.leaveManagement': 'leave-management',
-  };
-
-  const slugifyRoute = (translationKey: string) =>
-    routeSlugs[translationKey] ??
-    translationKey
-      .split('.')
-      .at(-1)
-      ?.replace(/([a-z])([A-Z])/g, '$1-$2')
-      .toLowerCase() ??
-    'workspace';
-
-  const activeModule = pathname.split('/').filter(Boolean).at(-1) ?? '';
-
+  const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
   const toggleMenu = (key: string) => {
     if (isCollapsed) return;
+    setOpenMenus((previous) => ({ ...previous, [key]: !previous[key] }));
+  };
 
-    setOpenMenus((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  const isRouteActive = (href: string) => {
+    if (!href) return pathname === `/${locale}/${clinicSlug}`;
+    const target = `/${locale}/${clinicSlug}/${href}`;
+    return pathname === target || pathname.startsWith(`${target}/`);
   };
 
   return (
     <Sidebar collapsible="icon" className="z-40">
       <button
         type="button"
+        data-sidebar-hover-ignore
         onClick={toggleSidebar}
-        className="absolute -right-3 top-8 z-50 hidden h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-sidebar-border bg-background text-muted-foreground shadow-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:flex"
+        className={cn(
+          'absolute -right-3 top-8 z-50 hidden h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border border-sidebar-border bg-background text-muted-foreground shadow-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:flex',
+          isHoverExpanded && 'lg:hidden'
+        )}
         title={
           isCollapsed ? t('Common.toggleExpand') : t('Common.toggleCollapse')
         }
@@ -151,6 +136,26 @@ function SidebarMain() {
       {/* Navigation */}
       <SidebarContent className={cn('py-5', isCollapsed ? 'px-1' : 'px-2')}>
         {navGroups.map((group) => {
+          const managementRoles: RoleSlug[] = [
+            'admin',
+            'organization_owner',
+            'clinic_owner',
+          ];
+          const isManagementRole = managementRoles.includes(
+            claims.role.slug as RoleSlug
+          );
+          const visibleItems = group.items.filter(
+            (item) =>
+              !item.roles ||
+              item.roles.some((role) =>
+                isManagementRole
+                  ? managementRoles.includes(role)
+                  : role === claims.role.slug
+              )
+          );
+
+          if (visibleItems.length === 0) return null;
+
           const groupTitle = t(group.groupKey);
 
           return (
@@ -163,55 +168,33 @@ function SidebarMain() {
 
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {group.items.map((item) => {
+                  {visibleItems.map((item) => {
                     const itemLabel = t(item.translationKey);
-                    const itemModule = slugifyRoute(item.translationKey);
-                    const isActive =
-                      item.translationKey === 'Navigation.items.overview'
-                        ? pathname === `/${locale}` ||
-                          pathname === `/${locale}/`
-                        : pathname.split('/').includes(itemModule);
-
-                    const hasChildren =
-                      !isCollapsed && Boolean(item.children?.length);
-
-                    const isOpen = Boolean(openMenus[item.translationKey]);
+                    const itemModule = item.href;
+                    const isActive = isRouteActive(itemModule);
+                    const hasChildren = !isCollapsed && Boolean(item.children?.length);
+                    const isOpen =
+                      Boolean(openMenus[item.translationKey]) ||
+                      Boolean(item.children?.some((child) => isRouteActive(child.href)));
 
                     return (
                       <SidebarMenuItem key={item.translationKey}>
                         <SidebarMenuButton
-                          isActive={isActive && (!hasChildren || isCollapsed)}
+                          isActive={isActive}
                           tooltip={itemLabel}
                           onClick={() => {
                             router.push(
                               itemModule
-                                ? `/${locale}/${itemModule}`
-                                : `/${locale}`
+                                ? `/${locale}/${clinicSlug}/${itemModule}`
+                                : `/${locale}/${clinicSlug}`
                             );
-                            if (hasChildren) {
-                              toggleMenu(item.translationKey);
-                            }
+                            if (hasChildren) toggleMenu(item.translationKey);
                           }}
                           className="cursor-pointer"
                         >
                           <item.icon className="h-[1.15rem] w-[1.15rem] shrink-0" />
 
                           <span className="flex-1 truncate">{itemLabel}</span>
-
-                          {item.badge && !isCollapsed && (
-                            <span
-                              className={cn(
-                                'ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[0.65rem] font-semibold',
-                                item.badge === '!'
-                                  ? 'bg-destructive/15 text-destructive'
-                                  : isActive
-                                    ? 'bg-primary/15 text-primary'
-                                    : 'bg-muted text-muted-foreground'
-                              )}
-                            >
-                              {item.badge}
-                            </span>
-                          )}
 
                           {hasChildren && (
                             <ChevronDown
@@ -221,47 +204,37 @@ function SidebarMain() {
                               )}
                             />
                           )}
+
                         </SidebarMenuButton>
 
                         {!isCollapsed && hasChildren && isOpen && (
-                          <SidebarMenuSub className="relative my-1 ml-4 space-y-1 border-l border-sidebar-border/60 pl-3">
-                            {item.children?.map((child, index, arr) => {
+                          <SidebarMenuSub className="my-1 ml-4 space-y-1 border-l border-sidebar-border/60 pl-3">
+                            {item.children?.map((child, index, children) => {
                               const childLabel = t(child.translationKey);
-                              const childModule = slugifyRoute(
-                                child.translationKey
-                              );
-                              const isChildActive = pathname
-                                .split('/')
-                                .includes(childModule);
-                              const isLast = index === arr.length - 1;
+                              const isChildActive = isRouteActive(child.href);
+                              const isLastChild = index === children.length - 1;
 
                               return (
                                 <SidebarMenuSubItem
                                   key={child.translationKey}
                                   className="relative"
                                 >
-                                  {/* Horizontal connector */}
-                                  <div className="absolute -left-3 top-1/2 h-px w-2.5 -translate-y-1/2 bg-sidebar-border/60" />
-
-                                  {/* Last item connector */}
-                                  {isLast && (
-                                    <div className="absolute -left-3 -top-2 h-1/2 w-px bg-sidebar-background" />
+                                  <span className="absolute -left-3 top-1/2 h-px w-2.5 -translate-y-1/2 bg-sidebar-border/60" />
+                                  {isLastChild && (
+                                    <span className="absolute -left-3 -top-2 h-1/2 w-px bg-sidebar-background" />
                                   )}
-
                                   <SidebarMenuSubButton
                                     isActive={isChildActive}
-                                    onClick={() => {
-                                      router.push(`/${locale}/${childModule}`);
-                                    }}
+                                    onClick={() =>
+                                      router.push(
+                                        `/${locale}/${clinicSlug}/${child.href}`
+                                      )
+                                    }
                                     className="cursor-pointer"
                                   >
                                     <span className="flex-1 truncate">
                                       {childLabel}
                                     </span>
-
-                                    {isChildActive && (
-                                      <span className="ml-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                                    )}
                                   </SidebarMenuSubButton>
                                 </SidebarMenuSubItem>
                               );
@@ -288,31 +261,34 @@ function SidebarMain() {
         {isCollapsed ? (
           <SidebarMenuButton
             tooltip={t('Common.userProfile', {
-              name: 'Zeynep Ak',
-              role: t('Common.clinicManager'),
+              name: displayName,
+              role: t(
+                roleTranslationKeys[claims.role.slug as RoleSlug] ??
+                  'Common.roles.staff'
+              ),
             })}
             className="justify-center p-2"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-              ZA
+              {initials}
             </div>
           </SidebarMenuButton>
         ) : (
           <div className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-sidebar-accent/50">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
-              {user.name
-                .split(' ')
-                .map((n) => n[0])
-                .join('')}
+              {initials}
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col leading-tight">
               <span className="truncate text-sm font-medium text-sidebar-foreground">
-                {user.name}
+                {displayName || t('Common.userFallback')}
               </span>
 
               <span className="truncate text-xs text-muted-foreground">
-                {user.role}
+                {t(
+                  roleTranslationKeys[claims.role.slug as RoleSlug] ??
+                    'Common.roles.staff'
+                )}
               </span>
             </div>
           </div>

@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { PipelineResponseGroups } from '@modules/crm/pipeline/domain/contracts';
-import { PipelineStageTypeType } from '@input-type-schemas/PipelineStageTypeSchema';
+import { PipelineStageTypeType, PipelineStageTypeSchema } from '@input-type-schemas/PipelineStageTypeSchema';
 
 const { MANAGEMENT, ADMIN } = PipelineResponseGroups;
 
@@ -10,6 +11,7 @@ export class PipelineStageResponseDto {
   @Expose() pipelineId: string;
   @Expose() name: string;
   @Expose() order: number;
+  @ApiProperty({ enum: PipelineStageTypeSchema.options })
   @Expose() type: PipelineStageTypeType;
   @Expose() color: string | null;
 }

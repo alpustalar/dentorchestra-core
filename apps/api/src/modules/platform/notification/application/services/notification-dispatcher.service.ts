@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ExecutionContextFactory } from '@src/domain/common/execution/execution-context.factory';
 import {
   NotificationTypeSchema,
@@ -12,7 +12,6 @@ import {
 } from '@input-type-schemas/NotificationPrioritySchema';
 import { NotificationDeliveryStatusSchema } from '@input-type-schemas/NotificationDeliveryStatusSchema';
 import { FindClinicStaffUserIdsQuery } from '@modules/identity/user/application/queries/find-clinic-staff-user-ids/find-clinic-staff-user-ids.query';
-import { FindPatientByIdQuery } from '@modules/crm/patient/application/queries/find-patient-by-id/find-patient-by-id.query';
 import { StaffNotification } from '@modules/platform/notification/domain/entities/staff-notification.entity';
 import {
   IStaffNotificationCommandRepository,
@@ -23,6 +22,7 @@ import {
   PatientNotificationPort,
 } from '@modules/platform/notification/domain/ports/patient-notification.port';
 import { NotificationRealtimeBridge } from '@modules/platform/notification/infrastructure/realtime/notification-realtime.bridge';
+import { GetPatientByIdQuery } from '@modules/crm/patient/application/queries/get-patient-by-id/get-patient-by-id.query';
 
 // Bu saatten az kala yapılan iptal "son dakika" sayılır → CRITICAL (toast).
 const LATE_CANCEL_THRESHOLD_HOURS = 24;
@@ -46,11 +46,13 @@ interface AppointmentPatientContact {
 
 export type AppointmentConfirmedNotificationInput = AppointmentPatientContact;
 export type AppointmentRescheduledNotificationInput = AppointmentPatientContact;
-export interface AppointmentCancelledNotificationInput extends AppointmentPatientContact {
+export interface AppointmentCancelledNotificationInput
+  extends AppointmentPatientContact {
   canceledBy: string;
   reason?: string;
 }
-export interface AppointmentReminderNotificationInput extends AppointmentPatientContact {
+export interface AppointmentReminderNotificationInput
+  extends AppointmentPatientContact {
   /** Klinik ayarı: hatırlatmaya hasta yanıtı (iki yönlü onay) bekleniyor mu? */
   requireResponse: boolean;
 }
@@ -327,7 +329,7 @@ export class NotificationDispatcherService {
     if (!input.patientId) return;
 
     const { data: patient } = await this.queryBus.execute(
-      new FindPatientByIdQuery(input.patientId, this.internalCtx)
+      new GetPatientByIdQuery(input.patientId, this.internalCtx)
     );
 
     if (!patient) return;

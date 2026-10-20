@@ -5,11 +5,7 @@
     "generated/prisma",
     "../../node_modules/.pnpm/handlebars@4.7.8/node_modules/handlebars/types/index.d.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "scripts"
-  ],
+  "exclude": ["node_modules", "dist", "scripts"],
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
@@ -18,7 +14,6 @@
     "outDir": "./dist",
     "baseUrl": "./",
     "paths": {
-
       "@prisma/client": ["node_modules/@prisma/client"],
 
       "@common/*": ["src/common/*", "../../packages/nest-kernel/src/common/*"],
@@ -34,11 +29,12 @@
 
       "@shared/common": ["../../packages/shared/common/index"],
       "@shared/common/*": ["../../packages/shared/common/*"],
-
-
+      "@shared/datasets/*": ["../../packages/shared/datasets/*"],
 
       "@generated/*": ["../../packages/shared/generated-zod/*"],
-      "@input-type-schemas/*": ["../../packages/shared/generated-zod/inputTypeSchemas/*"],
+      "@input-type-schemas/*": [
+        "../../packages/shared/generated-zod/inputTypeSchemas/*"
+      ],
       "@model-schema/*": ["../../packages/shared/generated-zod/modelSchema/*"]
     },
     "esModuleInterop": true,
@@ -58,5 +54,3 @@
     "noFallthroughCasesInSwitch": false
   }
 }
-
-

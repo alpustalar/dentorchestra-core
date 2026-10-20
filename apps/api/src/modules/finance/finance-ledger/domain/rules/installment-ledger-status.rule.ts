@@ -21,6 +21,11 @@ const LEDGER_STATUS_BY_INSTALLMENT_STATUS: Record<
 > = {
   [InstallmentStatusSchema.enum.COMPLETED]: LedgerStatusSchema.enum.COMPLETED,
   [InstallmentStatusSchema.enum.REFUNDED]: LedgerStatusSchema.enum.REFUNDED,
+  // Ters ibraz (kaybedilen kart itirazı): para iade edilmedi, geri ALINDI. Cari
+  // kayıt REFUNDED değil kendi durumunu taşır — gelirden düşer ama iade
+  // raporlarına karışmaz.
+  [InstallmentStatusSchema.enum.CHARGED_BACK]:
+    LedgerStatusSchema.enum.CHARGED_BACK,
   [InstallmentStatusSchema.enum.CANCELLED]: null,
   [InstallmentStatusSchema.enum.PENDING]: null,
   [InstallmentStatusSchema.enum.OVERDUE]: null,

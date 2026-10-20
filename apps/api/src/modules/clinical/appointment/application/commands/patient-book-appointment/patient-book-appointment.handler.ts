@@ -16,7 +16,7 @@ import {
   MaxActiveBookingsExceededException,
   PatientBookingDisabledException,
 } from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ExecutionPolicy } from '@src/domain/common/execution/execution.policy';
 import {
   ITenantScopeResolver,
@@ -41,10 +41,9 @@ import {
 } from '@modules/clinical/appointment/domain/interfaces/appointment-checker.service.interface';
 
 @CommandHandler(PatientBookAppointmentCommand)
-export class PatientBookAppointmentHandler implements ICommandHandler<
-  PatientBookAppointmentCommand,
-  string
-> {
+export class PatientBookAppointmentHandler
+  implements ICommandHandler<PatientBookAppointmentCommand, string>
+{
   constructor(
     @Inject(APPOINTMENT_COMMAND_REPOSITORY)
     private readonly appointmentRepo: IAppointmentCommandRepository,

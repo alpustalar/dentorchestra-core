@@ -3,41 +3,44 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { DateTimeManager } from '@shared/common';
+
+const currentYear = DateTimeManager.currentYear();
 
 export const patientDirectory = {
   'Elif Yıldız': {
     id: 'elif-yildiz',
-    protocol: 'MD-2026-0184',
+    protocol: `MD-${currentYear}-0184`,
     initials: 'EY',
     status: 'Aktif',
   },
   'James Miller': {
     id: 'james-miller',
-    protocol: 'MD-2026-0183',
+    protocol: `MD-${currentYear}-0183`,
     initials: 'JM',
     status: 'Aktif',
   },
   'Ayşe Korkmaz': {
     id: 'ayse-korkmaz',
-    protocol: 'MD-2026-0182',
+    protocol: `MD-${currentYear}-0182`,
     initials: 'AK',
     status: 'Takipte',
   },
   'Mohammed Al-Farsi': {
     id: 'mohammed-al-farsi',
-    protocol: 'MD-2026-0181',
+    protocol: `MD-${currentYear}-0181`,
     initials: 'MA',
     status: 'Aktif',
   },
   'Sofia Rossi': {
     id: 'sofia-rossi',
-    protocol: 'MD-2026-0179',
+    protocol: `MD-${currentYear}-0179`,
     initials: 'SR',
     status: 'Aktif',
   },
   'Deniz Arslan': {
     id: 'deniz-arslan',
-    protocol: 'MD-2026-0178',
+    protocol: `MD-${currentYear}-0178`,
     initials: 'DA',
     status: 'Aktif',
   },
@@ -61,12 +64,13 @@ export function PatientLink({
   variant = 'standard',
   className,
 }: PatientLinkProps) {
-  const params = useParams<{ locale: string }>();
+  const params = useParams<{ locale: string; 'clinic-slug'?: string }>();
   const patient = patientDirectory[name as PatientName];
   if (!patient) return <span className={className}>{name}</span>;
+  const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   return (
     <Link
-      href={`/${params.locale ?? 'tr'}/patients/${patient.id}`}
+      href={`/${params.locale ?? 'tr'}/${clinicSlug}/crm/patient/${patient.id}`}
       className={cn(
         'group inline-flex min-w-0 items-center gap-2 rounded-md text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
         className
@@ -97,7 +101,13 @@ export function PatientLink({
   );
 }
 
-export function patientProfilePath(locale: string, name: string) {
+export function patientProfilePath(
+  locale: string,
+  name: string,
+  clinicSlug = 'fethiye'
+) {
   const patient = patientDirectory[name as PatientName];
-  return patient ? `/${locale}/patients/${patient.id}` : `/${locale}/patients`;
+  return patient
+    ? `/${locale}/${clinicSlug}/crm/patient/${patient.id}`
+    : `/${locale}/${clinicSlug}/crm/patient`;
 }

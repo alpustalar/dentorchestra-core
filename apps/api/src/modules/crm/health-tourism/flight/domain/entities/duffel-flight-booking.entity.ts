@@ -13,7 +13,7 @@ import { AggregateRoot } from '@common/domain/aggregate-root';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Money } from '@src/domain/value-objects/money.vo';
 import { Currency } from '@src/domain/value-objects/currency.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 import {
@@ -201,7 +201,9 @@ export class DuffelFlightBooking extends AggregateRoot {
    * başka bir istek claim'i devralıp sağlayıcıyla mutabakat yapabilir.
    */
   public get isPaymentClaimStale(): boolean {
-    if (this._status !== DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS)
+    if (
+      this._status !== DuffelFlightBookingStatusSchema.enum.PAYMENT_IN_PROGRESS
+    )
       return false;
     if (!this._paymentClaimedAt) return true;
     return DateTimeManager.isBefore(

@@ -8,12 +8,11 @@ import {
 } from '@modules/finance/accounting/financial-events/domain/exceptions';
 import { IPolicyFactory } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
-import { ITenantScopeResolver } from '@shared';
+import { FinancialEventTypeSchema, ITenantScopeResolver } from '@shared';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { FinancialEventTypeSchema } from '@shared';
 import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
 import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
 

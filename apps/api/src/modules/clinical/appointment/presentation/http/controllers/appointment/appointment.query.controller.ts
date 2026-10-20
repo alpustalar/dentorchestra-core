@@ -59,7 +59,9 @@ export class AppointmentQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
 
   @Get()
-  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto)
+  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto, {
+    isArray: true,
+  })
   getAll(
     @Query() dto: GetClinicAppointmentsDto,
     @Query() pagination: PaginationDto,
@@ -71,7 +73,9 @@ export class AppointmentQueryController {
   }
 
   @Get('organization')
-  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto)
+  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto, {
+    isArray: true,
+  })
   getOrganizationAppointments(
     @Query() dto: GetOrganizationAppointmentsDto,
     @GetContext() ctx: IGetContext
@@ -82,11 +86,13 @@ export class AppointmentQueryController {
   }
 
   @Get('action-required')
-  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto)
+  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto, {
+    isArray: true,
+  })
   getActionRequired(
     @Query() pagination: PaginationDto,
     @GetContext() ctx: IGetContext,
-    @Param('clinicId', ParseUUIDPipe) clinicId: string
+    @Query('clinicId', ParseUUIDPipe) clinicId: string
   ) {
     return this.queryBus.execute(
       new GetActionRequiredQuery({ clinicId, pagination, ctx })
@@ -94,7 +100,9 @@ export class AppointmentQueryController {
   }
 
   @Get('provider')
-  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto)
+  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto, {
+    isArray: true,
+  })
   getProviderCalendar(
     @Query() dto: GetProviderCalendarDto,
     @Query() pagination: PaginationDto,
@@ -107,7 +115,8 @@ export class AppointmentQueryController {
 
   @Get('open-slots')
   @Serialize<ClinicOpenSlotsDay, ClinicOpenSlotsDayResponseDto>(
-    ClinicOpenSlotsDayResponseDto
+    ClinicOpenSlotsDayResponseDto,
+    { isArray: true }
   )
   getClinicOpenSlots(
     @Query() dto: GetClinicOpenSlotsDto,
@@ -118,7 +127,8 @@ export class AppointmentQueryController {
 
   @Get('calendar')
   @Serialize<ClinicCalendarDay, ClinicCalendarDayResponseDto>(
-    ClinicCalendarDayResponseDto
+    ClinicCalendarDayResponseDto,
+    { isArray: true }
   )
   getClinicCalendar(
     @Query() dto: GetClinicCalendarDto,
@@ -128,7 +138,9 @@ export class AppointmentQueryController {
   }
 
   @Get('search')
-  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto)
+  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto, {
+    isArray: true,
+  })
   searchClinicAppointments(
     @Query() dto: SearchClinicAppointmentsDto,
     @GetContext() ctx: IGetContext
@@ -137,7 +149,9 @@ export class AppointmentQueryController {
   }
 
   @Get('reminders')
-  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto)
+  @Serialize<Appointment, AppointmentResponseDto>(AppointmentResponseDto, {
+    isArray: true,
+  })
   getUpcomingReminders(
     @Query() dto: GetUpcomingRemindersDto,
     @GetContext() ctx: IGetContext
@@ -158,7 +172,8 @@ export class AppointmentQueryController {
 
   @Get('conflicts')
   @Serialize<ConflictingAppointmentView, ConflictingAppointmentResponseDto>(
-    ConflictingAppointmentResponseDto
+    ConflictingAppointmentResponseDto,
+    { isArray: true }
   )
   checkConflicts(
     @Query() dto: CheckAppointmentConflictsDto,
@@ -171,7 +186,8 @@ export class AppointmentQueryController {
 
   @Get('waiting-room')
   @Serialize<WaitingRoomEntry, WaitingRoomEntryResponseDto>(
-    WaitingRoomEntryResponseDto
+    WaitingRoomEntryResponseDto,
+    { isArray: true }
   )
   getWaitingRoom(
     @Query() dto: GetWaitingRoomDto,

@@ -1,5 +1,5 @@
 import { HttpStatus } from '@nestjs/common';
-import type { ErrorCode } from '@common/constants/error-codes.constant';
+import type { ErrorCode } from '../../../../shared/common/constants/error-codes.constant';
 
 /**
  * Tüm domain/application iş-mantığı hatalarının taban sınıfı. Bu katmanlar (handler,

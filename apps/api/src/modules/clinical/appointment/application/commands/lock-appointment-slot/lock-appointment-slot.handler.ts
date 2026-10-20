@@ -3,7 +3,7 @@ import { LockAppointmentSlotCommand } from './lock-appointment-slot.command';
 import { LockAppointmentSlotResponse } from './lock-appointment-slot.response';
 import { SlotTemporarilyHeldException } from '@modules/clinical/appointment/domain/exceptions/appointment.exceptions';
 import { ClinicNotAssignedException } from '@src/domain/exceptions/clinic-not-assigned.exception';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import {
   APPOINTMENT_CACHE_SERVICE,
   IAppointmentCacheService,

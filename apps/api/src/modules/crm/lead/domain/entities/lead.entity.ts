@@ -7,7 +7,7 @@ import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Name } from '@src/domain/value-objects/name.vo';
 import { Phone } from '@src/domain/value-objects/phone.vo';
 import { Email } from '@src/domain/value-objects/email.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { Guard } from '@common/domain/guards';
 import {
   AssignLeadStageProps,

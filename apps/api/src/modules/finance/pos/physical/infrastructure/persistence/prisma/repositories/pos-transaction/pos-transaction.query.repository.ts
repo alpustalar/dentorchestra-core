@@ -12,6 +12,7 @@ import {
   ScanStalePosTransactionsParams,
   StalePosTransactionRow,
   BridgeablePosTransactionRow,
+  PosTransactionSummary,
 } from '@modules/finance/pos/physical/domain/contracts/pos-transaction';
 import { normalizeReportDateRange } from '@modules/finance/shared/domain/reporting/report-date-range';
 
@@ -22,6 +23,39 @@ export class PosTransactionQueryRepository
 {
   constructor(prisma: PrismaService) {
     super(prisma);
+  }
+
+  async findSummaryById(id: string): Promise<PosTransactionSummary | null> {
+    const row = await this.db.posTransaction.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        clinicId: true,
+        kind: true,
+        status: true,
+        patientId: true,
+        paymentId: true,
+        amount: true,
+        currency: true,
+        completedAt: true,
+        // Aynı modülün cihaz tablosu: bounded context sınırı içinde.
+        posDevice: { select: { provider: true } },
+      },
+    });
+    if (!row) return null;
+
+    return {
+      id: row.id,
+      clinicId: row.clinicId,
+      kind: row.kind,
+      status: row.status,
+      provider: row.posDevice.provider,
+      patientId: row.patientId,
+      paymentId: row.paymentId,
+      amount: row.amount,
+      currency: row.currency,
+      completedAt: row.completedAt,
+    };
   }
 
   /**

@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { ClinicLegalTypeType as ClinicLegalType } from '@input-type-schemas/ClinicLegalTypeSchema';
+import { ResponseGroups } from '../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { ClinicLegalTypeType as ClinicLegalType, ClinicLegalTypeSchema } from '@input-type-schemas/ClinicLegalTypeSchema';
 
 const { INTERNAL, MANAGEMENT, ADMIN } = ResponseGroups;
 
@@ -10,6 +11,7 @@ export class ClinicGovernmentSpecsResponseDto {
 
   // --- Temel Regülasyon ve Kimlik Bilgileri (İç Operasyon ve Üst Roller) ---
   @Expose({ groups: [INTERNAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: ClinicLegalTypeSchema.options })
   legalType: ClinicLegalType;
 
   @Expose({ groups: [INTERNAL, MANAGEMENT, ADMIN] })

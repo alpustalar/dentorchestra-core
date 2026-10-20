@@ -1,4 +1,4 @@
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { EmployeeInvalidEntitlementException } from '@modules/hr/employee/domain/exceptions/employee.exceptions';
 
 export interface LeaveEntitlementProps {

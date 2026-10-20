@@ -10,7 +10,7 @@ import {
   UpdateClinicGovernmentSpecsProps,
 } from '@modules/organization/clinic-governance/domain/contracts/clinic-government-specs';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 /**
  * Kliniğin devlet/regülasyon kimliği (platform/governance bounded-context).

@@ -1,5 +1,5 @@
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 import { BillingTargetType as BillingTarget } from '@input-type-schemas/BillingTargetSchema';
 
 const { MANAGEMENT, ADMIN } = ResponseGroups;

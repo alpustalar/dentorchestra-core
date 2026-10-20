@@ -1,4 +1,4 @@
-import { ResponseGroups } from '@common/constants/response-groups.constant';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
 
 // eslint-disable-next-line
 const { DATA_OWNER, ...Groups } = ResponseGroups;

@@ -28,6 +28,9 @@ import { normalizeReportDateRange } from '@modules/finance/shared/domain/reporti
 const SETTLED_STATUSES = [
   InstallmentStatus.COMPLETED,
   InstallmentStatus.REFUNDED,
+  // Ters ibraz edilmiş taksidin parası da hareket etti (alındı, sonra sağlayıcı
+  // geri aldı); cari defterde `CHARGED_BACK` karşılığı olmak zorunda.
+  InstallmentStatus.CHARGED_BACK,
 ];
 
 /** Henüz tahsil edilmemiş (açık) taksit durumları. */

@@ -26,7 +26,9 @@ const { CASHSESSION } = CAPABILITIES;
 export class CashSessionQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get()
-  @Serialize<ICashSession, CashSessionResponseDto>(CashSessionResponseDto)
+  @Serialize<ICashSession, CashSessionResponseDto>(CashSessionResponseDto, {
+    isArray: true,
+  })
   list(
     @Query() dto: GetCashSessionsFilterDto,
     @Query() pagination: PaginationDto,

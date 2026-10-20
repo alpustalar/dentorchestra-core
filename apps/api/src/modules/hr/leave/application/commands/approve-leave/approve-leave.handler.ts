@@ -20,7 +20,7 @@ import {
   EMPLOYEE_LEAVE_ENTITLEMENT_SERVICE,
   IEmployeeLeaveEntitlementService,
 } from '@modules/hr/employee/domain/services/leave-entitlement/leave-entitlement.service.interface';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @CommandHandler(ApproveLeaveCommand)
 export class ApproveLeaveHandler

@@ -12,6 +12,7 @@
     "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/microservices": "^11.1.28",
     "@nestjs/mongoose": "^11.0.4",
+    "@nestjs/swagger": "^11.2.5",
     "dayjs": "^1.11.20",
     "helmet": "^8.1.0",
     "ioredis": "^5.9.2",

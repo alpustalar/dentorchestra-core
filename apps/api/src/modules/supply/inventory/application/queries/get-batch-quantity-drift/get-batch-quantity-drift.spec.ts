@@ -3,7 +3,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { GetBatchQuantityDriftHandler } from './get-batch-quantity-drift.handler';
 import { GetBatchQuantityDriftQuery } from './get-batch-quantity-drift.query';
 import { PolicyFactory } from '@modules/platform/policy/staff/application/policy-factory';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { ActorContext } from '@common/interfaces';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import type { IGetContext } from '@common/decorators/get-context.decorator';

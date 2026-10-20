@@ -7,7 +7,7 @@ import {
   CreateProviderAvailabilityProps,
   UpdateProviderAvailabilityProps,
 } from '@modules/clinical/provider/domain/contracts';
-import { DateTimeManager } from '@src/common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { isDefined } from '@common/utils';
 import { ProviderAvailabilityRules } from '@modules/clinical/provider/domain/rules/provider-availability.rules';
 import { ValidateOptionsType } from '@shared/common/validate-options/validate-options.type';
@@ -109,7 +109,10 @@ export class ProviderAvailability extends AggregateRoot {
     // Mola tanımlıysa mesai saatlerinin tamamen içinde kalmalı. Eskiden bu kural
     // yalnız hiç `.parse()` edilmeyen bir Zod `.refine()`'da yaşıyordu (fiilen
     // enforce edilmiyordu); dönüşümle birlikte gerçek zamanlı hale getirildi.
-    if (breakRange && !breakRange.validate.isCompletelyWithIn(availabilityRange).value) {
+    if (
+      breakRange &&
+      !breakRange.validate.isCompletelyWithIn(availabilityRange).value
+    ) {
       throw new BreakTimeOutOfRangeException(
         breakRange.start.toString(),
         breakRange.end.toString(),

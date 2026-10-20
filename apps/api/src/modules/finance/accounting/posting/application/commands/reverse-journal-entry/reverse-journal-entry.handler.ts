@@ -19,7 +19,7 @@ import {
 import { ReverseJournalEntryCommand } from './reverse-journal-entry.command';
 import { AccountingPeriodStatusSchema } from '@shared';
 import { ACCOUNTING_EVENTS } from '@src/domain/constants/events';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import {
   IJournalEntryNumberingService,
@@ -27,10 +27,9 @@ import {
 } from '@modules/finance/accounting/periods/domain/services/entry-numbering/journal-entry-numbering.service.interface';
 
 @CommandHandler(ReverseJournalEntryCommand)
-export class ReverseJournalEntryHandler implements ICommandHandler<
-  ReverseJournalEntryCommand,
-  string
-> {
+export class ReverseJournalEntryHandler
+  implements ICommandHandler<ReverseJournalEntryCommand, string>
+{
   constructor(
     @Inject(JOURNAL_COMMAND_REPOSITORY)
     private readonly journalCommandRepo: IJournalCommandRepository,

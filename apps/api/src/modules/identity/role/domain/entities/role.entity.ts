@@ -3,7 +3,7 @@ import { AggregateRoot } from '@common/domain/aggregate-root';
 import { Name } from '@src/domain/value-objects/name.vo';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { Slug } from '@src/domain/value-objects/slug.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { CreateRoleProps } from '@modules/identity/role/domain/contracts/role';
 import { Priority } from '@src/domain/value-objects/priority.vo';
 import { Guard } from '@common/domain/guards';

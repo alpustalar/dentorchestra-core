@@ -1,16 +1,21 @@
 import { Patient } from '@core-crm/shared/client';
+import { DateTimeManager } from '@shared/common';
+
+const currentYear = DateTimeManager.currentYear();
+const today = DateTimeManager.startOfDay(DateTimeManager.create());
+const recordCreatedAt = DateTimeManager.startOfYear(currentYear);
 
 export const patients: Patient[] = [
   {
     id: '1',
-    firebaseUid: null,
+    firebaseUid: '35',
     organizationId: 'org_1',
     clinicId: 'clinic_1',
     sectorId: 'sector_dental',
     firstName: 'Elif',
     lastName: 'Yıldız',
     tcNo: '12345678902',
-    protocolNo: 'MD-2026-0184',
+    protocolNo: `MD-${currentYear}-0184`,
     status: 'ACTIVE', // PatientStatusSchema Enum değeri
     patientType: 'ACTIVE', // PatientTypeSchema Enum değeri
     phone: '05324812218',
@@ -18,7 +23,7 @@ export const patients: Patient[] = [
     email: 'elif.yildiz@example.com',
     gender: 'FEMALE', // GenderSchema Enum değeri
     bloodType: 'A_POS', // BloodTypeSchema Enum değeri
-    birthDate: new Date('1988-05-14'),
+    birthDate: DateTimeManager.create('1988-05-14'),
     address: 'Nilüfer, Bursa',
     emergencyContact: null,
     companionName: null,
@@ -27,21 +32,21 @@ export const patients: Patient[] = [
     allergies: 'Penisilin',
     chronicDiseases: 'Yok',
     responsibleProviderId: 'provider_dr_kaya',
-    checkupDate: new Date('2026-08-12'),
-    createdAt: new Date('2026-01-01T10:00:00Z'),
-    updatedAt: new Date('2026-01-01T10:00:00Z'),
+    checkupDate: DateTimeManager.addDays(today, 7),
+    createdAt: DateTimeManager.create(recordCreatedAt),
+    updatedAt: DateTimeManager.create(recordCreatedAt),
     deletedAt: null,
   },
   {
     id: '2',
-    firebaseUid: null,
+    firebaseUid: '34',
     organizationId: 'org_1',
     clinicId: 'clinic_1',
     sectorId: 'sector_intl',
     firstName: 'James',
     lastName: 'Miller',
     tcNo: null,
-    protocolNo: 'MD-2026-0183',
+    protocolNo: `MD-${currentYear}-0183`,
     status: 'ACTIVE',
     patientType: 'POTENTIAL',
     phone: '+442079460912',
@@ -49,7 +54,7 @@ export const patients: Patient[] = [
     email: 'james.miller@example.com',
     gender: 'MALE',
     bloodType: 'O_POS',
-    birthDate: new Date('1981-09-22'),
+    birthDate: DateTimeManager.create('1981-09-22'),
     address: 'London, United Kingdom',
     emergencyContact: null,
     companionName: null,
@@ -58,9 +63,9 @@ export const patients: Patient[] = [
     allergies: 'Bilinmiyor',
     chronicDiseases: 'Yok',
     responsibleProviderId: 'provider_op_dr_demir',
-    checkupDate: new Date('2026-08-14'),
-    createdAt: new Date('2026-01-02T10:00:00Z'),
-    updatedAt: new Date('2026-01-02T10:00:00Z'),
+    checkupDate: DateTimeManager.addDays(today, 9),
+    createdAt: DateTimeManager.addDays(recordCreatedAt, 1),
+    updatedAt: DateTimeManager.addDays(recordCreatedAt, 1),
     deletedAt: null,
   },
 ];

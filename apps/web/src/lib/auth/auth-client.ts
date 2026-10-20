@@ -2,8 +2,12 @@
 
 import {
   onAuthStateChanged,
+  RecaptchaVerifier,
   signInWithEmailAndPassword,
+  signInWithPopup,
+  signInWithPhoneNumber,
   signOut as firebaseSignOut,
+  GoogleAuthProvider,
   type User,
 } from 'firebase/auth';
 
@@ -32,6 +36,42 @@ export async function signIn(email: string, password: string): Promise<void> {
     password
   );
 
+  await syncSessionCookie(await credential.user.getIdToken());
+}
+
+export async function signInWithGoogle(): Promise<void> {
+  assertFirebaseConfigured();
+
+  const credential = await signInWithPopup(
+    getFirebaseAuth(),
+    new GoogleAuthProvider()
+  );
+
+  await syncSessionCookie(await credential.user.getIdToken());
+}
+
+export function createPhoneSignInVerifier(
+  container: HTMLElement
+): RecaptchaVerifier {
+  assertFirebaseConfigured();
+  return new RecaptchaVerifier(getFirebaseAuth(), container, {
+    size: 'invisible',
+  });
+}
+
+export async function requestPhoneSignInCode(
+  phoneNumber: string,
+  verifier: RecaptchaVerifier
+) {
+  assertFirebaseConfigured();
+  return signInWithPhoneNumber(getFirebaseAuth(), phoneNumber, verifier);
+}
+
+export async function confirmPhoneSignIn(
+  confirmation: Awaited<ReturnType<typeof requestPhoneSignInCode>>,
+  verificationCode: string
+): Promise<void> {
+  const credential = await confirmation.confirm(verificationCode);
   await syncSessionCookie(await credential.user.getIdToken());
 }
 

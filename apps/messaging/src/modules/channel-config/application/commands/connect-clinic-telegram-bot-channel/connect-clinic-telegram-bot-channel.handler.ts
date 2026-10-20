@@ -3,7 +3,7 @@ import { Inject } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { ENV } from '@common/constants/env.constant';
-import { getGlobalPrefix } from '@common/constants/api-config.constant';
+import { getGlobalPrefix } from '../../../../../../../../packages/shared/common/constants/api-config.constant';
 import { MongoTransactionManager } from '@src/infrastructure/persistence/mongo/mongo-transaction.manager';
 import { TokenCipherService } from '@src/infrastructure/security/crypto/token-cipher.service';
 import {
@@ -21,10 +21,9 @@ import { ConnectClinicTelegramBotChannelCommand } from './connect-clinic-telegra
 const TELEGRAM_WEBHOOK_PATH = 'messaging/telegram/bot';
 
 @CommandHandler(ConnectClinicTelegramBotChannelCommand)
-export class ConnectClinicTelegramBotChannelHandler implements ICommandHandler<
-  ConnectClinicTelegramBotChannelCommand,
-  string
-> {
+export class ConnectClinicTelegramBotChannelHandler
+  implements ICommandHandler<ConnectClinicTelegramBotChannelCommand, string>
+{
   constructor(
     @Inject(TELEGRAM_BOT_API)
     private readonly botApi: ITelegramBotApi,

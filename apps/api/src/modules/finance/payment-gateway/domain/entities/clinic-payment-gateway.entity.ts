@@ -5,7 +5,7 @@ import {
   UpdateClinicPaymentGatewayProps,
 } from '@modules/finance/payment-gateway/domain/contracts/clinic-payment-gateway';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { ClinicPaymentGatewayRegisteredEvent } from '@modules/finance/payment-gateway/domain/events';
 import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 

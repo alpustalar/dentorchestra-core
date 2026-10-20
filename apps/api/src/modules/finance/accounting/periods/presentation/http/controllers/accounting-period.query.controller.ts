@@ -23,7 +23,8 @@ export class AccountingPeriodQueryController {
    */
   @Get()
   @Serialize<AccountingPeriod, AccountingPeriodResponseDto>(
-    AccountingPeriodResponseDto
+    AccountingPeriodResponseDto,
+    { isArray: true }
   )
   getPeriods(
     @GetContext() ctx: IGetContext,

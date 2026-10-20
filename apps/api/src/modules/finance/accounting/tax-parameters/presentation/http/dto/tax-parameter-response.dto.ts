@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { FinanceResponseGroups } from '@modules/finance/shared/domain/finance.contracts';
-import { TaxParameterKeyType } from '@input-type-schemas/TaxParameterKeySchema';
+import { TaxParameterKeyType, TaxParameterKeySchema } from '@input-type-schemas/TaxParameterKeySchema';
 
 const { INTERNAL, FINANCIAL, MANAGEMENT, ADMIN } = FinanceResponseGroups;
 
@@ -17,6 +18,7 @@ export class TaxParameterResponseDto {
   clinicId: string;
 
   @Expose({ groups: [INTERNAL, FINANCIAL, MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: TaxParameterKeySchema.options })
   key: TaxParameterKeyType;
 
   // Decimal — hassasiyet kaybı olmaması için string olarak taşınır.

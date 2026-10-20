@@ -1,8 +1,9 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { NotificationTypeType as NotificationType } from '@input-type-schemas/NotificationTypeSchema';
-import { NotificationPriorityType as NotificationPriority } from '@input-type-schemas/NotificationPrioritySchema';
-import { NotificationDeliveryStatusType as NotificationDeliveryStatus } from '@input-type-schemas/NotificationDeliveryStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { NotificationTypeType as NotificationType, NotificationTypeSchema } from '@input-type-schemas/NotificationTypeSchema';
+import { NotificationPriorityType as NotificationPriority, NotificationPrioritySchema } from '@input-type-schemas/NotificationPrioritySchema';
+import { NotificationDeliveryStatusType as NotificationDeliveryStatus, NotificationDeliveryStatusSchema } from '@input-type-schemas/NotificationDeliveryStatusSchema';
 
 const { INTERNAL, MANAGEMENT, ADMIN } = ResponseGroups;
 
@@ -12,9 +13,11 @@ export class StaffNotificationResponseDto {
   @Expose() staffId: string;
 
   // --- Temel Bildirim İçeriği (Herkes Görebilir / UI Tüketimi) ---
+  @ApiProperty({ enum: NotificationTypeSchema.options })
   @Expose() type: NotificationType;
   @Expose() title: string;
   @Expose() body: string;
+  @ApiProperty({ enum: NotificationPrioritySchema.options })
   @Expose() priority: NotificationPriority;
 
   @Expose() isRead: boolean;
@@ -32,6 +35,7 @@ export class StaffNotificationResponseDto {
 
   // --- Push Teslimat ve Altyapı Durumları (Sadece Yönetim ve Admin) ---
   @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: NotificationDeliveryStatusSchema.options })
   deliveryStatus: NotificationDeliveryStatus;
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })

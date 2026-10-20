@@ -7,7 +7,7 @@ import {
 } from '@modules/supply/purchasing/domain/exceptions/purchasing.exceptions';
 import { SupplierNotUsableInClinicException } from '@modules/supply/inventory/domain/exceptions/inventory.exceptions';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import type { CreatePurchaseOrder } from '@shared/modules/purchasing';
 
 /**

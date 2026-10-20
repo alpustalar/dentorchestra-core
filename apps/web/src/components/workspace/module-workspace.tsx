@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowUpRight,
   BriefcaseBusiness,
@@ -38,6 +38,17 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { DateTimeManager } from '@shared/common';
+import { formatLongDate, formatShortDate } from '@/lib/date-time';
+
+const today = DateTimeManager.startOfDay(DateTimeManager.create());
+const currentYear = DateTimeManager.currentYear();
+const relativeDate = (days: number) =>
+  formatShortDate(
+    days < 0
+      ? DateTimeManager.subtractDays(today, Math.abs(days))
+      : DateTimeManager.addDays(today, days)
+  );
 
 const modules = {
   patients: {
@@ -48,15 +59,21 @@ const modules = {
     action: 'Yeni hasta',
     columns: ['Hasta', 'İletişim', 'Son ziyaret', 'Sonraki randevu', 'Durum'],
     rows: [
-      ['Elif Yıldız', '0532 481 22 18', '08 Ağu 2026', '12 Ağu 2026', 'Aktif'],
+      [
+        'Elif Yıldız',
+        '0532 481 22 18',
+        relativeDate(-5),
+        relativeDate(-1),
+        'Aktif',
+      ],
       [
         'James Miller',
         '+44 20 7946 0912',
-        '07 Ağu 2026',
-        '14 Ağu 2026',
+        relativeDate(-6),
+        relativeDate(1),
         'Tedavi sürüyor',
       ],
-      ['Ayşe Korkmaz', '0555 209 45 61', '02 Ağu 2026', '—', 'Takipte'],
+      ['Ayşe Korkmaz', '0555 209 45 61', relativeDate(-11), '—', 'Takipte'],
     ],
   },
   inventory: {
@@ -94,9 +111,27 @@ const modules = {
     action: 'Fatura oluştur',
     columns: ['Belge', 'Müşteri', 'Tarih', 'Tutar', 'Durum'],
     rows: [
-      ['FTR-2026-184', 'Elif Yıldız', '08 Ağu 2026', '₺42.500', 'Ödendi'],
-      ['FTR-2026-183', 'James Miller', '07 Ağu 2026', '€2.400', 'Bekliyor'],
-      ['FTR-2026-182', 'Sofia Rossi', '05 Ağu 2026', '€4.200', 'Kısmi'],
+      [
+        `FTR-${currentYear}-184`,
+        'Elif Yıldız',
+        relativeDate(-5),
+        '₺42.500',
+        'Ödendi',
+      ],
+      [
+        `FTR-${currentYear}-183`,
+        'James Miller',
+        relativeDate(-6),
+        '€2.400',
+        'Bekliyor',
+      ],
+      [
+        `FTR-${currentYear}-182`,
+        'Sofia Rossi',
+        relativeDate(-8),
+        '€4.200',
+        'Kısmi',
+      ],
     ],
   },
   crm: {
@@ -108,7 +143,7 @@ const modules = {
     rows: [
       ['Lucia Fernández', 'Meta Ads', 'Teklif', 'Bugün', 'Zeynep Ak'],
       ['Ahmed Hassan', 'WhatsApp', 'Konsültasyon', 'Dün', 'Mert Kaya'],
-      ['Sofia Rossi', 'Referans', 'Kazanıldı', '05 Ağu', 'Zeynep Ak'],
+      ['Sofia Rossi', 'Referans', 'Kazanıldı', relativeDate(-8), 'Zeynep Ak'],
     ],
   },
   marketing: {
@@ -265,7 +300,7 @@ const appointments: Appointment[] = sourceAppointments.map((item, index) => {
   return {
     ...item,
     id: `apt-${index + 1}`,
-    date: '2026-08-13',
+    date: DateTimeManager.toDateKey(today),
     endTime:
       index === 2
         ? '11:15'
@@ -313,11 +348,12 @@ const appointments: Appointment[] = sourceAppointments.map((item, index) => {
 });
 
 export function ModuleWorkspace({ module }: { module: string }) {
+  const params = useParams<{ locale: string; 'clinic-slug': string }>();
+  const router = useRouter();
   if (module === 'appointments') return <AppointmentsWorkspace />;
   if (module === 'inbox') return <ChatWorkspace />;
   const config =
     modules[(module in modules ? module : 'patients') as ModuleKey];
-  const router = useRouter();
   const [query, setQuery] = React.useState('');
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [selectedRow, setSelectedRow] = React.useState<
@@ -557,7 +593,7 @@ export function ModuleWorkspace({ module }: { module: string }) {
               className="w-full"
               onClick={() =>
                 router.push(
-                  `../patients/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
+                  `/${params.locale}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
                 )
               }
             >
@@ -787,6 +823,7 @@ function ChatWorkspace() {
 
 function AppointmentsWorkspace() {
   const router = useRouter();
+  const params = useParams<{ locale: string; 'clinic-slug': string }>();
   const [view, setView] = React.useState<'calendar' | 'list' | 'waiting'>(
     'calendar'
   );
@@ -804,8 +841,8 @@ function AppointmentsWorkspace() {
   const [selectedRow, setSelectedRow] = React.useState<
     readonly string[] | null
   >(null);
-  const [anchorDate, setAnchorDate] = React.useState(
-    () => new Date(2026, 7, 13)
+  const [anchorDate, setAnchorDate] = React.useState(() =>
+    DateTimeManager.create()
   );
   const visible = appointments.filter(
     (item) =>
@@ -815,37 +852,40 @@ function AppointmentsWorkspace() {
         .toLocaleLowerCase('tr')
         .includes(query.toLocaleLowerCase('tr'))
   );
-  const formatter = new Intl.DateTimeFormat('tr-TR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-  const shortFormatter = new Intl.DateTimeFormat('tr-TR', {
-    day: 'numeric',
-    month: 'short',
-  });
-  const weekStart = new Date(anchorDate);
-  weekStart.setDate(anchorDate.getDate() - ((anchorDate.getDay() + 6) % 7));
+  const daysToMonday = (DateTimeManager.getDayOfWeek(anchorDate) + 6) % 7;
+  const weekStart = DateTimeManager.subtractDays(anchorDate, daysToMonday);
   const dateLabel =
     range === 'day'
-      ? formatter.format(anchorDate)
-      : `${shortFormatter.format(weekStart)}–${shortFormatter.format(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 4))} ${anchorDate.getFullYear()}`;
+      ? formatLongDate(anchorDate)
+      : `${formatShortDate(weekStart)}–${formatShortDate(
+          DateTimeManager.addDays(weekStart, 4)
+        )}`;
   const gridDays =
     range === 'day'
-      ? [`Bugün · ${shortFormatter.format(anchorDate)}`]
+      ? [
+          `${DateTimeManager.isSameDay(anchorDate, DateTimeManager.create()) ? 'Bugün' : 'Seçili gün'} · ${formatShortDate(anchorDate)}`,
+        ]
       : dayNames.map(
           (day, index) =>
-            `${day} · ${shortFormatter.format(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + index))}`
+            `${day} · ${formatShortDate(
+              DateTimeManager.addDays(weekStart, index)
+            )}`
         );
   const moveDate = (amount: number) =>
-    setAnchorDate((current) => {
-      const next = new Date(current);
-      next.setDate(current.getDate() + (range === 'day' ? amount : amount * 7));
-      return next;
-    });
+    setAnchorDate((current) =>
+      amount > 0
+        ? DateTimeManager.addDays(
+            current,
+            range === 'day' ? amount : amount * 7
+          )
+        : DateTimeManager.subtractDays(
+            current,
+            Math.abs(range === 'day' ? amount : amount * 7)
+          )
+    );
   const openCreate = (time: string, doctor = providers[1]) =>
     setDraft({
-      date: anchorDate.toLocaleDateString('tr-TR'),
+      date: DateTimeManager.toDateKey(anchorDate),
       time,
       doctor,
     });
@@ -869,7 +909,7 @@ function AppointmentsWorkspace() {
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm">
                 <Settings2 data-icon="inline-start" />
-                Randevu kuralları
+                Randevu ayarları
               </Button>
               <Button size="sm" onClick={() => openCreate('09:00')}>
                 <Plus data-icon="inline-start" />
@@ -890,7 +930,7 @@ function AppointmentsWorkspace() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setAnchorDate(new Date(2026, 7, 13))}
+                onClick={() => setAnchorDate(DateTimeManager.create())}
               >
                 Bugün
               </Button>
@@ -1098,7 +1138,7 @@ function AppointmentsWorkspace() {
               className="w-full"
               onClick={() =>
                 router.push(
-                  `../patients/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
+                  `/${params.locale}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
                 )
               }
             >
@@ -1231,7 +1271,9 @@ function AppointmentList({
                     variant="compact"
                   />
                 </td>
-                <td className="px-5 py-4">13 Ağu 2026</td>
+                <td className="px-5 py-4">
+                  {formatShortDate(DateTimeManager.create(item.date))}
+                </td>
                 <td className="px-5 py-4">
                   {item.time}–{item.endTime}
                 </td>

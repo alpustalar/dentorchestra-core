@@ -1,3 +1,5 @@
+import { UnbridgedBookingLedgerKind } from '@modules/crm/health-tourism/booking-payment/application/queries/find-unbridged-booking-ledger-entries/find-unbridged-booking-ledger-entries.response';
+
 /**
  * Telafi turunun sonucu. Başarısızlar **gerekçesiyle** döner: bir kısmı
  * yeniden denemeyle çözülür (sağlayıcı/DB hatası), bir kısmı çözülmez
@@ -10,7 +12,7 @@ export interface BackfillBookingLedgerEntriesResponse {
   recorded: number;
   failed: Array<{
     bookingPaymentId: string;
-    kind: 'SETTLED' | 'REFUNDED';
+    kind: UnbridgedBookingLedgerKind;
     reason: string;
   }>;
 }

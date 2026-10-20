@@ -5,7 +5,7 @@ import { FinancialEventTypeType as FinancialEventType } from '@input-type-schema
 import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema';
 import { RecordFinancialEventProps } from '@modules/finance/accounting/financial-events/domain/contracts/financial-event';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { validateFinancialEventPayload } from '@modules/finance/shared/domain/contracts/financial-event-payload.schemas';
 import {
   FinancialEventFutureDateException,

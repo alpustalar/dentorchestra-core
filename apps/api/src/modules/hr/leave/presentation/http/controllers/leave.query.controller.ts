@@ -30,7 +30,9 @@ const { LEAVEREQUEST } = CAPABILITIES;
 export class LeaveQueryController {
   constructor(private readonly queryBus: TSQueryBus) {}
   @Get('employees/:employeeId/leaves')
-  @Serialize<LeaveRequest, LeaveRequestResponseDto>(LeaveRequestResponseDto)
+  @Serialize<LeaveRequest, LeaveRequestResponseDto>(LeaveRequestResponseDto, {
+    isArray: true,
+  })
   listByEmployee(
     @Param('employeeId', ParseUUIDPipe) employeeId: string,
     @Query() dto: GetLeavesFilterDto,
@@ -50,11 +52,13 @@ export class LeaveQueryController {
     return this.queryBus.execute(new GetLeaveBalanceQuery(employeeId, ctx));
   }
   @Get('leaves/pending')
-  @Serialize<LeaveRequest, LeaveRequestResponseDto>(LeaveRequestResponseDto)
+  @Serialize<LeaveRequest, LeaveRequestResponseDto>(LeaveRequestResponseDto, {
+    isArray: true,
+  })
   pending(
     @Query() pagination: PaginationDto,
     @GetContext() ctx: IGetContext,
-    @Param('clinicId', ParseUUIDPipe) clinicId: string
+    @Query('clinicId', ParseUUIDPipe) clinicId: string
   ) {
     return this.queryBus.execute(
       new GetPendingLeavesQuery({ pagination, ctx, clinicId })

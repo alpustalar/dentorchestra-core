@@ -1,6 +1,7 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { HotelbedsBookingStatusType as HotelbedsBookingStatus } from '@input-type-schemas/HotelbedsBookingStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { HotelbedsBookingStatusType as HotelbedsBookingStatus, HotelbedsBookingStatusSchema } from '@input-type-schemas/HotelbedsBookingStatusSchema';
 import { JsonValueType as JsonValue } from '@input-type-schemas/JsonValueSchema';
 
 const { INTERNAL, MANAGEMENT, DATA_OWNER, FINANCIAL, ADMIN } = ResponseGroups;
@@ -14,6 +15,7 @@ export class HotelbedsBookingResponseDto {
 
   // --- Rezervasyon Temel Bilgileri (Herkese Açık) ---
   @Expose() hotelCode: string;
+  @ApiProperty({ enum: HotelbedsBookingStatusSchema.options })
   @Expose() status: HotelbedsBookingStatus;
 
   @Expose()

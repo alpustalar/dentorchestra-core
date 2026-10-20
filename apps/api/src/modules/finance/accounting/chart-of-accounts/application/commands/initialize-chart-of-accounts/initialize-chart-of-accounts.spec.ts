@@ -7,7 +7,7 @@ import { IPolicyFactory } from '@modules/platform/policy/staff/domain/interfaces
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction/transaction.manager';
 import { ITenantScopeResolver } from '@shared';
 import { IGetContext } from '@common/decorators';
-import { ExecutionSources } from '@src/domain/constants/execution-source.constant';
+import { ExecutionSources } from '../../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 import { LogSource } from '@src/domain/constants/log-action.constant';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import { CLINIC_CHART_OF_ACCOUNTS_TEMPLATE } from '@modules/finance/accounting/chart-of-accounts/domain/constants/clinic-chart-of-accounts.template';

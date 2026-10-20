@@ -15,6 +15,8 @@ export const LEDGER_STATUS_LABELS: Record<string, string> = {
   COMPLETED: 'Tamamlandı',
   CANCELLED: 'İptal',
   REFUNDED: 'İade',
+  // Kaybedilen kart itirazı: para iade edilmedi, sağlayıcı geri aldı (iade DEĞİL).
+  CHARGED_BACK: 'Ters ibraz',
 };
 
 export const LEDGER_CATEGORY_LABELS: Record<string, string> = {

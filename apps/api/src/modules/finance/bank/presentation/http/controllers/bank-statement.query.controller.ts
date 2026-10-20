@@ -37,7 +37,10 @@ export class BankStatementQueryController {
 
   @HasCapability(BANKSTATEMENT.read)
   @Get()
-  @Serialize<IBankStatement, BankStatementResponseDto>(BankStatementResponseDto)
+  @Serialize<IBankStatement, BankStatementResponseDto>(
+    BankStatementResponseDto,
+    { isArray: true }
+  )
   list(
     @Query() dto: GetBankStatementsFilterDto,
     @Query() pagination: PaginationDto,
@@ -80,7 +83,8 @@ export class BankStatementQueryController {
   @HasCapability(BANKSTATEMENTLINE.read)
   @Get('lines/:lineId/suggestions')
   @Serialize<LineMatchSuggestion, LineMatchSuggestionResponseDto>(
-    LineMatchSuggestionResponseDto
+    LineMatchSuggestionResponseDto,
+    { isArray: true }
   )
   lineSuggestions(
     @Param('lineId', ParseUUIDPipe) lineId: string,

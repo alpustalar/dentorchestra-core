@@ -4,7 +4,7 @@ import { PrismaService } from '@src/infrastructure/persistence/prisma/prisma.ser
 import { IMetaAdAccountCommandRepository } from '@modules/crm/meta-ads/domain/repositories/meta-ad-account.repository';
 import { MetaAdAccount } from '@modules/crm/meta-ads/domain/entities/meta-ad-account.entity';
 import { txStorage } from '@src/infrastructure/persistence/prisma/transaction';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 
 @Injectable()
 export class MetaAdAccountCommandRepository

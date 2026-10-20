@@ -3,8 +3,14 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, Logger } from '@nestjs/common';
 import { MessageStatus, MessageType } from '@shared';
 import { QUEUES } from '@common/constants';
-import { MESSAGING_DELIVERY_RETRY_BUFFER_MS, MESSAGING_JOBS, MESSAGING_SEND_MAX_ATTEMPTS, MESSAGING_SEND_RATE_DURATION_MS, MESSAGING_SEND_RATE_MAX } from '@messaging/constants/jobs.constant';
-import { DateTimeManager } from '@common/infrastructure/date-time/date-time.manager';
+import {
+  MESSAGING_DELIVERY_RETRY_BUFFER_MS,
+  MESSAGING_JOBS,
+  MESSAGING_SEND_MAX_ATTEMPTS,
+  MESSAGING_SEND_RATE_DURATION_MS,
+  MESSAGING_SEND_RATE_MAX,
+} from '@messaging/constants/jobs.constant';
+import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
 import { UUID } from '@src/domain/value-objects/uuid.vo';
 import {
   IMessagingCacheService,

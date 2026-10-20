@@ -1,4 +1,4 @@
-import { ScheduleAppointmentSchema } from '@shared/modules/index';
+import { ScheduleAppointmentSchema } from '../../schemas/command';
 import { z } from 'zod';
 
 export type ScheduleAppointment = z.infer<typeof ScheduleAppointmentSchema>;

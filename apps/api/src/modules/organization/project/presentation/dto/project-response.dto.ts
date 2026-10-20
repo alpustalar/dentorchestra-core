@@ -1,10 +1,11 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { ProjectResponseGroups } from '@modules/organization/project/domain/contracts';
-import { ProjectStatusType } from '@input-type-schemas/ProjectStatusSchema';
-import { ProjectPhaseStatusType } from '@input-type-schemas/ProjectPhaseStatusSchema';
-import { ProjectTaskStatusType } from '@input-type-schemas/ProjectTaskStatusSchema';
-import { ProjectTaskPriorityType } from '@input-type-schemas/ProjectTaskPrioritySchema';
-import { ProjectResourceKindType } from '@input-type-schemas/ProjectResourceKindSchema';
+import { ProjectStatusType, ProjectStatusSchema } from '@input-type-schemas/ProjectStatusSchema';
+import { ProjectPhaseStatusType, ProjectPhaseStatusSchema } from '@input-type-schemas/ProjectPhaseStatusSchema';
+import { ProjectTaskStatusType, ProjectTaskStatusSchema } from '@input-type-schemas/ProjectTaskStatusSchema';
+import { ProjectTaskPriorityType, ProjectTaskPrioritySchema } from '@input-type-schemas/ProjectTaskPrioritySchema';
+import { ProjectResourceKindType, ProjectResourceKindSchema } from '@input-type-schemas/ProjectResourceKindSchema';
 
 const { INTERNAL, FINANCIAL, MANAGEMENT, ADMIN } = ProjectResponseGroups;
 
@@ -23,6 +24,7 @@ export class ProjectResponseDto {
   @Expose(OPS) code: string | null;
   @Expose(OPS) name: string;
   @Expose(OPS) description: string | null;
+  @ApiProperty({ enum: ProjectStatusSchema.options })
   @Expose(OPS) status: ProjectStatusType;
   @Expose(OPS) ownerId: string;
 
@@ -73,6 +75,7 @@ export class ProjectPhaseResponseDto {
   @Expose(OPS) clinicId: string;
   @Expose(OPS) name: string;
   @Expose(OPS) order: number;
+  @ApiProperty({ enum: ProjectPhaseStatusSchema.options })
   @Expose(OPS) status: ProjectPhaseStatusType;
 
   @Expose(OPS)
@@ -109,7 +112,9 @@ export class ProjectTaskResponseDto {
   @Expose(OPS) parentTaskId: string | null;
   @Expose(OPS) title: string;
   @Expose(OPS) description: string | null;
+  @ApiProperty({ enum: ProjectTaskStatusSchema.options })
   @Expose(OPS) status: ProjectTaskStatusType;
+  @ApiProperty({ enum: ProjectTaskPrioritySchema.options })
   @Expose(OPS) priority: ProjectTaskPriorityType;
   @Expose(OPS) assigneeId: string | null;
   @Expose(OPS) boardOrder: number;
@@ -152,6 +157,7 @@ export class ProjectTaskResponseDto {
 
 /** Durum bazlı görev sayacı (pano başlıkları). */
 export class ProjectTaskStatusCountResponseDto {
+  @ApiProperty({ enum: ProjectTaskStatusSchema.options })
   @Expose(OPS) status: ProjectTaskStatusType;
   @Expose(OPS) count: number;
 }
@@ -177,6 +183,7 @@ export class ResourceScheduleRowResponseDto {
   @Expose(OPS) projectId: string;
   @Expose(OPS) projectName: string;
   @Expose(OPS) phaseId: string | null;
+  @ApiProperty({ enum: ProjectResourceKindSchema.options })
   @Expose(OPS) kind: ProjectResourceKindType;
   @Expose(OPS) resourceId: string;
 

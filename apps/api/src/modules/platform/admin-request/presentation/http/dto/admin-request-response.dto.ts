@@ -1,7 +1,8 @@
+import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
-import { ResponseGroups } from '@common/constants/response-groups.constant';
-import { AdminRequestTypeType as AdminRequestType } from '@input-type-schemas/AdminRequestTypeSchema';
-import { AdminRequestStatusType as AdminRequestStatus } from '@input-type-schemas/AdminRequestStatusSchema';
+import { ResponseGroups } from '../../../../../../../../../packages/shared/common/constants/response-groups.constant';
+import { AdminRequestTypeType as AdminRequestType, AdminRequestTypeSchema } from '@input-type-schemas/AdminRequestTypeSchema';
+import { AdminRequestStatusType as AdminRequestStatus, AdminRequestStatusSchema } from '@input-type-schemas/AdminRequestStatusSchema';
 
 const { MANAGEMENT, ADMIN } = ResponseGroups;
 
@@ -12,9 +13,11 @@ export class AdminRequestResponseDto {
 
   // --- Temel Talep Bilgileri (Yönetim ve Üst Roller Görebilir) ---
   @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: AdminRequestTypeSchema.options })
   type: AdminRequestType;
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })
+  @ApiProperty({ enum: AdminRequestStatusSchema.options })
   status: AdminRequestStatus;
 
   @Expose({ groups: [MANAGEMENT, ADMIN] })
