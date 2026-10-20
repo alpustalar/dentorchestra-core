@@ -6817,3 +6817,17 @@ varken iade sağlayıcıya gitmeden reddedilir**, iade edilmiş takside itiraz a
 
 Kalan (paket 23): fiziksel POS iade/iptal (pax, iyzico terminal), sanal POS iptal, booking-payment iade claim'leri,
 `POS_TRANSACTION`/`BOOKING_PAYMENT` itirazı. Doğrulama: `pnpm test:db` 6 suite / **58** test (biri `it.failing`).
+
+### 96.1 Devam (tur 34c): fiziksel POS, rezervasyon iadesi, tahsilat köprüsü
+
+Üç akış daha gerçek DB'de çalıştırıldı. **Yeni bulgu yok**; üçü de tasarlandığı gibi davrandı:
+
+| Akış (spec) | Doğrulananlar |
+| --- | --- |
+| **Fiziksel POS iadesi + `POS_TRANSACTION` itirazı** (`pax-refund.db-spec.ts`) | Kısmi iadeler kümülatif (200+300 geçer, +1 kuruş reddedilir), köprü olayları fişlenir (108 −500); cihaz reddi → FAILED + yeniden denenebilir; **zaman aşımı → PENDING kalır ve tavandan düşer** (çift iade yok); bağlantı hatası → FAILED, tavandan düşmez; açık itiraz iadeyi cihaza gitmeden reddeder; iade itiraz tavanını düşürür. **Cihaz uçuştayken açılan itiraz iadeyle birlikte tavanı aşamaz** — sanal POS'un (§96 #1) aksine PENDING iade kaydı TCP öncesi, orijinal satır kilitliyken yazıldığı için yarış kapalı |
+| **Rezervasyon iadesi ↔ `BOOKING_PAYMENT` itirazı** (`booking-payment-refund.db-spec.ts`) | Kilitli claim (BOOKED→REFUNDED + tek PENDING iade satırı), ikinci/eşzamanlı iade SKIPPED, aktif itirazda claim reddedilir ve geri sarılır, iade talep edilmiş tahsilata itiraz açılamaz, FAILED iade tavandan düşmez, eşzamanlı iade+itiraz sıraya girer (toplam tahsilatı aşmaz). Sağlayıcı çağrısını yapan executor taklit |
+| **iyzico ödeme callback'i (tahsilat köprüsü)** (`handle-payment-callback.db-spec.ts`) | Başarılı callback → taksit COMPLETED + tek `PAYMENT_RECEIVED` fişlenir (108 +tutar); ikinci callback ve **callback+webhook eşzamanlı** tek tahsilat; sağlayıcı başarısızlığı → taksit PENDING/olay yok; token uyuşmazlığı `IyzicoCallbackRejectedException`; köprü patlarsa taksit işaretlemesi **geri sarılır** (kural 4) |
+
+Doğrulama: `pnpm test:db` 9 suite / **78** test (biri `it.failing`, §96 #1). Kalan (paket 23): iyzico terminal iade/iptal,
+pax iptal (void), sanal POS iptal (`cancel-payment`), booking executor'ın gerçek sağlayıcı sonucu eşlemesi, ödeme oluşturma,
+fatura/bordro/stok/satın alma kaynak handler'ları, CI bağlantısı.

@@ -74,7 +74,7 @@ canlıda olmalı; sonra `finans:degismezler` 30/30; mevcut kliniklerde `chart-of
 komutu/ucu, planda `EQUITY_CARRYFORWARD` adımı (1 Ocak; şirket 570/580, şahıs 500). **Üçüncü migration:**
 `20261024100000_clinic_business_type` (uygulanmadı). Eski klinikler için seçim ucu çağrılmalı; seçilene kadar devir atlanır.
 
-**Tur 34 (§95, 2026-10-21) — gerçek-DB turu KODLANDI; tur 32–34 `231c27f5` ile commit'li:** `pnpm test:db` (izole DB, 5 suite / 52 test): 17 posting kuralı,
+**Tur 34 (§95, 2026-10-21) — gerçek-DB turu KODLANDI; tur 32–34 `231c27f5` ile commit'li:** `pnpm test:db` (izole DB, şimdi 9 suite / 78 test; §95–§96.1): 17 posting kuralı,
 kasa, kart itirazı (ONLINE_PAYMENT), hesap kapaması, yıl sonu kapanışı (özkaynak devri dahil). **1×P0** (`lockConcept` Prisma `void`
 sütunu → 108 kapısını kullanan her yol patlıyordu) ve **1×P1** (108 kapısı fişlenmemiş kesintileri düşmüyordu) bulundu ve
 kapatıldı. Migration yok. Ölçümler: `tsc` 1 ilgisiz hata; `pnpm test` 293/294 suite, **2266** test; `test:db` **52** test.
