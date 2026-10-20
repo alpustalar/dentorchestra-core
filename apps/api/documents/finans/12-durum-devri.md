@@ -67,14 +67,14 @@ Kapanış zinciri tek saf planlayıcıdır (`planYearEndClosing`): GRNI tahakkuk
 tek suite ilgisiz `schedule-appointment.handler.spec.ts`); `finans:degismezler` 30 kontrol, **28 temiz + 2 çalıştırılamadı**
 (`mal-kabul-gunlugu-*`: migration dev DB'de yok → exit 2, tasarım gereği).
 
-**Kullanıcıda bekleyen:** iki migration'ı uygula (`pnpm migrate:dev`) — mal kabul günlüğü **30 Kasım'a kadar**
+**(2026-10-21: dev DB'de YAPILDI — 93/93 migration uygulandı, `finans:degismezler` 30/30, dev test kliniği için hesap planı (70 hesap) + 2026/2027 dönemleri kuruldu. Test kliniğinin işletme biçimi seçilmedi: kullanıcı kararı, seçilene kadar devir atlanır. Üretim adımları hâlâ kullanıcıda.)** Eski not: iki migration'ı uygula (`pnpm migrate:dev`) — mal kabul günlüğü **30 Kasım'a kadar**
 canlıda olmalı; sonra `finans:degismezler` 30/30; mevcut kliniklerde `chart-of-accounts/initialize`; tur 32+33 commit.
 
 **İşletme biçimi + devir (§94, 2026-10-21) kodlandı:** `businessType` alanı (kayıtta zorunlu), `SetClinicBusinessType`
 komutu/ucu, planda `EQUITY_CARRYFORWARD` adımı (1 Ocak; şirket 570/580, şahıs 500). **Üçüncü migration:**
 `20261024100000_clinic_business_type` (uygulanmadı). Eski klinikler için seçim ucu çağrılmalı; seçilene kadar devir atlanır.
 
-**Tur 34 (§95, 2026-10-21) — gerçek-DB turu KODLANDI, commit'siz:** `pnpm test:db` (izole DB, 5 suite / 52 test): 17 posting kuralı,
+**Tur 34 (§95, 2026-10-21) — gerçek-DB turu KODLANDI; tur 32–34 `231c27f5` ile commit'li:** `pnpm test:db` (izole DB, 5 suite / 52 test): 17 posting kuralı,
 kasa, kart itirazı (ONLINE_PAYMENT), hesap kapaması, yıl sonu kapanışı (özkaynak devri dahil). **1×P0** (`lockConcept` Prisma `void`
 sütunu → 108 kapısını kullanan her yol patlıyordu) ve **1×P1** (108 kapısı fişlenmemiş kesintileri düşmüyordu) bulundu ve
 kapatıldı. Migration yok. Ölçümler: `tsc` 1 ilgisiz hata; `pnpm test` 293/294 suite, **2266** test; `test:db` **52** test.
