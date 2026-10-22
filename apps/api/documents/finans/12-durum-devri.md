@@ -22,6 +22,21 @@ yoksa liste sessizce bayatlar.
 
 ## 0. Devam noktası — buradan başla
 
+### Son durum (2026-10-21, tur 34d sonrası) — kısa özet
+
+| | |
+| --- | --- |
+| **Commit durumu** | Tur 34d (§97) **commit'siz** (çalışma ağacında) |
+| **Bu tur** | Sanal POS iptali yerelde kapanmıyordu (P0) → ortak `IyzicoReversalFinalizer`; iade/iptal ↔ itiraz yarışı (§96 #1) → `reversal_requested_at` damgası |
+| **Bekleyen migration** | `20261025100000_payment_installment_reversal_requested` — **kullanıcı uygular**; sonra `finans:degismezler` 31 kontrol |
+| **Ölçüm** | `tsc` 1 ilgisiz hata · `pnpm test` 294/295 suite, 2273 test · `pnpm test:db` 10 suite, 90 test |
+| **Üretimde yapılacak** | migration deploy (tur 30–34d) → seed → tarama → `VALIDATE CONSTRAINT`; eski `/iyzico/cancel` iptallerini sağlayıcı paneliyle karşılaştır; legacy REFUNDED satırlarını doğrula |
+| **Sıradaki kod işi** | Paket 23 kalanı: iyzico terminal iade/iptal, pax void, `test:db` CI bağlantısı |
+| **Bloke / karar bekleyen** | POS EOD (sağlayıcı dokümanı), Stripe (canlıya alınmıyor), e-belge adapter (entegratör), hasta borç tavanı, ProjectCost/work-order maliyeti, yabancı para tanıma, test kliniği işletme biçimi |
+| **Operasyon** | `SLACK_OPS_WEBHOOK_URL`, `POS_CALLBACK_SECRET` tanımsız |
+
+Ayrıntı: `09` §97 · açık işler: `10-kalan-isler.md` · hafıza: `finance-real-db-harness`.
+
 **Durum (2026-10-20).** Tur 30 (kart itirazı) ve tur 31 (platform iade doğrulaması) `main`'e commit edildi
 (`ca4b5075`); kullanıcının refactor'ü ayrı commit'te (`68898279`). Migration'lar **yerel dev DB'ye uygulandı**
 (90/90), seed çalıştırıldı, uygulama açıldı (platform dönemi açıldı), sekiz `NOT VALID` kısıt doğrulandı,
@@ -78,6 +93,13 @@ komutu/ucu, planda `EQUITY_CARRYFORWARD` adımı (1 Ocak; şirket 570/580, şah�
 kasa, kart itirazı (ONLINE_PAYMENT), hesap kapaması, yıl sonu kapanışı (özkaynak devri dahil). **1×P0** (`lockConcept` Prisma `void`
 sütunu → 108 kapısını kullanan her yol patlıyordu) ve **1×P1** (108 kapısı fişlenmemiş kesintileri düşmüyordu) bulundu ve
 kapatıldı. Migration yok. Ölçümler: `tsc` 1 ilgisiz hata; `pnpm test` 293/294 suite, **2266** test; `test:db` **52** test.
+
+**Tur 34d (§97, 2026-10-21) — sanal POS iade/iptal KODLANDI, commit'siz:** §96 #1 (iade ↔ itiraz yarışı) kapandı:
+`payment_installments.reversal_requested_at` damgası (SDK'dan önce, ödeme satırı kilitliyken) + `Begin/ReleaseInstallmentReversal`
+komutları. Gerçek-DB'de **ikinci bir P0** çıktı: `POST /payments/iyzico/cancel` sağlayıcıda iptal ediyor ama yerel kapanış her
+zaman fırlatıyordu → artık iade ile ortak `IyzicoReversalFinalizer`. **Migration `20261025100000_payment_installment_reversal_requested`
+UYGULANMADI** (kullanıcı uygular; önce `pnpm migrate:dev`, sonra `finans:degismezler` **31** kontrol). Ölçümler: `tsc` 1 ilgisiz
+hata; `pnpm test` 294/295 suite; `test:db` **10 suite / 90 test**.
 
 **Sıradaki tur önerisi — iş paketi 23'ün kalanı (§95.5):** iade/iptal yolları (sağlayıcı adaptörü taklidi ister) ve
 `POS_TRANSACTION`/`BOOKING_PAYMENT` itirazı; `test:db`'yi CI'a bağlamak. Tur 33'teki P0 ve tur 34'teki ikisi aynı sınıftandı. Alternatifler: `13-organization-clinic-defter-plani.md`
@@ -367,3 +389,20 @@ cd apps/api && pnpm finans:eksik           # 218 kalem (206 açık) üretir
 
 Son tur (§87) sonunda ölçülen durum budur. `pnpm lint` tüm projede zorunlu değil;
 yeni dosyalarda hedefli ESLint temiz (değişen mevcut dosyalarda yalnız önceden var olan biçim borcu kaldı).
+
+---
+
+## 12. Nilvera devri (2026-10-21)
+
+- Klinik kapsamlı e-belge credential modeli tamamlandı; klinik kaydı organizasyon kaydını ezer,
+  kayıt yoksa organizasyon ayarı miras alınır.
+- Secret write-only DTO ile alınır, `TokenCipherService` ile şifrelenir ve okuma uçlarından hiçbir
+  zaman dönmez. Credential yenileme aynı `PUT` upsert akışıdır ve önceki test sonucunu sıfırlar.
+- Gerçek Nilvera adapter'ı e-Fatura/e-Arşiv gönderimi, durum, mükellef sorgusu, e-Arşiv iptali ve
+  bağlantı testini destekler. Processor credentialı `invoice.clinicId` ile çözer.
+- Migration hazır ama uygulanmadı: `20261026100000_edocument_integration_config`.
+- Web e-belge sayfasındaki “Entegrasyon Ayarları” formu klinik/organizasyon okuma, kaydetme,
+  anahtar yenileme, bağlantı testi ve kaldırma uçlarına bağlandı; secret hiçbir zaman forma geri
+  yüklenmiyor.
+- Sonraki adım: migrationı kullanıcı uygular. Sonraki backend paketi `FAILED`→uzak durum
+  doğrulama→elle requeue ve satır bazlı fatura kalemleridir.

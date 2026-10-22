@@ -1,6 +1,6 @@
 import { Expose, Type } from 'class-transformer';
 import { AppointmentResponseDto } from './appointment-response.dto';
-import { AppointmentsResponseGroups } from '@modules/clinical/appointment/domain/contracts/appointment';
+import { AppointmentsResponseGroups } from '@shared/modules/appointment/constants';
 
 const { INTERNAL, PROVIDER_DATA_OWNER, PATIENT_DATA_OWNER, ADMIN, MANAGEMENT } =
   AppointmentsResponseGroups;

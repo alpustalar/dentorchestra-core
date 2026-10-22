@@ -17,7 +17,10 @@ import type {
 
 import type {
   BackfillBookingLedgerEntriesDto,
-  BookingPaymentBackfillLedger201
+  BookingPaymentBackfillLedger201,
+  BookingPaymentResolveRefund201,
+  BookingPaymentRetryRefund201,
+  ResolveBookingPaymentRefundDto
 } from '../model';
 
 import { orvalMutator } from '../../../lib/api/orval-mutator';
@@ -96,4 +99,139 @@ export const useBookingPaymentBackfillLedger = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getBookingPaymentBackfillLedgerMutationOptions(options), queryClient);
+    }
+    /**
+ * @summary Sonucu doğrulanamamış / takılmış iadeyi ELLE kapatır. Ayrı yetki ailesi
+(`bookingpaymentrefund`): `bookingpayment:update` klinik sahibi ve resepsiyonda da var.
+ */
+export const bookingPaymentResolveRefund = (
+    refundId: string,
+    resolveBookingPaymentRefundDto: ResolveBookingPaymentRefundDto,
+ signal?: AbortSignal
+) => {
+
+
+      return orvalMutator<BookingPaymentResolveRefund201>(
+      {url: `/api/v1/health-tourism/booking-payments/refunds/${refundId}/resolve`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: resolveBookingPaymentRefundDto, signal
+    },
+      );
+    }
+
+
+
+
+export const getBookingPaymentResolveRefundMutationKey = () => ['bookingPaymentResolveRefund'] as const;
+
+export const getBookingPaymentResolveRefundMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingPaymentResolveRefund>>, TError,BookingPaymentResolveRefundMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof bookingPaymentResolveRefund>>, TError,BookingPaymentResolveRefundMutationVariables, TContext> => {
+
+const mutationKey = getBookingPaymentResolveRefundMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookingPaymentResolveRefund>>, BookingPaymentResolveRefundMutationVariables> = (props) => {
+          const {refundId,data} = props ?? {};
+
+          return  bookingPaymentResolveRefund(refundId,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookingPaymentResolveRefundMutationResult = NonNullable<Awaited<ReturnType<typeof bookingPaymentResolveRefund>>>
+    export type BookingPaymentResolveRefundMutationBody = ResolveBookingPaymentRefundDto
+    export type BookingPaymentResolveRefundMutationError = ErrorType<unknown>
+    export type BookingPaymentResolveRefundMutationVariables = {refundId: string;data: ResolveBookingPaymentRefundDto}
+
+    /**
+ * @summary Sonucu doğrulanamamış / takılmış iadeyi ELLE kapatır. Ayrı yetki ailesi
+(`bookingpaymentrefund`): `bookingpayment:update` klinik sahibi ve resepsiyonda da var.
+ */
+export const useBookingPaymentResolveRefund = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingPaymentResolveRefund>>, TError,BookingPaymentResolveRefundMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof bookingPaymentResolveRefund>>,
+        TError,
+        BookingPaymentResolveRefundMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBookingPaymentResolveRefundMutationOptions(options), queryClient);
+    }
+    /**
+ * @summary Sağlayıcının reddettiği (FAILED) iadeyi yeniden dener. `UNCONFIRMED` önce `resolve` ister.
+ */
+export const bookingPaymentRetryRefund = (
+    refundId: string,
+ signal?: AbortSignal
+) => {
+
+
+      return orvalMutator<BookingPaymentRetryRefund201>(
+      {url: `/api/v1/health-tourism/booking-payments/refunds/${refundId}/retry`, method: 'POST', signal
+    },
+      );
+    }
+
+
+
+
+export const getBookingPaymentRetryRefundMutationKey = () => ['bookingPaymentRetryRefund'] as const;
+
+export const getBookingPaymentRetryRefundMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingPaymentRetryRefund>>, TError,BookingPaymentRetryRefundMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof bookingPaymentRetryRefund>>, TError,BookingPaymentRetryRefundMutationVariables, TContext> => {
+
+const mutationKey = getBookingPaymentRetryRefundMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof bookingPaymentRetryRefund>>, BookingPaymentRetryRefundMutationVariables> = (props) => {
+          const {refundId} = props ?? {};
+
+          return  bookingPaymentRetryRefund(refundId,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type BookingPaymentRetryRefundMutationResult = NonNullable<Awaited<ReturnType<typeof bookingPaymentRetryRefund>>>
+
+    export type BookingPaymentRetryRefundMutationError = ErrorType<unknown>
+    export type BookingPaymentRetryRefundMutationVariables = {refundId: string}
+
+    /**
+ * @summary Sağlayıcının reddettiği (FAILED) iadeyi yeniden dener. `UNCONFIRMED` önce `resolve` ister.
+ */
+export const useBookingPaymentRetryRefund = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof bookingPaymentRetryRefund>>, TError,BookingPaymentRetryRefundMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof bookingPaymentRetryRefund>>,
+        TError,
+        BookingPaymentRetryRefundMutationVariables,
+        TContext
+      > => {
+      return useMutation(getBookingPaymentRetryRefundMutationOptions(options), queryClient);
     }

@@ -28,7 +28,9 @@ import { LogAction, LogType } from '@src/domain/constants/log-action.constant';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { GetPaymentWithInstallmentsQuery } from '@modules/finance/payment/application/queries/get-payment-with-installments/get-payment-with-installments.query';
-import { MarkInstallmentAsCancelledCommand } from '@modules/finance/payment/application/commands/mark-installment-as-cancelled/mark-installment-as-cancelled.command';
+import { BeginInstallmentReversalCommand } from '@modules/finance/payment/application/commands/begin-installment-reversal/begin-installment-reversal.command';
+import { ReleaseInstallmentReversalCommand } from '@modules/finance/payment/application/commands/release-installment-reversal/release-installment-reversal.command';
+import { IyzicoReversalFinalizer } from '@modules/finance/pos/virtual/application/services/iyzico-reversal-finalizer.service';
 import InstallmentStatusSchema from '@input-type-schemas/InstallmentStatusSchema';
 import {
   IIyzicoTransactionCommandRepository,
@@ -57,6 +59,7 @@ export class CancelPaymentHandler implements ICommandHandler<
     private readonly paymentEventPublisher: IPaymentEventPublisher,
     private readonly commandBus: TSCommandBus,
     private readonly queryBus: TSQueryBus,
+    private readonly finalizer: IyzicoReversalFinalizer,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
     @Inject(CARD_CHARGEBACK_EXPOSURE_GUARD)
@@ -91,25 +94,10 @@ export class CancelPaymentHandler implements ICommandHandler<
     if (!completedInstallment)
       throw new CompletedInstallmentNotFoundException();
 
-    // Kart itirazı da aynı taksidin aynı tutarına dokunur: açık ya da kaybedilmiş
-    // bir itiraz varken iade/iptal parayı kart sahibine İKİ KEZ götürürdü (bir kez
-    // sağlayıcı kesintisi, bir kez bizim iademiz). Kontrol dış SDK çağrısından
-    // ÖNCE — sonra olsaydı para çoktan hareket etmişti.
-    // Not: bu yolda taksit satırı kilitlenmiyor ve PENDING işareti yok; SDK
-    // uçuştayken kaydedilen bir itiraz yakalanmaz (§88 ertelemesi).
-    const completedAmount = new Decimal(completedInstallment.amount.toString());
-    await this.chargebackExposureGuard.assertReversalWithinCollection({
-      sourceType: CardChargebackSourceSchema.enum.ONLINE_PAYMENT,
-      sourceId: completedInstallment.id,
-      collectedAmount: completedAmount,
-      // COMPLETED taksit henüz iade edilmemiştir (iade → REFUNDED durumuna geçer).
-      alreadyReversedAmount: new Decimal(0),
-      requestedAmount: completedAmount,
-    });
-
     // İptal çağrısı için dış referans (iyzicoPaymentId). Kayıt az önce yazılmış
     // olabileceğinden okuma command repo'dan (ana bağlantı) yapılır; bu akış iyzico
-    // işlem kaydını değiştirmediği için kilit gerekmez.
+    // işlem kaydını değiştirmediği için kilit gerekmez. Damgadan ÖNCE okunur: kayıt
+    // yoksa damga atılmamış olmalı.
     const iyzicoTx = await this.iyzicoCommandRepo.findByInstallmentId(
       completedInstallment.id
     );
@@ -118,28 +106,69 @@ export class CancelPaymentHandler implements ICommandHandler<
       throw new IyzicoPaymentRecordNotFoundException();
     }
 
+    // Kart itirazı da aynı taksidin aynı tutarına dokunur: açık ya da kaybedilmiş
+    // bir itiraz varken iade/iptal parayı kart sahibine İKİ KEZ götürürdü. Kapı SDK
+    // çağrısından ÖNCE, ödeme satırı kilitliyken çalışır ve aynı kısa transaction'da
+    // taksit damgalanır: SDK uçuştayken açılmaya çalışılan itiraz reddedilir (kural 18d).
+    const completedAmount = new Decimal(completedInstallment.amount.toString());
+    await this.txManager.run(async () => {
+      await this.commandBus.execute(
+        new BeginInstallmentReversalCommand(
+          completedInstallment.id,
+          this.internalCtx
+        )
+      );
+      await this.chargebackExposureGuard.assertReversalWithinCollection({
+        sourceType: CardChargebackSourceSchema.enum.ONLINE_PAYMENT,
+        sourceId: completedInstallment.id,
+        collectedAmount: completedAmount,
+        // COMPLETED taksit henüz iade edilmemiştir (iade → REFUNDED durumuna geçer).
+        alreadyReversedAmount: new Decimal(0),
+        requestedAmount: completedAmount,
+      });
+    });
+
     const generatedConversationUUID = UUID.generate();
 
+    // SDK FIRLATIRSA sonuç BİLİNMİYOR: damga kasıtlı olarak kalır (bkz. iade handler'ı).
     const sdkResult = await this.iyzicoProvider.cancelPayment({
       conversationId: generatedConversationUUID.value,
       paymentId: iyzicoTx.iyzicoPaymentId,
       ip,
     });
 
-    IyzicoResultGuard.create({
+    const outcome = IyzicoResultGuard.create({
       status: sdkResult.status,
       errorMessage: sdkResult?.errorMessage,
-    })
-      .isSuccess()
-      .orThrow();
+    }).isSuccess();
 
-    await this.txManager.outboxRun(async () => {
+    if (!outcome.isValid) {
+      // Sağlayıcı AÇIKÇA reddetti: para gitmedi, damga kalkar.
       await this.commandBus.execute(
-        new MarkInstallmentAsCancelledCommand(
+        new ReleaseInstallmentReversalCommand(
           completedInstallment.id,
           this.internalCtx
         )
       );
+      outcome.orThrow();
+    }
+
+    // İptal de parayı kart sahibine geri götürür: yerel kapanış iade ile AYNI yoldur
+    // (taksit REFUNDED + PAYMENT_REFUNDED olayı → 120 / 108). Eskiden burada
+    // `MarkInstallmentAsCancelledCommand` çağrılıyordu; entity tahsil edilmiş taksidin
+    // iptalini reddettiği için sağlayıcıda iptal edilmiş para yerelde HİÇ kapanmıyor,
+    // taksit COMPLETED, defter tahsilatı göstermeye devam ediyordu (§97).
+    await this.txManager.outboxRun(async () => {
+      await this.finalizer.finalize({
+        installmentId: completedInstallment.id,
+        paymentId: payment.id,
+        clinicId: payment.clinicId,
+        patientId: payment.patientId,
+        amount: completedInstallment.amount.toString(),
+        rawResponse: sdkResult,
+        details: 'iyzico ödeme iptali (void)',
+        ctx: this.internalCtx,
+      });
 
       this.paymentEventPublisher.paymentCancelled({
         paymentId: payment.id,

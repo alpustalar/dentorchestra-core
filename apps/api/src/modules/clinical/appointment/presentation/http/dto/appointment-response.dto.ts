@@ -2,12 +2,27 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 
 import { TimeZone } from '@src/domain/value-objects/timezone.vo';
-import { AppointmentStatusType, AppointmentStatusSchema } from '@input-type-schemas/AppointmentStatusSchema';
-import { AppointmentSourceType, AppointmentSourceSchema } from '@input-type-schemas/AppointmentSourceSchema';
-import { VisitTypeType, VisitTypeSchema } from '@input-type-schemas/VisitTypeSchema';
-import { ExaminationTypeType as ExaminationType, ExaminationTypeSchema } from '@input-type-schemas/ExaminationTypeSchema';
-import { AppointmentCreatorTypeType as AppointmentCreatorType, AppointmentCreatorTypeSchema } from '@input-type-schemas/AppointmentCreatorTypeSchema';
-import { AppointmentsResponseGroups } from '@modules/clinical/appointment/domain/contracts/appointment';
+import {
+  AppointmentStatusSchema,
+  AppointmentStatusType,
+} from '@input-type-schemas/AppointmentStatusSchema';
+import {
+  AppointmentSourceSchema,
+  AppointmentSourceType,
+} from '@input-type-schemas/AppointmentSourceSchema';
+import {
+  VisitTypeSchema,
+  VisitTypeType,
+} from '@input-type-schemas/VisitTypeSchema';
+import {
+  ExaminationTypeSchema,
+  ExaminationTypeType as ExaminationType,
+} from '@input-type-schemas/ExaminationTypeSchema';
+import {
+  AppointmentCreatorTypeSchema,
+  AppointmentCreatorTypeType as AppointmentCreatorType,
+} from '@input-type-schemas/AppointmentCreatorTypeSchema';
+import { AppointmentsResponseGroups } from '@shared/modules/appointment/constants';
 
 const { PROVIDER_DATA_OWNER, PATIENT_DATA_OWNER, INTERNAL, ADMIN, MANAGEMENT } =
   AppointmentsResponseGroups;

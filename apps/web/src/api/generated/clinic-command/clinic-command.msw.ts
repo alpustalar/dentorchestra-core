@@ -44,8 +44,19 @@ export const getClinicUpdateAppointmentSettingsMockHandler = (overrideResponse?:
       })
   }, options)
 }
+
+export const getClinicSetBusinessTypeMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.patch>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
+  return http.patch('*/api/v1/clinics/:id/business-type', async (info: Parameters<Parameters<typeof http.patch>[1]>[0]) => {
+  if (typeof overrideResponse === 'function') {await overrideResponse(info); }
+
+    return new HttpResponse(null,
+      { status: 200
+      })
+  }, options)
+}
 export const getClinicCommandMock = () => [
   getClinicCreateMockHandler(),
   getClinicUpdateMockHandler(),
-  getClinicUpdateAppointmentSettingsMockHandler()
+  getClinicUpdateAppointmentSettingsMockHandler(),
+  getClinicSetBusinessTypeMockHandler()
 ]

@@ -27,6 +27,7 @@ export * from './FinanceLedgerSchema';
 export * from './PaymentSchema';
 export * from './PaymentInstallmentSchema';
 export * from './IyzicoTransactionSchema';
+export * from './EDocumentIntegrationConfigSchema';
 export * from './FinancialEventSchema';
 export * from './ClinicGovernmentSpecsSchema';
 export * from './HotelbedsHotelSchema';

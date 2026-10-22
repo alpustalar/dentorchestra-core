@@ -163,6 +163,7 @@ describe('CancelInvoiceHandler', () => {
     );
     expect(queued?.payload).toEqual({
       invoiceId: invoice.id.value,
+      documentType: EDocumentTypeSchema.enum.E_FATURA,
       uuid: einvoiceUuid,
       reason: 'Tutar hatalı girildi',
       clinicId,

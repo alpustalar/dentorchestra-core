@@ -31,7 +31,8 @@ export interface CardChargebackResponseDto {
   paymentId: string | null;
   /** @nullable */
   installmentId: string | null;
-  patientId: string;
+  /** @nullable */
+  patientId: string | null;
   amount: string;
   feeAmount: string;
   openedAt: string;
@@ -49,7 +50,8 @@ export interface CardChargebackResponseDto {
   resolutionNote: string | null;
   /** @nullable */
   recoveryInstallmentId: string | null;
-  partyId: string;
+  /** @nullable */
+  partyId: string | null;
   organizationId: string;
   recordedById: string;
   /** @nullable */

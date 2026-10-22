@@ -5,6 +5,7 @@ export const PARTY_QUERY_REPOSITORY = Symbol('IPartyQueryRepository');
 
 export interface IPartyQueryRepository {
   findById(id: string): Promise<Party | null>;
+  findByIds(clinicId: string, ids: string[]): Promise<Party[]>;
   findMany(
     filter: FindPartiesFilter,
     pagination: Pagination

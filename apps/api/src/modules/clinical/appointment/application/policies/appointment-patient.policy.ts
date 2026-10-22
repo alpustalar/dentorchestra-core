@@ -5,7 +5,7 @@ import { ExecutionSource } from '../../../../../../../../packages/shared/common/
 import {
   AppointmentResponseGroup,
   AppointmentsResponseGroups,
-} from '@modules/clinical/appointment/domain/contracts/appointment';
+} from '@shared/modules/appointment/constants';
 
 export class AppointmentPatientPolicy extends PatientBasePolicy {
   constructor(actor: PatientActorContext, source: ExecutionSource) {

@@ -17,6 +17,7 @@ import type {
 
 import type {
   ConnectMetaAccountDto,
+  MatchLeadToPatientDto,
   MetaAdsConnectAccount201
 } from '../model';
 
@@ -156,12 +157,15 @@ export const useMetaAdsDisconnectAccount = <TError = ErrorType<unknown>,
     }
     export const metaAdsMatchLead = (
     leadId: string,
+    matchLeadToPatientDto: MatchLeadToPatientDto,
  signal?: AbortSignal
 ) => {
 
 
       return orvalMutator<void>(
-      {url: `/api/v1/meta-ads/leads/${leadId}/match`, method: 'PUT', signal
+      {url: `/api/v1/meta-ads/leads/${leadId}/match`, method: 'PUT',
+      headers: {'Content-Type': 'application/json', },
+      data: matchLeadToPatientDto, signal
     },
       );
     }
@@ -186,9 +190,9 @@ const {mutation: mutationOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof metaAdsMatchLead>>, MetaAdsMatchLeadMutationVariables> = (props) => {
-          const {leadId} = props ?? {};
+          const {leadId,data} = props ?? {};
 
-          return  metaAdsMatchLead(leadId,)
+          return  metaAdsMatchLead(leadId,data,)
         }
 
 
@@ -199,9 +203,9 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type MetaAdsMatchLeadMutationResult = NonNullable<Awaited<ReturnType<typeof metaAdsMatchLead>>>
-
+    export type MetaAdsMatchLeadMutationBody = MatchLeadToPatientDto
     export type MetaAdsMatchLeadMutationError = ErrorType<unknown>
-    export type MetaAdsMatchLeadMutationVariables = {leadId: string}
+    export type MetaAdsMatchLeadMutationVariables = {leadId: string;data: MatchLeadToPatientDto}
 
     export const useMetaAdsMatchLead = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof metaAdsMatchLead>>, TError,MetaAdsMatchLeadMutationVariables, TContext>, }

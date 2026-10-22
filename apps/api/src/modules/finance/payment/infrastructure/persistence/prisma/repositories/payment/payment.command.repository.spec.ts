@@ -119,6 +119,30 @@ describe('PaymentCommandRepository (mapping + kilit)', () => {
     // Tahsil edilmiş taksitin tutarı bu yoldan değiştirilemez.
     expect(installmentData).not.toHaveProperty('amount');
     expect(installmentData).not.toHaveProperty('currency');
+    // İade/iptal damgası yalnız `setReversalRequestedAt` ile yazılır: yük→değiştir→kaydet
+    // akışı, araya giren bir girişimin damgasını bayat kopyayla EZMEMELİ (kural 3).
+    expect(installmentData).not.toHaveProperty('reversalRequestedAt');
+  });
+
+  it('setReversalRequestedAt: yalnız damga kolonunu yazar / kaldırır', async () => {
+    const db = buildDb();
+    const repo = buildRepo(db);
+    const at = new Date('2026-10-21T10:00:00.000Z');
+
+    await inTransaction(db, () =>
+      repo.setReversalRequestedAt({ installmentId: 'inst-1', requestedAt: at })
+    );
+    await inTransaction(db, () =>
+      repo.setReversalRequestedAt({
+        installmentId: 'inst-1',
+        requestedAt: null,
+      })
+    );
+
+    expect(db.paymentInstallment.update.mock.calls).toEqual([
+      [{ where: { id: 'inst-1' }, data: { reversalRequestedAt: at } }],
+      [{ where: { id: 'inst-1' }, data: { reversalRequestedAt: null } }],
+    ]);
   });
 
   it('findByInstallmentIdForUpdate: önce satırı kilitler, sonra okur', async () => {

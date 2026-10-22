@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 
 import type { AppointmentStatus } from '../appointment.types';
 import { appointmentKeys } from './appointment.keys';
+import { OFFLINE_QUERY_CACHE_MAX_AGE } from '@/lib/query';
 
 interface UseAppointmentDayParams {
   clinicId: string;
@@ -33,6 +34,8 @@ export function useAppointmentDay({
 }: UseAppointmentDayParams) {
   return useQuery({
     queryKey: appointmentKeys.day(clinicId, date, { providerId, status }),
+    gcTime: OFFLINE_QUERY_CACHE_MAX_AGE,
+    meta: { persist: true },
     queryFn: async ({ signal }) => {
       const days = await api(appointmentEndpoints.calendar, {
         query: {
@@ -59,6 +62,8 @@ export function useAppointmentDailySummary({
 }: Omit<UseAppointmentDayParams, 'status'>) {
   return useQuery({
     queryKey: appointmentKeys.summary(clinicId, date, providerId),
+    gcTime: OFFLINE_QUERY_CACHE_MAX_AGE,
+    meta: { persist: true },
     queryFn: ({ signal }) =>
       api(appointmentEndpoints.dailySummary, {
         query: {

@@ -1,11 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useRouter } from '@/i18n/navigation';
 import { registerTokenProvider } from '@/lib/auth/auth-client';
 
 import { makeQueryClient } from './client';
+import {
+  makeOfflineQueryPersister,
+  OFFLINE_QUERY_CACHE_BUSTER,
+  OFFLINE_QUERY_CACHE_MAX_AGE,
+} from './offline-cache';
 
 /**
  * `useState` ile bir kez kuruluyor — modül düzeyinde tutulsaydı sunucu tarafı
@@ -13,6 +18,7 @@ import { makeQueryClient } from './client';
  */
 export function QueryProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(makeQueryClient);
+  const [persister] = useState(makeOfflineQueryPersister);
   const router = useRouter();
 
   // Register before rendering query consumers so Orval hooks can attach the
@@ -27,6 +33,19 @@ export function QueryProvider({ children }: { children: React.ReactNode }) {
   });
 
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{
+        persister,
+        buster: OFFLINE_QUERY_CACHE_BUSTER,
+        maxAge: OFFLINE_QUERY_CACHE_MAX_AGE,
+        dehydrateOptions: {
+          shouldDehydrateQuery: (query) =>
+            query.state.status === 'success' && query.meta?.persist === true,
+        },
+      }}
+    >
+      {children}
+    </PersistQueryClientProvider>
   );
 }

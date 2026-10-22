@@ -12,6 +12,7 @@ import {
 import {
   InstallmentNotFoundException,
   InstallmentNotRefundableException,
+  InstallmentReversalInFlightException,
 } from '@modules/finance/payment/domain/exceptions/payment.exceptions';
 
 @Injectable()
@@ -46,6 +47,15 @@ export class PaymentCollectionService implements IPaymentCollectionService {
       throw new InstallmentNotRefundableException({
         installmentId: params.installmentId,
         status: installment.status,
+      });
+    }
+
+    // Sağlayıcıya bir iade/iptal girişimi gitti ve sonucu kesinleşmedi: para
+    // çıkmış olabilir, itiraz ikinci bir geri götürme olurdu (kural 17/18).
+    if (installment.reversalRequestedAt) {
+      throw new InstallmentReversalInFlightException({
+        installmentId: params.installmentId,
+        requestedAt: installment.reversalRequestedAt.toISOString(),
       });
     }
 

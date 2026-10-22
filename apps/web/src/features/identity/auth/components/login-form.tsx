@@ -1,18 +1,14 @@
 'use client';
 
+import { SelectInput } from '@/components/ui/select-input';
+
 import { useEffect, useRef, useState } from 'react';
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import {
-  ChevronDown,
-  Eye,
-  EyeClosed,
-  Loader2,
-  Smartphone,
-} from 'lucide-react';
+import { Eye, EyeClosed, Loader2, Smartphone } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -211,10 +207,22 @@ export function LoginForm() {
             <Loader2 className="animate-spin" />
           ) : (
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-5">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.75 3.27-8.1Z" />
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.99 7.28-2.65l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.28-1.93-6.15-4.53H2.16v2.85A11 11 0 0 0 12 23Z" />
-              <path fill="#FBBC05" d="M5.85 14.11a6.6 6.6 0 0 1 0-4.22V7.04H2.16a11 11 0 0 0 0 9.92l3.69-2.85Z" />
-              <path fill="#EA4335" d="M12 5.36c1.62 0 3.06.56 4.2 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.84 6.04l3.69 2.85C6.72 7.29 9.14 5.36 12 5.36Z" />
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.75 3.27-8.1Z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.99 7.28-2.65l-3.57-2.77c-.99.66-2.25 1.06-3.71 1.06-2.86 0-5.28-1.93-6.15-4.53H2.16v2.85A11 11 0 0 0 12 23Z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.85 14.11a6.6 6.6 0 0 1 0-4.22V7.04H2.16a11 11 0 0 0 0 9.92l3.69-2.85Z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.36c1.62 0 3.06.56 4.2 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1a11 11 0 0 0-9.84 6.04l3.69 2.85C6.72 7.29 9.14 5.36 12 5.36Z"
+              />
             </svg>
           )}
           {t('continueWithGoogle')}
@@ -222,9 +230,7 @@ export function LoginForm() {
 
         <div className="relative flex items-center">
           <div className="h-px flex-1 bg-border" />
-          <span className="px-3 text-xs text-muted-foreground">
-            {t('or')}
-          </span>
+          <span className="px-3 text-xs text-muted-foreground">{t('or')}</span>
           <div className="h-px flex-1 bg-border" />
         </div>
 
@@ -332,7 +338,10 @@ export function LoginForm() {
           <form onSubmit={onPhoneSubmit} className="flex flex-col gap-4">
             {phoneConfirmation ? (
               <div className="flex flex-col gap-2">
-                <label htmlFor="verification-code" className="text-sm font-medium">
+                <label
+                  htmlFor="verification-code"
+                  className="text-sm font-medium"
+                >
                   {t('smsVerificationCode')}
                 </label>
                 <Input
@@ -365,7 +374,7 @@ export function LoginForm() {
                 </label>
                 <div className="flex">
                   <div className="relative w-[6.5rem] shrink-0">
-                    <select
+                    <SelectInput
                       aria-label={t('countryCode')}
                       autoComplete="tel-country-code"
                       value={countryCallingCode}
@@ -388,11 +397,7 @@ export function LoginForm() {
                       <option value="61">🇦🇺 +61</option>
                       <option value="34">🇪🇸 +34</option>
                       <option value="39">🇮🇹 +39</option>
-                    </select>
-                    <ChevronDown
-                      aria-hidden="true"
-                      className="pointer-events-none absolute right-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                    />
+                    </SelectInput>
                   </div>
                   <Input
                     id="phone"
@@ -436,9 +441,7 @@ export function LoginForm() {
           </form>
         )}
         <div className="border-t border-border pt-4 text-center text-sm">
-          <span className="text-muted-foreground">
-            {t('signUpPrompt')}
-          </span>{' '}
+          <span className="text-muted-foreground">{t('signUpPrompt')}</span>{' '}
           <button
             type="button"
             onClick={() => setShowSignupHelp((shown) => !shown)}

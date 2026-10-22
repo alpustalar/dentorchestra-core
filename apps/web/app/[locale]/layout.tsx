@@ -2,6 +2,7 @@ import { Analytics } from '@vercel/analytics/next';
 import type { Metadata, Viewport } from 'next';
 import { hasLocale } from 'next-intl';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { Toaster } from '@/components/ui/sonner';
 import { routing } from '@/i18n/routing';
 import Providers from '@/providers';
 import '../globals.css';
@@ -63,7 +64,10 @@ export default async function LocaleLayout({ children, params }: Props) {
       className={`bg-background ${geistSans.variable} ${geistMono.variable}`}
     >
       <body className="font-sans antialiased">
-        <Providers locale={locale}>{children}</Providers>
+        <Providers locale={locale}>
+          {children}
+          <Toaster />
+        </Providers>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>

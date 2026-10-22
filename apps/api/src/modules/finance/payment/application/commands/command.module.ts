@@ -6,6 +6,8 @@ import { MarkInstallmentAsPaidHandler } from './mark-installment-as-paid/mark-in
 import { MarkInstallmentAsFailedHandler } from './mark-installment-as-failed/mark-installment-as-failed.handler';
 import { MarkInstallmentAsCancelledHandler } from './mark-installment-as-cancelled/mark-installment-as-cancelled.handler';
 import { MarkInstallmentAsRefundedHandler } from './mark-installment-as-refunded/mark-installment-as-refunded.handler';
+import { BeginInstallmentReversalHandler } from './begin-installment-reversal/begin-installment-reversal.handler';
+import { ReleaseInstallmentReversalHandler } from './release-installment-reversal/release-installment-reversal.handler';
 import { ChargeBackInstallmentHandler } from './charge-back-installment/charge-back-installment.handler';
 import { PaymentInfrastructureModule } from '@modules/finance/payment/infrastructure/infrastructure.module';
 
@@ -17,6 +19,8 @@ const CommandHandlers = [
   MarkInstallmentAsCancelledHandler,
   MarkInstallmentAsRefundedHandler,
   ChargeBackInstallmentHandler,
+  BeginInstallmentReversalHandler,
+  ReleaseInstallmentReversalHandler,
 ];
 
 @Module({

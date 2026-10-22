@@ -68,7 +68,7 @@ export class HandleMetaOAuthCallbackHandler
       );
     }
 
-    const { clinicId, userId } = oAuthState;
+    const { clinicId, userId, returnPath } = oAuthState;
     const { appSecret, appId, redirectUri } = this.metaAdsConfig;
 
     const shortLived = await this.metaMarketingApi.exchangeCodeForToken(
@@ -123,6 +123,6 @@ export class HandleMetaOAuthCallbackHandler
       `OAuth callback: ${connectedAccounts} hesap bağlandı (clinic: ${clinicId})`
     );
 
-    return { connectedAccounts };
+    return { connectedAccounts, returnPath };
   }
 }

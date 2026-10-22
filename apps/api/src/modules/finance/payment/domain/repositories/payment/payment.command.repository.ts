@@ -19,4 +19,15 @@ export interface IPaymentCommandRepository extends IBaseCommandRepository<Paymen
    * transaction içinde çağrılır.
    */
   findByIdForUpdate(paymentId: string): Promise<Payment | null>;
+
+  /**
+   * Taksidin "geri götüren girişim sürüyor" damgasını yazar ya da (`null`) kaldırır.
+   * Hot-path scalar yazma: `update(entity)` mevcut taksitte yalnız `status`/`paidAt`
+   * yazdığı için damgayı ezmez. Kilit çağıranın işidir — `findByInstallmentIdForUpdate`
+   * ile aynı transaction'da çağrılır.
+   */
+  setReversalRequestedAt(params: {
+    installmentId: string;
+    requestedAt: Date | null;
+  }): Promise<void>;
 }

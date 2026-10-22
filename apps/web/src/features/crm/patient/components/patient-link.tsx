@@ -64,13 +64,18 @@ export function PatientLink({
   variant = 'standard',
   className,
 }: PatientLinkProps) {
-  const params = useParams<{ locale: string; 'clinic-slug'?: string }>();
+  const params = useParams<{
+    locale: string;
+    'organization-slug'?: string;
+    'clinic-slug'?: string;
+  }>();
   const patient = patientDirectory[name as PatientName];
   if (!patient) return <span className={className}>{name}</span>;
+  const organizationSlug = params['organization-slug'] ?? 'as-yazilim';
   const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   return (
     <Link
-      href={`/${params.locale ?? 'tr'}/${clinicSlug}/crm/patient/${patient.id}`}
+      href={`/${params.locale ?? 'tr'}/${organizationSlug}/${clinicSlug}/crm/patient/${patient.id}`}
       className={cn(
         'group inline-flex min-w-0 items-center gap-2 rounded-md text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
         className
@@ -104,10 +109,11 @@ export function PatientLink({
 export function patientProfilePath(
   locale: string,
   name: string,
+  organizationSlug = 'as-yazilim',
   clinicSlug = 'fethiye'
 ) {
   const patient = patientDirectory[name as PatientName];
   return patient
-    ? `/${locale}/${clinicSlug}/crm/patient/${patient.id}`
-    : `/${locale}/${clinicSlug}/crm/patient`;
+    ? `/${locale}/${organizationSlug}/${clinicSlug}/crm/patient/${patient.id}`
+    : `/${locale}/${organizationSlug}/${clinicSlug}/crm/patient`;
 }

@@ -146,6 +146,13 @@ model PaymentInstallment {
   /// yeniden işlenmesi ikinci bir alacak doğurmasın).
   recoversInstallmentId String? @unique @map("recovers_installment_id")
 
+  /// Parayı kart sahibine geri götüren bir girişim (iade/iptal) sağlayıcıya GİTTİ ve
+  /// sonucu kesinleşmedi (kural 18). SDK çağrısı transaction dışında yapıldığı için
+  /// uçuştaki iade, aynı taksitte açılan bir itirazı kendi başına göremez; bu damga,
+  /// çağrıdan ÖNCE ve ödeme satırı kilitliyken yazılır. Doluyken itiraz açılamaz.
+  /// Sağlayıcı açıkça reddederse temizlenir; zaman aşımında (sonuç bilinmiyor) kalır.
+  reversalRequestedAt DateTime? @map("reversal_requested_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -188,4 +195,47 @@ model IyzicoTransaction {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("iyzico_transactions")
+}
+enum EDocumentProvider {
+  NILVERA
+  LOGO
+  PARASUT
+}
+
+enum EDocumentEnvironment {
+  TEST
+  PRODUCTION
+}
+
+enum EDocumentIntegrationScope {
+  CLINIC
+  ORGANIZATION
+}
+
+/// E-belge sağlayıcı kimlikleri. Secret'lar uygulama katmanında AES-256-GCM ile
+/// tek bir şifreli blob'a çevrilir; bu tablo düz API key/şifre taşımaz.
+model EDocumentIntegrationConfig {
+  id String @id
+
+  scope       EDocumentIntegrationScope
+  provider    EDocumentProvider
+  environment EDocumentEnvironment
+
+  credentialsCiphertext String  @map("credentials_ciphertext") @db.Text
+  credentialHint       String? @map("credential_hint")
+  isActive              Boolean @default(true) @map("is_active")
+  lastTestedAt          DateTime? @map("last_tested_at")
+  lastTestSucceeded     Boolean? @map("last_test_succeeded")
+
+  clinicId       String? @unique @map("clinic_id")
+  organizationId String? @unique @map("organization_id")
+
+  clinic       Clinic?       @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([provider, isActive])
+  @@map("e_document_integration_configs")
 }

@@ -4,6 +4,7 @@ import {
   EDocumentResult,
   MailboxInfo,
 } from '@modules/finance/e-document/domain/contracts/e-document.contracts';
+import type { EDocumentTypeType as EDocumentType } from '@input-type-schemas/EDocumentTypeSchema';
 
 export const E_INVOICE_PORT = Symbol('EInvoicePort');
 
@@ -13,7 +14,16 @@ export const E_INVOICE_PORT = Symbol('EInvoicePort');
  */
 export interface EInvoicePort {
   issue(req: EDocumentRequest): Promise<EDocumentResult>;
-  cancel(uuid: string, reason: string): Promise<void>;
-  getStatus(uuid: string): Promise<EDocumentStatus>;
-  checkMailbox(taxId: string): Promise<MailboxInfo>;
+  cancel(input: {
+    clinicId: string;
+    documentType: EDocumentType;
+    uuid: string;
+    reason: string;
+  }): Promise<void>;
+  getStatus(input: {
+    clinicId: string;
+    documentType: EDocumentType;
+    uuid: string;
+  }): Promise<EDocumentStatus>;
+  checkMailbox(clinicId: string, taxId: string): Promise<MailboxInfo>;
 }

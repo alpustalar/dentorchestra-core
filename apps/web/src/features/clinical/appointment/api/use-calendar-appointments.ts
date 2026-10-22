@@ -7,6 +7,7 @@ import { appointmentReschedule } from '@/api/generated/appointment-command/appoi
 import { appointments } from '../data/mock-appointments';
 import { appointmentKeys } from './appointment.keys';
 import type { CalendarAppointment } from '../calendar-appointment.types';
+import { OFFLINE_QUERY_CACHE_MAX_AGE } from '@/lib/query';
 
 const calendarKeys = ['appointment-calendar-records'] as const;
 const mockTimes = new Map<string, { startTime: Date; endTime: Date }>();
@@ -24,6 +25,8 @@ export function useCalendarAppointments(filter: Filter) {
   return useQuery({
     queryKey: [...calendarKeys, filter],
     enabled: Boolean(filter.clinicId),
+    gcTime: OFFLINE_QUERY_CACHE_MAX_AGE,
+    meta: { persist: true },
     queryFn: async ({ signal }): Promise<CalendarData> => {
       if (mockingEnabled) {
         const start = DateTimeManager.create(filter.startDate);

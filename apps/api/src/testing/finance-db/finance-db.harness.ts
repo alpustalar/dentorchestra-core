@@ -424,6 +424,7 @@ export async function seedCollectedInstallment(
       id: UUID.generate().value,
       installmentId,
       conversationId: UUID.generate().value,
+      iyzicoPaymentId: `pay-${installmentId}`,
       iyzicoPaymentTransactionId: `pt-${installmentId}`,
       status: 'SUCCESS',
     },

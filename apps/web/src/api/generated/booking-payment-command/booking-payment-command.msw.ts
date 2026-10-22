@@ -14,11 +14,17 @@ import type {
 } from 'msw';
 
 import type {
-  BookingPaymentBackfillLedger201
+  BookingPaymentBackfillLedger201,
+  BookingPaymentResolveRefund201,
+  BookingPaymentRetryRefund201
 } from '../model';
 
 
 export const getBookingPaymentBackfillLedgerResponseMock = (): BookingPaymentBackfillLedger201 => ({})
+
+export const getBookingPaymentResolveRefundResponseMock = (): BookingPaymentResolveRefund201 => ({})
+
+export const getBookingPaymentRetryRefundResponseMock = (): BookingPaymentRetryRefund201 => ({})
 
 
 export const getBookingPaymentBackfillLedgerMockHandler = (overrideResponse?: BookingPaymentBackfillLedger201 | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<BookingPaymentBackfillLedger201> | BookingPaymentBackfillLedger201), options?: RequestHandlerOptions) => {
@@ -32,6 +38,32 @@ export const getBookingPaymentBackfillLedgerMockHandler = (overrideResponse?: Bo
       })
   }, options)
 }
+
+export const getBookingPaymentResolveRefundMockHandler = (overrideResponse?: BookingPaymentResolveRefund201 | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<BookingPaymentResolveRefund201> | BookingPaymentResolveRefund201), options?: RequestHandlerOptions) => {
+  return http.post('*/api/v1/health-tourism/booking-payments/refunds/:refundId/resolve', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getBookingPaymentResolveRefundResponseMock(),
+      { status: 201
+      })
+  }, options)
+}
+
+export const getBookingPaymentRetryRefundMockHandler = (overrideResponse?: BookingPaymentRetryRefund201 | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<BookingPaymentRetryRefund201> | BookingPaymentRetryRefund201), options?: RequestHandlerOptions) => {
+  return http.post('*/api/v1/health-tourism/booking-payments/refunds/:refundId/retry', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getBookingPaymentRetryRefundResponseMock(),
+      { status: 201
+      })
+  }, options)
+}
 export const getBookingPaymentCommandMock = () => [
-  getBookingPaymentBackfillLedgerMockHandler()
+  getBookingPaymentBackfillLedgerMockHandler(),
+  getBookingPaymentResolveRefundMockHandler(),
+  getBookingPaymentRetryRefundMockHandler()
 ]

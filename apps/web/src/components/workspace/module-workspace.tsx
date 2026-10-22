@@ -1,5 +1,7 @@
 'use client';
 
+import { SelectInput } from '@/components/ui/select-input';
+
 import * as React from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -348,7 +350,11 @@ const appointments: Appointment[] = sourceAppointments.map((item, index) => {
 });
 
 export function ModuleWorkspace({ module }: { module: string }) {
-  const params = useParams<{ locale: string; 'clinic-slug': string }>();
+  const params = useParams<{
+    locale: string;
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
   const router = useRouter();
   if (module === 'appointments') return <AppointmentsWorkspace />;
   if (module === 'inbox') return <ChatWorkspace />;
@@ -593,7 +599,7 @@ export function ModuleWorkspace({ module }: { module: string }) {
               className="w-full"
               onClick={() =>
                 router.push(
-                  `/${params.locale}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
+                  `/${params.locale}/${params['organization-slug']}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
                 )
               }
             >
@@ -823,7 +829,11 @@ function ChatWorkspace() {
 
 function AppointmentsWorkspace() {
   const router = useRouter();
-  const params = useParams<{ locale: string; 'clinic-slug': string }>();
+  const params = useParams<{
+    locale: string;
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
   const [view, setView] = React.useState<'calendar' | 'list' | 'waiting'>(
     'calendar'
   );
@@ -945,7 +955,7 @@ function AppointmentsWorkspace() {
               <span className="ml-1 text-sm font-medium">{dateLabel}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <SelectInput
                 value={provider}
                 onChange={(event) => setProvider(event.target.value)}
                 className="h-9 rounded-md border bg-background px-3 text-sm"
@@ -954,8 +964,8 @@ function AppointmentsWorkspace() {
                 {providers.map((item) => (
                   <option key={item}>{item}</option>
                 ))}
-              </select>
-              <select
+              </SelectInput>
+              <SelectInput
                 value={clinic}
                 onChange={(event) => setClinic(event.target.value)}
                 className="h-9 rounded-md border bg-background px-3 text-sm"
@@ -964,7 +974,7 @@ function AppointmentsWorkspace() {
                 {clinics.map((item) => (
                   <option key={item}>{item}</option>
                 ))}
-              </select>
+              </SelectInput>
               <div className="relative">
                 <Search
                   aria-hidden="true"
@@ -1138,7 +1148,7 @@ function AppointmentsWorkspace() {
               className="w-full"
               onClick={() =>
                 router.push(
-                  `/${params.locale}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
+                  `/${params.locale}/${params['organization-slug']}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
                 )
               }
             >

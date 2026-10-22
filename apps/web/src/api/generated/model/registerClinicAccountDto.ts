@@ -5,10 +5,12 @@
  * Core CRM B2B SaaS API Dokümantasyonu
  * OpenAPI spec version: 1
  */
+import type { RegisterClinicAccountDtoBusinessType } from './registerClinicAccountDtoBusinessType';
 import type { RegisterClinicAccountDtoClinic } from './registerClinicAccountDtoClinic';
 import type { RegisterClinicAccountDtoOwner } from './registerClinicAccountDtoOwner';
 
 export interface RegisterClinicAccountDto {
+  businessType: RegisterClinicAccountDtoBusinessType;
   clinic: RegisterClinicAccountDtoClinic;
   owner: RegisterClinicAccountDtoOwner;
 }

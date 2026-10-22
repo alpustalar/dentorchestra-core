@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { orvalMutator } from '@/lib/api/orval-mutator';
 import { getMockClinicAppointmentSettings } from './mock-clinic-appointment-settings';
+import { OFFLINE_QUERY_CACHE_MAX_AGE } from '@/lib/query';
 
 export interface ClinicAppointmentSettings {
   clinicId: string;
@@ -31,6 +32,8 @@ export function useClinicAppointmentSettings(clinicId: string) {
   return useQuery({
     queryKey: clinicAppointmentSettingsQueryKey(clinicId),
     enabled: Boolean(clinicId),
+    gcTime: OFFLINE_QUERY_CACHE_MAX_AGE,
+    meta: { persist: true },
     queryFn: async () => {
       if (mockingEnabled) {
         return { data: getMockClinicAppointmentSettings(clinicId) };

@@ -5,7 +5,7 @@ import { SerializationOptionsResponse } from '@common/interfaces/serialization-p
 import {
   PatientResponseGroup,
   PatientResponseGroups,
-} from '@modules/crm/patient/domain/contracts/patient';
+} from '@shared/modules/patients/constants';
 
 export interface PatientScope {
   organizationId: string;

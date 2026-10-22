@@ -77,6 +77,8 @@ import { AttendanceModule } from '@modules/hr/attendance/attendance.module';
 import { AttendancePresentationModule } from '@modules/hr/attendance/presentation/presentation.module';
 import { ConsentFormModule } from '@modules/clinical/consent-form/consent-form.module';
 import { ConsentFormPresentationModule } from '@modules/clinical/consent-form/presentation/presentation.module';
+import { EDocumentModule } from '@modules/finance/e-document/e-document.module';
+import { EDocumentPresentationModule } from '@modules/finance/e-document/presentation/presentation.module';
 
 export const APP_ROUTES: Routes = [
   {
@@ -271,5 +273,10 @@ export const APP_ROUTES: Routes = [
     path: 'consent-forms',
     module: ConsentFormModule,
     children: [ConsentFormPresentationModule],
+  },
+  {
+    path: 'e-documents',
+    module: EDocumentModule,
+    children: [EDocumentPresentationModule],
   },
 ];

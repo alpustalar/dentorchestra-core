@@ -30,8 +30,10 @@ export * from './clinic-health-tourism-config-command/clinic-health-tourism-conf
 export * from './clinic-health-tourism-config-query/clinic-health-tourism-config-query';
 export * from './clinic-payment-gateway-command/clinic-payment-gateway-command';
 export * from './clinic-payment-gateway-query/clinic-payment-gateway-query';
+export * from './clinic-query/clinic-query';
 export * from './consent-form-command/consent-form-command';
 export * from './consent-form-query/consent-form-query';
+export * from './edocument-integration/edocument-integration';
 export * from './employee-command/employee-command';
 export * from './employee-query/employee-query';
 export * from './finance-ledger-command/finance-ledger-command';
@@ -72,6 +74,7 @@ export * from './patient-query/patient-query';
 export * from './pax/pax';
 export * from './payment-reports-query/payment-reports-query';
 export * from './payroll-command/payroll-command';
+export * from './payroll-query/payroll-query';
 export * from './pipeline-command/pipeline-command';
 export * from './pipeline-query/pipeline-query';
 export * from './pos-callback/pos-callback';

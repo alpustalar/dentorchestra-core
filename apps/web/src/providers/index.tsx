@@ -7,6 +7,7 @@ import { NotificationProvider } from '@/providers/notification-provider';
 import { QueryProvider } from '@/lib/query';
 import { useAuth } from '@/data/auth/auth-context';
 import { ApiMockProvider } from '@/providers/api-mock-provider';
+import { OfflineStatusBanner } from '@/components/connectivity';
 
 type Props = {
   children: Readonly<React.ReactNode>;
@@ -28,7 +29,10 @@ const Providers = ({ children, locale }: Props) => {
       >
         <QueryProvider>
           <ApiMockProvider>
-            <NotificationProvider>{children}</NotificationProvider>
+            <NotificationProvider>
+              {children}
+              <OfflineStatusBanner />
+            </NotificationProvider>
           </ApiMockProvider>
         </QueryProvider>
       </ThemeProvider>

@@ -10,6 +10,7 @@ import { GetClinicCurrencyHandler } from '@modules/organization/clinic/applicati
 import { GetClinicFinanceSettingsHandler } from '@modules/organization/clinic/application/queries/get-clinic-finance-settings/get-clinic-finance-settings.handler';
 import { GetClinicOrganizationIdHandler } from '@modules/organization/clinic/application/queries/get-clinic-organization-id/get-clinic-organization-id.handler';
 import { GetClinicAppointmentSettingsHandler } from '@modules/organization/clinic/application/queries/get-clinic-appointment-settings/get-clinic-appointment-settings.handler';
+import { GetClinicEDocumentProfileHandler } from './get-clinic-edocument-profile/get-clinic-edocument-profile.handler';
 import { ClinicInfrastructureModule } from '@modules/organization/clinic/infrastructure/infrastructure.module';
 
 const QueryHandlers = [
@@ -23,6 +24,7 @@ const QueryHandlers = [
   GetClinicFinanceSettingsHandler,
   GetClinicOrganizationIdHandler,
   GetClinicAppointmentSettingsHandler,
+  GetClinicEDocumentProfileHandler,
 ];
 
 @Module({

@@ -1,0 +1,150 @@
+import type {
+  AgencyRoiReport,
+  MetaAdAccountResponse,
+  MetaLeadResponse,
+  MetaReportResponse,
+} from '@core-crm/shared/client';
+
+/** `NEXT_PUBLIC_API_MOCKING=enabled` iken gösterilen sabit örnek veri. */
+
+export const DEMO_ACCOUNTS: MetaAdAccountResponse[] = [
+  {
+    id: 'demo-meta-account-1',
+    clinicId: 'demo-clinic',
+    adAccountId: 'act_1234567890',
+    businessName: 'Demo Diş Kliniği Reklam Hesabı',
+    isActive: true,
+    lastSyncAt: new Date('2026-10-21T02:00:00.000Z'),
+    connectedAt: new Date('2026-09-01T10:00:00.000Z'),
+  },
+];
+
+export const DEMO_ROI_REPORT: AgencyRoiReport = {
+  period: { from: new Date('2026-09-21'), to: new Date('2026-10-21') },
+  current: {
+    spend: 62000,
+    revenue: 318500,
+    netProfit: 256500,
+    roas: 5.14,
+    roiPercent: 413.7,
+    attributedLeads: 148,
+    convertedPatients: 23,
+    revenueCurrency: 'TRY',
+    excludedRevenueCurrencies: [],
+  },
+  previous: {
+    spend: 54000,
+    revenue: 271000,
+    netProfit: 217000,
+    roas: 5.02,
+    roiPercent: 401.9,
+    attributedLeads: 131,
+    convertedPatients: 19,
+    revenueCurrency: 'TRY',
+    excludedRevenueCurrencies: [],
+  },
+  deltas: {
+    spendPct: 14.8,
+    revenuePct: 17.5,
+    roasPct: 2.4,
+  },
+  campaigns: [
+    {
+      campaignId: 'demo-campaign-1',
+      campaignName: 'Yaz Saç Ekimi Kampanyası',
+      spend: 38000,
+      attributedLeads: 91,
+      convertedPatients: 15,
+      revenue: 212000,
+      roas: 5.58,
+      roiPercent: 457.9,
+    },
+    {
+      campaignId: 'demo-campaign-2',
+      campaignName: 'Diş Beyazlatma Promosyonu',
+      spend: 24000,
+      attributedLeads: 57,
+      convertedPatients: 8,
+      revenue: 106500,
+      roas: 4.44,
+      roiPercent: 343.8,
+    },
+  ],
+};
+
+export const DEMO_REPORT: MetaReportResponse = {
+  period: { from: new Date('2026-09-21'), to: new Date('2026-10-21') },
+  totalSpend: 62000,
+  totalClicks: 4850,
+  averageCpc: 12.78,
+  totalLeads: 0,
+  convertedLeads: 0,
+  costPerLead: 0,
+  costPerAppointment: 0,
+  conversionRate: 0,
+  campaigns: [
+    {
+      campaignId: 'demo-campaign-1',
+      campaignName: 'Yaz Saç Ekimi Kampanyası',
+      spend: 38000,
+      clicks: 2900,
+      cpc: 13.1,
+      leads: 0,
+      conversions: 0,
+    },
+    {
+      campaignId: 'demo-campaign-2',
+      campaignName: 'Diş Beyazlatma Promosyonu',
+      spend: 24000,
+      clicks: 1950,
+      cpc: 12.31,
+      leads: 0,
+      conversions: 0,
+    },
+  ],
+};
+
+export const DEMO_LEADS: MetaLeadResponse[] = [
+  {
+    id: 'demo-lead-1',
+    metaLeadId: 'meta-lead-1',
+    campaignId: 'demo-campaign-1',
+    campaignName: 'Yaz Saç Ekimi Kampanyası',
+    name: 'Ahmet Yılmaz',
+    phone: '+90 532 000 00 01',
+    email: 'ahmet@example.com',
+    status: 'NEW',
+    matchedPatientId: null,
+    matchedAppointmentId: null,
+    matchedAt: null,
+    createdAt: new Date('2026-10-20T09:00:00.000Z'),
+  },
+  {
+    id: 'demo-lead-2',
+    metaLeadId: 'meta-lead-2',
+    campaignId: 'demo-campaign-2',
+    campaignName: 'Diş Beyazlatma Promosyonu',
+    name: 'Elif Kaya',
+    phone: '+90 532 000 00 02',
+    email: 'elif@example.com',
+    status: 'MATCHED',
+    matchedPatientId: 'demo-patient-2',
+    matchedAppointmentId: null,
+    matchedAt: new Date('2026-10-19T11:00:00.000Z'),
+    createdAt: new Date('2026-10-18T14:30:00.000Z'),
+  },
+  {
+    id: 'demo-lead-3',
+    metaLeadId: 'meta-lead-3',
+    campaignId: 'demo-campaign-1',
+    campaignName: 'Yaz Saç Ekimi Kampanyası',
+    name: 'Mehmet Demir',
+    phone: '+90 532 000 00 03',
+    email: null,
+    status: 'CONVERTED',
+    matchedPatientId: 'demo-patient-3',
+    matchedAppointmentId: 'demo-appointment-3',
+    matchedAt: new Date('2026-10-15T08:00:00.000Z'),
+    createdAt: new Date('2026-10-10T16:45:00.000Z'),
+  },
+];

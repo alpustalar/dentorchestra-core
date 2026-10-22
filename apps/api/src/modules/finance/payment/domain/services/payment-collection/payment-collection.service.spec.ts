@@ -5,6 +5,7 @@ import { IPaymentCommandRepository } from '@modules/finance/payment/domain/repos
 import {
   InstallmentNotFoundException,
   InstallmentNotRefundableException,
+  InstallmentReversalInFlightException,
 } from '@modules/finance/payment/domain/exceptions/payment.exceptions';
 import { Money } from '@src/domain/value-objects/money.vo';
 import { LogSource } from '@src/domain/constants/log-action.constant';
@@ -93,6 +94,20 @@ describe('PaymentCollectionService', () => {
     await expect(
       service.lockAndGetCollectedAmount({ installmentId: ids[0] })
     ).rejects.toBeInstanceOf(InstallmentNotRefundableException);
+  });
+
+  it('iade/iptal girişimi sürerken itiraz reddedilir (sonuç bilinmiyor: para çıkmış olabilir)', async () => {
+    const { payment, ids } = buildPayment();
+    payment.completeInstallment({ installmentId: ids[0], ...audit });
+    // Damga kolonu entity'de değil repo'da yazılır; okunan satırda taşınır.
+    const row = payment.installments.find((i) => i.id === ids[0]);
+    if (!row) throw new Error('taksit yok');
+    row.reversalRequestedAt = new Date('2026-10-21T10:00:00.000Z');
+    const { service } = build(payment);
+
+    await expect(
+      service.lockAndGetCollectedAmount({ installmentId: ids[0] })
+    ).rejects.toBeInstanceOf(InstallmentReversalInFlightException);
   });
 
   it('taksit/ödeme bulunamazsa tipli hata', async () => {

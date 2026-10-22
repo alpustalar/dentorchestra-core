@@ -6,6 +6,7 @@
  * OpenAPI spec version: 1
  */
 import type { RecordPurchaseInvoiceDtoCurrency } from './recordPurchaseInvoiceDtoCurrency';
+import type { RecordPurchaseInvoiceDtoLineAccountCode } from './recordPurchaseInvoiceDtoLineAccountCode';
 
 export interface RecordPurchaseInvoiceDto {
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
@@ -18,8 +19,7 @@ export interface RecordPurchaseInvoiceDto {
   invoiceDate: string;
   /** @pattern ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$ */
   purchaseOrderId?: string;
-  /** @minLength 1 */
-  lineAccountCode?: string;
+  lineAccountCode?: RecordPurchaseInvoiceDtoLineAccountCode;
   /**
      * @minimum -9007199254740991
      * @maximum 9007199254740991

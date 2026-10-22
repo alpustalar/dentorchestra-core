@@ -6,23 +6,29 @@
  * OpenAPI spec version: 1
  */
 import {
+  useMutation,
   useQuery
 } from '@tanstack/react-query';
 import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult
 } from '@tanstack/react-query';
 
 import type {
+  AccountingPeriodClosingPreview200,
   AccountingPeriodGetPeriods200,
-  AccountingPeriodGetPeriodsParams
+  AccountingPeriodGetPeriodsParams,
+  GetYearEndClosingPreviewFilterDto
 } from '../model';
 
 import { orvalMutator } from '../../../lib/api/orval-mutator';
@@ -143,3 +149,79 @@ export function useAccountingPeriodGetPeriods<TData = Awaited<ReturnType<typeof 
 
 
 
+/**
+ * @summary Yıl sonu kapanış **önizlemesi** — hiçbir şey yazmaz.
+
+`POST` olmasının sebebi gövde: seçim (tahakkuk edilecek siparişler) sorgu dizesine
+sığmayacak kadar yapılandırılmıştır. Kapanış geri alınamaz; bu yüzden `POST :id/close`
+önizlemenin döndürdüğü `expectedLastEntryNo` olmadan çalışmaz.
+ */
+export const accountingPeriodClosingPreview = (
+    id: string,
+    getYearEndClosingPreviewFilterDto: GetYearEndClosingPreviewFilterDto,
+ signal?: AbortSignal
+) => {
+
+
+      return orvalMutator<AccountingPeriodClosingPreview200>(
+      {url: `/api/v1/accounting/periods/${id}/closing-preview`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: getYearEndClosingPreviewFilterDto, signal
+    },
+      );
+    }
+
+
+
+
+export const getAccountingPeriodClosingPreviewMutationKey = () => ['accountingPeriodClosingPreview'] as const;
+
+export const getAccountingPeriodClosingPreviewMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof accountingPeriodClosingPreview>>, TError,AccountingPeriodClosingPreviewMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof accountingPeriodClosingPreview>>, TError,AccountingPeriodClosingPreviewMutationVariables, TContext> => {
+
+const mutationKey = getAccountingPeriodClosingPreviewMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof accountingPeriodClosingPreview>>, AccountingPeriodClosingPreviewMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  accountingPeriodClosingPreview(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AccountingPeriodClosingPreviewMutationResult = NonNullable<Awaited<ReturnType<typeof accountingPeriodClosingPreview>>>
+    export type AccountingPeriodClosingPreviewMutationBody = GetYearEndClosingPreviewFilterDto
+    export type AccountingPeriodClosingPreviewMutationError = ErrorType<unknown>
+    export type AccountingPeriodClosingPreviewMutationVariables = {id: string;data: GetYearEndClosingPreviewFilterDto}
+
+    /**
+ * @summary Yıl sonu kapanış **önizlemesi** — hiçbir şey yazmaz.
+
+`POST` olmasının sebebi gövde: seçim (tahakkuk edilecek siparişler) sorgu dizesine
+sığmayacak kadar yapılandırılmıştır. Kapanış geri alınamaz; bu yüzden `POST :id/close`
+önizlemenin döndürdüğü `expectedLastEntryNo` olmadan çalışmaz.
+ */
+export const useAccountingPeriodClosingPreview = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof accountingPeriodClosingPreview>>, TError,AccountingPeriodClosingPreviewMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof accountingPeriodClosingPreview>>,
+        TError,
+        AccountingPeriodClosingPreviewMutationVariables,
+        TContext
+      > => {
+      return useMutation(getAccountingPeriodClosingPreviewMutationOptions(options), queryClient);
+    }

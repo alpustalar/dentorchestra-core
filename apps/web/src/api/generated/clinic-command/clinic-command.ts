@@ -17,6 +17,7 @@ import type {
 
 import type {
   CreateClinicDto,
+  SetClinicBusinessTypeDto,
   UpdateClinicAppointmentSettingsDto,
   UpdateClinicDto
 } from '../model';
@@ -211,4 +212,66 @@ const {mutation: mutationOptions} = options ?
         TContext
       > => {
       return useMutation(getClinicUpdateAppointmentSettingsMutationOptions(options), queryClient);
+    }
+    export const clinicSetBusinessType = (
+    id: string,
+    setClinicBusinessTypeDto: SetClinicBusinessTypeDto,
+ signal?: AbortSignal
+) => {
+
+
+      return orvalMutator<void>(
+      {url: `/api/v1/clinics/${id}/business-type`, method: 'PATCH',
+      headers: {'Content-Type': 'application/json', },
+      data: setClinicBusinessTypeDto, signal
+    },
+      );
+    }
+
+
+
+
+export const getClinicSetBusinessTypeMutationKey = () => ['clinicSetBusinessType'] as const;
+
+export const getClinicSetBusinessTypeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clinicSetBusinessType>>, TError,ClinicSetBusinessTypeMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof clinicSetBusinessType>>, TError,ClinicSetBusinessTypeMutationVariables, TContext> => {
+
+const mutationKey = getClinicSetBusinessTypeMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clinicSetBusinessType>>, ClinicSetBusinessTypeMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  clinicSetBusinessType(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClinicSetBusinessTypeMutationResult = NonNullable<Awaited<ReturnType<typeof clinicSetBusinessType>>>
+    export type ClinicSetBusinessTypeMutationBody = SetClinicBusinessTypeDto
+    export type ClinicSetBusinessTypeMutationError = ErrorType<unknown>
+    export type ClinicSetBusinessTypeMutationVariables = {id: string;data: SetClinicBusinessTypeDto}
+
+    export const useClinicSetBusinessType = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clinicSetBusinessType>>, TError,ClinicSetBusinessTypeMutationVariables, TContext>, }
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof clinicSetBusinessType>>,
+        TError,
+        ClinicSetBusinessTypeMutationVariables,
+        TContext
+      > => {
+      return useMutation(getClinicSetBusinessTypeMutationOptions(options), queryClient);
     }

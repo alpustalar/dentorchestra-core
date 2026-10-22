@@ -21,6 +21,7 @@ import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import { E_DOCUMENT_JOBS } from '@common/constants';
 import { EDocumentTypeSchema } from '@input-type-schemas/EDocumentTypeSchema';
 import { EDocumentStatusSchema } from '@input-type-schemas/EDocumentStatusSchema';
+import { GetClinicEDocumentProfileQuery } from '@modules/organization/clinic/application/queries/get-clinic-edocument-profile/get-clinic-edocument-profile.query';
 
 describe('EDocumentProcessor (doc 07 §5)', () => {
   const invoiceView = {
@@ -69,6 +70,19 @@ describe('EDocumentProcessor (doc 07 §5)', () => {
             },
           };
         }
+        if (query instanceof GetClinicEDocumentProfileQuery) {
+          return {
+            data: {
+              id: 'clinic-1',
+              name: 'Örnek Klinik',
+              phone: null,
+              email: null,
+              address: 'Test Caddesi 1',
+              city: 'İstanbul',
+              district: 'Kadıköy',
+            },
+          };
+        }
         if (query instanceof GetPartyByIdQuery) {
           return {
             data: {
@@ -114,6 +128,7 @@ describe('EDocumentProcessor (doc 07 §5)', () => {
       name: E_DOCUMENT_JOBS.CANCEL,
       data: {
         invoiceId: 'inv-1',
+        documentType: EDocumentTypeSchema.enum.E_ARSIV,
         uuid: 'ettn-1',
         reason: 'Tutar hatalı girildi',
         clinicId: 'clinic-1',
@@ -139,6 +154,7 @@ describe('EDocumentProcessor (doc 07 §5)', () => {
     expect(request.type).toBe(EDocumentTypeSchema.enum.E_ARSIV);
     expect(request.invoiceId).toBe('inv-1');
     expect(request.seller.taxId).toBe('1234567890');
+    expect(request.seller.name).toBe('Örnek Klinik');
     expect(request.buyer.taxId).toBe('11111111111');
     expect(request.lines[0].unitPrice).toBe('1000.00');
     expect(request.totals.payable).toBe('1100.00');
@@ -298,7 +314,12 @@ describe('EDocumentProcessor (doc 07 §5)', () => {
 
     await processor.process(cancelJob());
 
-    expect(port.cancel).toHaveBeenCalledWith('ettn-1', 'Tutar hatalı girildi');
+    expect(port.cancel).toHaveBeenCalledWith({
+      clinicId: 'clinic-1',
+      documentType: EDocumentTypeSchema.enum.E_ARSIV,
+      uuid: 'ettn-1',
+      reason: 'Tutar hatalı girildi',
+    });
   });
 
   it('iptal bildirimi hatası YUTULMAZ: alarm düşer ve job yeniden denenir', async () => {

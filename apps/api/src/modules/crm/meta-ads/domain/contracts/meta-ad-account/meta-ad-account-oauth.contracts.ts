@@ -10,6 +10,12 @@ import { z } from 'zod';
 export const oAuthStatePayloadSchema = z.object({
   clinicId: z.uuid(),
   userId: z.uuid(),
+  /**
+   * Frontend'in `/authorize`'ı tetiklediği andaki tam sayfa yolu (locale/
+   * organization-slug/clinic-slug zaten içinde). Callback bu yolu bilmeden
+   * doğru sayfaya dönemez — backend bu segmentleri hiç bilmez.
+   */
+  returnPath: z.string(),
 });
 
 export type OAuthStatePayload = z.infer<typeof oAuthStatePayloadSchema>;

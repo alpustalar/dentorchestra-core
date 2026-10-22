@@ -8,6 +8,8 @@ import { PosInfrastructureModule } from '@src/infrastructure/payment/pos/pos.inf
 import { IyzicoTransactionRepositoryModule } from '@modules/finance/pos/virtual/infrastructure/persistence/prisma/repositories/iyzico-transaction/iyzico-transaction.repository.module';
 import { BankDomainServicesModule } from '@modules/finance/bank/domain/services/services.module';
 
+import { IyzicoReversalFinalizer } from '@modules/finance/pos/virtual/application/services/iyzico-reversal-finalizer.service';
+
 const CommandHandlers = [
   RefundPaymentHandler,
   InitCheckoutFormHandler,
@@ -24,6 +26,6 @@ const CommandHandlers = [
     // domain-servis modülü (banka modülünün tamamı çekilmez).
     BankDomainServicesModule,
   ],
-  providers: CommandHandlers,
+  providers: [...CommandHandlers, IyzicoReversalFinalizer],
 })
 export class VirtualPosCommandModule {}

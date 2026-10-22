@@ -9,15 +9,14 @@ import {
   IUserCommandRepository,
   USER_COMMAND_REPOSITORY,
 } from '@modules/identity/user/domain/repositories/user/user.command.repository';
+import { SYSTEM_ACTOR } from '@common/constants/system-actor.constant';
+import { ExecutionSources } from '../../../../../../../../../packages/shared/common/constants/execution-source.constant';
 
 @CommandHandler(SoftDeleteManyUserByOrganizationIdCommand)
-export class SoftDeleteManyUsersByOrganizationIdHandler
-  implements
-    ICommandHandler<
-      SoftDeleteManyUserByOrganizationIdCommand,
-      SoftDeleteManyUserByOrganizationIdResponse
-    >
-{
+export class SoftDeleteManyUsersByOrganizationIdHandler implements ICommandHandler<
+  SoftDeleteManyUserByOrganizationIdCommand,
+  SoftDeleteManyUserByOrganizationIdResponse
+> {
   constructor(
     @Inject(USER_COMMAND_REPOSITORY)
     private readonly userRepo: IUserCommandRepository,
@@ -31,7 +30,10 @@ export class SoftDeleteManyUsersByOrganizationIdHandler
     const { organizationId } = command;
 
     const { data: clinics } = await this.queryBus.execute(
-      new FindManyByOrganizationIdQuery(organizationId)
+      new FindManyByOrganizationIdQuery(organizationId, {
+        actor: SYSTEM_ACTOR,
+        source: ExecutionSources.INTERNAL_CASCADE,
+      })
     );
     const clinicIds = clinics.map((clinic) => clinic.id);
 

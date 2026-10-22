@@ -1,17 +1,17 @@
 'use client';
 
+import { SelectInput } from '@/components/ui/select-input';
+
 import * as React from 'react';
 import { useTranslations } from 'next-intl';
 import { DateTimeManager } from '@shared/common';
-import { RefreshCw } from 'lucide-react';
 import type { CalendarAppointment } from '@/features/clinical/appointment/calendar-appointment.types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { ScheduleDayColumn } from './schedule-day-column';
 import {
-  CALENDAR_TIMELINE,
   CALENDAR_SLOT_DURATIONS,
+  CALENDAR_TIMELINE,
   type CalendarDay,
   type CalendarSelection,
 } from './calendar-selection';
@@ -95,7 +95,7 @@ export function ScheduleGrid({
           {!resizeEnabled && (
             <label className="flex min-h-11 items-center gap-2 text-sm">
               <span>{t('slotDuration')}</span>
-              <select
+              <SelectInput
                 className="h-9 rounded-md border bg-background px-2 text-sm"
                 value={slotDurationMinutes}
                 disabled={isInteracting || isSaving}
@@ -110,23 +110,9 @@ export function ScheduleGrid({
                     {t('slotDurationOption', { minutes })}
                   </option>
                 ))}
-              </select>
+              </SelectInput>
             </label>
           )}
-          <Button
-            variant="outline"
-            disabled={isInteracting || isSaving || isRefreshing}
-            onClick={() => {
-              setSelection(null);
-              onRefresh();
-            }}
-          >
-            <RefreshCw
-              className={isRefreshing ? 'animate-spin' : ''}
-              data-icon="inline-start"
-            />
-            {t(isRefreshing ? 'refreshing' : 'refresh')}
-          </Button>
         </div>
       </CardHeader>
       {feedback?.message && (

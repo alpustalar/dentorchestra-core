@@ -43,13 +43,21 @@ export function NotificationItem({
   const t = useTranslations('Notifications');
   const locale = useLocale();
   const router = useRouter();
-  const params = useParams<{ 'clinic-slug': string }>();
+  const params = useParams<{
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
+  const organizationSlug = params['organization-slug'] ?? 'as-yazilim';
   const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   const { markRead, markUnread } = useNotifications();
   const Icon = iconFor(item.type);
   const navigate = () => {
     markRead(item.id);
-    const result = resolveNotificationDeepLink(item.deepLink, clinicSlug);
+    const result = resolveNotificationDeepLink(
+      item.deepLink,
+      organizationSlug,
+      clinicSlug
+    );
     if (result.supported && result.href) router.push(result.href as never);
   };
   return (
@@ -117,7 +125,11 @@ export function NotificationItem({
 export function NotificationDropdown({ onClose }: { onClose: () => void }) {
   const t = useTranslations('Notifications');
   const router = useRouter();
-  const params = useParams<{ 'clinic-slug': string }>();
+  const params = useParams<{
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
+  const organizationSlug = params['organization-slug'] ?? 'as-yazilim';
   const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   const { notifications, markAllRead, unreadCount } = useNotifications();
   return (
@@ -143,7 +155,9 @@ export function NotificationDropdown({ onClose }: { onClose: () => void }) {
         className="w-full border-t p-3 text-center text-sm font-medium text-primary hover:bg-muted"
         onClick={() => {
           onClose();
-          router.push(`/${clinicSlug}/platform/notification` as never);
+          router.push(
+            `/${organizationSlug}/${clinicSlug}/platform/notification` as never
+          );
         }}
       >
         {t('actions.viewAll')}

@@ -16,6 +16,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ClosePeriodDto,
   OpenPeriodDto
 } from '../model';
 
@@ -215,16 +216,23 @@ const {mutation: mutationOptions} = options ?
       return useMutation(getAccountingPeriodReopenPeriodMutationOptions(options), queryClient);
     }
     /**
- * @summary Dönemi kapatır: yıl sonu kapanış fişlerini üretir + CLOSED'a alır.
+ * @summary Dönemi kapatır: yıl sonu kapanış fişlerini üretir + CLOSED'a alır. **Geri alınamaz.**
+
+Gövde zorunludur: `expectedLastEntryNo` önizlemenin (`POST :id/closing-preview`) döndürdüğü
+yevmiye sayacıdır — önizlemeyi görmeden ve önizlemeden sonra defter değişmişken kapanış
+reddedilir. `grniAccruals` boş liste "bilerek tahakkuk yok" demektir.
  */
 export const accountingPeriodClosePeriod = (
     id: string,
+    closePeriodDto: ClosePeriodDto,
  signal?: AbortSignal
 ) => {
 
 
       return orvalMutator<void>(
-      {url: `/api/v1/accounting/periods/${id}/close`, method: 'POST', signal
+      {url: `/api/v1/accounting/periods/${id}/close`, method: 'POST',
+      headers: {'Content-Type': 'application/json', },
+      data: closePeriodDto, signal
     },
       );
     }
@@ -249,9 +257,9 @@ const {mutation: mutationOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof accountingPeriodClosePeriod>>, AccountingPeriodClosePeriodMutationVariables> = (props) => {
-          const {id} = props ?? {};
+          const {id,data} = props ?? {};
 
-          return  accountingPeriodClosePeriod(id,)
+          return  accountingPeriodClosePeriod(id,data,)
         }
 
 
@@ -262,12 +270,16 @@ const {mutation: mutationOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type AccountingPeriodClosePeriodMutationResult = NonNullable<Awaited<ReturnType<typeof accountingPeriodClosePeriod>>>
-
+    export type AccountingPeriodClosePeriodMutationBody = ClosePeriodDto
     export type AccountingPeriodClosePeriodMutationError = ErrorType<unknown>
-    export type AccountingPeriodClosePeriodMutationVariables = {id: string}
+    export type AccountingPeriodClosePeriodMutationVariables = {id: string;data: ClosePeriodDto}
 
     /**
- * @summary Dönemi kapatır: yıl sonu kapanış fişlerini üretir + CLOSED'a alır.
+ * @summary Dönemi kapatır: yıl sonu kapanış fişlerini üretir + CLOSED'a alır. **Geri alınamaz.**
+
+Gövde zorunludur: `expectedLastEntryNo` önizlemenin (`POST :id/closing-preview`) döndürdüğü
+yevmiye sayacıdır — önizlemeyi görmeden ve önizlemeden sonra defter değişmişken kapanış
+reddedilir. `grniAccruals` boş liste "bilerek tahakkuk yok" demektir.
  */
 export const useAccountingPeriodClosePeriod = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof accountingPeriodClosePeriod>>, TError,AccountingPeriodClosePeriodMutationVariables, TContext>, }

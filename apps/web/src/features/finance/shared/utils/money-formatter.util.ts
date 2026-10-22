@@ -37,3 +37,12 @@ export function formatAmount(
   if (value === undefined) return undefined;
   return formatMoney(String(value), currency);
 }
+
+/**
+ * İki ondalığa yuvarlar (kuruş hassasiyeti). Yalnız ekran/istemci tarafı
+ * toplamları ve mutabakat karşılaştırmaları için; sunucuya giden tutarlar
+ * backend'in kendi `Decimal`/`Money` VO'sundan geçer.
+ */
+export function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}

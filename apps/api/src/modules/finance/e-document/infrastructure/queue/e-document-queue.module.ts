@@ -3,7 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { QUEUES } from '@common/constants';
 import { EDocumentProducer } from './producers/e-document.producer';
 import { EDocumentProcessor } from './processors/e-document.processor';
-import { NoopEInvoiceModule } from '../adapters/noop/noop-e-invoice.module';
+import { EInvoiceAdapterModule } from '../adapters/e-invoice-adapter.module';
 
 /**
  * e-Belge kuyruk altyapısı: producer (enqueue) + processor (worker) + aktif adapter.
@@ -12,7 +12,7 @@ import { NoopEInvoiceModule } from '../adapters/noop/noop-e-invoice.module';
 @Module({
   imports: [
     BullModule.registerQueue({ name: QUEUES.E_DOCUMENT }),
-    NoopEInvoiceModule,
+    EInvoiceAdapterModule,
   ],
   providers: [EDocumentProducer, EDocumentProcessor],
   exports: [EDocumentProducer],

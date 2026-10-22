@@ -68,6 +68,7 @@ model Clinic {
   portalSettings       ClinicPortalSettings?
   paymentGateway       ClinicPaymentGateway?
   iyzicoTerminalConfig ClinicIyzicoTerminalConfig?
+  eDocumentIntegrationConfig EDocumentIntegrationConfig?
   governmentSpecs      ClinicGovernmentSpecs?
   // NOT: WhatsApp/Telegram/Instagram kanal ve AI asistan config'leri messaging
   // bounded-context'ine ait olup MongoDB'de tutulur (bkz. documents/messaging-microservice.md).

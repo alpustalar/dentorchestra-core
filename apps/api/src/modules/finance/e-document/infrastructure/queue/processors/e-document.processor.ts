@@ -25,6 +25,8 @@ import { ClaimInvoiceEDocumentDispatchCommand } from '@modules/finance/invoice/a
 import { MarkInvoiceEDocumentFailedCommand } from '@modules/finance/invoice/application/commands/mark-invoice-edocument-failed/mark-invoice-edocument-failed.command';
 import { CriticalFailurePublisher } from '@common/observability/critical-failure.publisher';
 import { DateTimeManager } from '@shared/common/utils/date-time/date-time.manager';
+import type { EDocumentTypeType as EDocumentType } from '@input-type-schemas/EDocumentTypeSchema';
+import { GetClinicEDocumentProfileQuery } from '@modules/organization/clinic/application/queries/get-clinic-edocument-profile/get-clinic-edocument-profile.query';
 
 interface SendJobData {
   invoiceId: string;
@@ -32,6 +34,7 @@ interface SendJobData {
 
 interface CancelJobData {
   invoiceId: string;
+  documentType: EDocumentType;
   uuid: string;
   reason: string;
   clinicId: string;
@@ -85,7 +88,12 @@ export class EDocumentProcessor extends WorkerHost {
    */
   private async handleCancel(data: CancelJobData): Promise<void> {
     try {
-      await this.eInvoicePort.cancel(data.uuid, data.reason);
+      await this.eInvoicePort.cancel({
+        clinicId: data.clinicId,
+        documentType: data.documentType,
+        uuid: data.uuid,
+        reason: data.reason,
+      });
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -127,6 +135,9 @@ export class EDocumentProcessor extends WorkerHost {
       new GetClinicGovernmentSpecsQuery(invoice.clinicId, this.internalCtx)
     );
     const legalType = specs?.legalType ?? 'KURUM';
+    const { data: clinic } = await this.queryBus.execute(
+      new GetClinicEDocumentProfileQuery(invoice.clinicId, this.internalCtx)
+    );
 
     // Alıcı: hastanın finans carisi (idempotent garanti → party detayı).
     const { partyId } = await this.commandBus.execute(
@@ -161,6 +172,7 @@ export class EDocumentProcessor extends WorkerHost {
     }
 
     const request: EDocumentRequest = {
+      clinicId: invoice.clinicId,
       type: documentType,
       invoiceId: invoice.id,
       // Gerçek entegratör adapter'ları bu anahtarı sağlayıcı tarafında da
@@ -173,13 +185,21 @@ export class EDocumentProcessor extends WorkerHost {
       // tarihleyip defterden koparırdı.
       issueDate: invoice.issuedAt ?? DateTimeManager.create(),
       seller: {
-        // TODO(gerçek-adapter): kliniğin yasal unvanını çöz; Noop kullanmıyor.
         taxId: specs?.companyTaxNumber ?? null,
-        name: '',
+        name: clinic?.name ?? '',
+        address: clinic?.address ?? null,
+        district: clinic?.district ?? null,
+        city: clinic?.city ?? null,
+        phone: clinic?.phone ?? null,
+        email: clinic?.email ?? null,
       },
       buyer: {
         taxId: buyer?.taxNumber ?? buyer?.nationalId ?? null,
         name: buyer?.name ?? '',
+        taxOffice: buyer?.taxOffice ?? null,
+        address: buyer?.address ?? null,
+        phone: buyer?.phone ?? null,
+        email: buyer?.email ?? null,
         isEInvoiceUser: buyer?.isEInvoiceUser ?? false,
         alias: buyer?.eInvoiceMailbox ?? null,
       },

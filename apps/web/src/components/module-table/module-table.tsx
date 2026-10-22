@@ -213,7 +213,11 @@ const statusVariant = (value: string) =>
 
 export function ModuleTable({ module }: { module: string }) {
   const router = useRouter();
-  const params = useParams<{ locale: string; 'clinic-slug': string }>();
+  const params = useParams<{
+    locale: string;
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
   const config =
     modules[(module in modules ? module : 'patients') as ModuleKey];
   const [query, setQuery] = React.useState('');
@@ -414,7 +418,7 @@ export function ModuleTable({ module }: { module: string }) {
               className="w-full"
               onClick={() =>
                 router.push(
-                  `/${params.locale}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
+                  `/${params.locale}/${params['organization-slug']}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
                 )
               }
             >

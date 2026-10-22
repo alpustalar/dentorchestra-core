@@ -59,6 +59,9 @@ describe('GetPosTransactionByIdHandler', () => {
             return { orThrow };
           },
         },
+        policy: {
+          getSerializationOptions: () => ({ groups: [], isGroupActive: false }),
+        },
       }),
     } as never;
 

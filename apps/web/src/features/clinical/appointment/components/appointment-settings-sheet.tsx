@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Settings2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,8 @@ import {
   useClinicAppointmentSettings,
 } from '@/features/clinical/appointment/api/use-clinic-appointment-settings';
 import { mockClinicAppointmentSettings } from '@/features/clinical/appointment/api/mock-clinic-appointment-settings';
+import { DataLoadingBoundary, OfflineDataState } from '@/components/loading';
+import { AppointmentSettingsSkeleton } from './appointment-skeletons';
 
 const DEFAULT_SETTINGS: Required<UpdateClinicAppointmentSettingsDto> = {
   allowPatientBooking: true,
@@ -110,6 +113,7 @@ function NumberSettingField({
 }
 
 export function AppointmentSettingsSheet() {
+  const calendarText = useTranslations('AppointmentCalendar');
   const [open, setOpen] = useState(false);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [message, setMessage] = useState('');
@@ -198,135 +202,141 @@ export function AppointmentSettingsSheet() {
         </ManagedSheet.Header>
 
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
-          {settingsQuery.isLoading ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              Randevu ayarları yükleniyor…
-            </p>
-          ) : settingsQuery.isError ? (
-            <p
-              role="alert"
-              className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
-            >
-              Klinik randevu ayarları alınamadı. Daha sonra tekrar deneyin.
-            </p>
-          ) : (
-            <>
-              <section>
-                <h3 className="text-sm font-semibold">
-                  Hasta portalı ve yapay zeka
-                </h3>
-                <div className="mt-2 divide-y rounded-lg border px-3">
-                  <SettingToggle
-                    label="Hasta randevu oluşturabilsin"
-                    description="Hastalar portal veya yapay zeka asistanı üzerinden kendi randevularını alabilir."
-                    checked={settings.allowPatientBooking}
-                    onChange={(value) =>
-                      updateToggle('allowPatientBooking', value)
-                    }
-                  />
-                  {settings.allowPatientBooking && (
-                    <>
-                      <NumberSettingField
-                        label="Randevu slot süresi"
-                        description="Hasta portalı ve yapay zeka üzerinden alınan muayene randevuları kaç dakikalık aralıklarla açılsın?"
-                        value={settings.slotDurationMinutes}
-                        min={5}
-                        onChange={(value) =>
-                          updateNumber('slotDurationMinutes', value)
-                        }
-                      />
-                      <SettingToggle
-                        label="Hasta randevusunu iptal edebilsin"
-                        description="İptal süresi sınırına uyulduğunda hasta iptal yapabilir."
-                        checked={settings.allowPatientCancel}
-                        onChange={(value) =>
-                          updateToggle('allowPatientCancel', value)
-                        }
-                      />
-                      <NumberSettingField
-                        label="İptal için en az süre"
-                        description="Randevudan kaç saat öncesine kadar iptal edilebilir?"
-                        value={settings.cancelLimitHours}
-                        onChange={(value) =>
-                          updateNumber('cancelLimitHours', value)
-                        }
-                      />
-                      <NumberSettingField
-                        label="Erteleme için en az süre"
-                        description="Randevudan kaç saat öncesine kadar ertelenebilir?"
-                        value={settings.rescheduleLimitHours}
-                        onChange={(value) =>
-                          updateNumber('rescheduleLimitHours', value)
-                        }
-                      />
-                      <NumberSettingField
-                        label="Aktif randevu limiti"
-                        description="Bir hastanın aynı anda sahip olabileceği ileri tarihli randevu sayısı."
-                        value={settings.maxActivePatientBookings}
-                        min={1}
-                        onChange={(value) =>
-                          updateNumber('maxActivePatientBookings', value)
-                        }
-                      />
-                      <NumberSettingField
-                        label="İleri tarih sınırı"
-                        description="Kaç gün sonrasına kadar randevu alınabilir?"
-                        value={settings.maxFutureBookingDays}
-                        min={1}
-                        onChange={(value) =>
-                          updateNumber('maxFutureBookingDays', value)
-                        }
-                      />
-                      <SettingToggle
-                        label="Sekreter onayı gerektir"
-                        description="Hasta portalı veya yapay zeka üzerinden alınan yeni randevular onaylanana kadar beklemede kalsın."
-                        checked={settings.requireConfirmation}
-                        onChange={(value) =>
-                          updateToggle('requireConfirmation', value)
-                        }
-                      />
-                    </>
-                  )}
-                </div>
-              </section>
+          <DataLoadingBoundary
+            isLoading={settingsQuery.isLoading}
+            label={calendarText('loading')}
+            fallback={<AppointmentSettingsSkeleton />}
+            hasData={Boolean(settingsQuery.data)}
+            offlineFallback={<OfflineDataState />}
+          >
+            {settingsQuery.isError ? (
+              <p
+                role="alert"
+                className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+              >
+                Klinik randevu ayarları alınamadı. Daha sonra tekrar deneyin.
+              </p>
+            ) : (
+              <>
+                <section>
+                  <h3 className="text-sm font-semibold">
+                    Hasta portalı ve yapay zeka
+                  </h3>
+                  <div className="mt-2 divide-y rounded-lg border px-3">
+                    <SettingToggle
+                      label="Hasta randevu oluşturabilsin"
+                      description="Hastalar portal veya yapay zeka asistanı üzerinden kendi randevularını alabilir."
+                      checked={settings.allowPatientBooking}
+                      onChange={(value) =>
+                        updateToggle('allowPatientBooking', value)
+                      }
+                    />
+                    {settings.allowPatientBooking && (
+                      <>
+                        <NumberSettingField
+                          label="Randevu slot süresi"
+                          description="Hasta portalı ve yapay zeka üzerinden alınan muayene randevuları kaç dakikalık aralıklarla açılsın?"
+                          value={settings.slotDurationMinutes}
+                          min={5}
+                          onChange={(value) =>
+                            updateNumber('slotDurationMinutes', value)
+                          }
+                        />
+                        <SettingToggle
+                          label="Hasta randevusunu iptal edebilsin"
+                          description="İptal süresi sınırına uyulduğunda hasta iptal yapabilir."
+                          checked={settings.allowPatientCancel}
+                          onChange={(value) =>
+                            updateToggle('allowPatientCancel', value)
+                          }
+                        />
+                        <NumberSettingField
+                          label="İptal için en az süre"
+                          description="Randevudan kaç saat öncesine kadar iptal edilebilir?"
+                          value={settings.cancelLimitHours}
+                          onChange={(value) =>
+                            updateNumber('cancelLimitHours', value)
+                          }
+                        />
+                        <NumberSettingField
+                          label="Erteleme için en az süre"
+                          description="Randevudan kaç saat öncesine kadar ertelenebilir?"
+                          value={settings.rescheduleLimitHours}
+                          onChange={(value) =>
+                            updateNumber('rescheduleLimitHours', value)
+                          }
+                        />
+                        <NumberSettingField
+                          label="Aktif randevu limiti"
+                          description="Bir hastanın aynı anda sahip olabileceği ileri tarihli randevu sayısı."
+                          value={settings.maxActivePatientBookings}
+                          min={1}
+                          onChange={(value) =>
+                            updateNumber('maxActivePatientBookings', value)
+                          }
+                        />
+                        <NumberSettingField
+                          label="İleri tarih sınırı"
+                          description="Kaç gün sonrasına kadar randevu alınabilir?"
+                          value={settings.maxFutureBookingDays}
+                          min={1}
+                          onChange={(value) =>
+                            updateNumber('maxFutureBookingDays', value)
+                          }
+                        />
+                        <SettingToggle
+                          label="Sekreter onayı gerektir"
+                          description="Hasta portalı veya yapay zeka üzerinden alınan yeni randevular onaylanana kadar beklemede kalsın."
+                          checked={settings.requireConfirmation}
+                          onChange={(value) =>
+                            updateToggle('requireConfirmation', value)
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                </section>
 
-              <section>
-                <h3 className="text-sm font-semibold">Klinik randevu akışı</h3>
-                <div className="mt-2 divide-y rounded-lg border px-3">
-                  <SettingToggle
-                    label="Çakışan randevuya izin ver"
-                    description="Personel aynı hekime veya koltuğa çakışan randevu ekleyebilir."
-                    checked={settings.staffAllowOverbooking}
-                    onChange={(value) =>
-                      updateToggle('staffAllowOverbooking', value)
-                    }
-                  />
-                </div>
-              </section>
+                <section>
+                  <h3 className="text-sm font-semibold">
+                    Klinik randevu akışı
+                  </h3>
+                  <div className="mt-2 divide-y rounded-lg border px-3">
+                    <SettingToggle
+                      label="Çakışan randevuya izin ver"
+                      description="Personel aynı hekime veya koltuğa çakışan randevu ekleyebilir."
+                      checked={settings.staffAllowOverbooking}
+                      onChange={(value) =>
+                        updateToggle('staffAllowOverbooking', value)
+                      }
+                    />
+                  </div>
+                </section>
 
-              <section>
-                <h3 className="text-sm font-semibold">Hatırlatmalar</h3>
-                <div className="mt-2 divide-y rounded-lg border px-3">
-                  <NumberSettingField
-                    label="SMS hatırlatma zamanı"
-                    description="Randevudan kaç saat önce SMS gönderilsin? 0 değeri kapatır."
-                    value={settings.sendSmsReminderHours}
-                    onChange={(value) =>
-                      updateNumber('sendSmsReminderHours', value)
-                    }
-                  />
-                  <SettingToggle
-                    label="Hasta yanıtı iste"
-                    description="Hatırlatma SMS'inden sonra hastadan katılım yanıtı bekle."
-                    checked={settings.requireReminderResponse}
-                    onChange={(value) =>
-                      updateToggle('requireReminderResponse', value)
-                    }
-                  />
-                </div>
-              </section>
-            </>
-          )}
+                <section>
+                  <h3 className="text-sm font-semibold">Hatırlatmalar</h3>
+                  <div className="mt-2 divide-y rounded-lg border px-3">
+                    <NumberSettingField
+                      label="SMS hatırlatma zamanı"
+                      description="Randevudan kaç saat önce SMS gönderilsin? 0 değeri kapatır."
+                      value={settings.sendSmsReminderHours}
+                      onChange={(value) =>
+                        updateNumber('sendSmsReminderHours', value)
+                      }
+                    />
+                    <SettingToggle
+                      label="Hasta yanıtı iste"
+                      description="Hatırlatma SMS'inden sonra hastadan katılım yanıtı bekle."
+                      checked={settings.requireReminderResponse}
+                      onChange={(value) =>
+                        updateToggle('requireReminderResponse', value)
+                      }
+                    />
+                  </div>
+                </section>
+              </>
+            )}
+          </DataLoadingBoundary>
           <p
             aria-live="polite"
             className="min-h-5 text-sm text-muted-foreground"

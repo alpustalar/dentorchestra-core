@@ -28,6 +28,7 @@ export { FinanceLedgerScalarFieldEnumSchema } from './FinanceLedgerScalarFieldEn
 export { PaymentScalarFieldEnumSchema } from './PaymentScalarFieldEnumSchema';
 export { PaymentInstallmentScalarFieldEnumSchema } from './PaymentInstallmentScalarFieldEnumSchema';
 export { IyzicoTransactionScalarFieldEnumSchema } from './IyzicoTransactionScalarFieldEnumSchema';
+export { EDocumentIntegrationConfigScalarFieldEnumSchema } from './EDocumentIntegrationConfigScalarFieldEnumSchema';
 export { FinancialEventScalarFieldEnumSchema } from './FinancialEventScalarFieldEnumSchema';
 export { ClinicGovernmentSpecsScalarFieldEnumSchema } from './ClinicGovernmentSpecsScalarFieldEnumSchema';
 export { HotelbedsHotelScalarFieldEnumSchema } from './HotelbedsHotelScalarFieldEnumSchema';
@@ -165,6 +166,9 @@ export { PaymentStatusSchema } from './PaymentStatusSchema';
 export { PaymentMethodSchema } from './PaymentMethodSchema';
 export { InstallmentStatusSchema } from './InstallmentStatusSchema';
 export { IyzicoTransactionStatusSchema } from './IyzicoTransactionStatusSchema';
+export { EDocumentProviderSchema } from './EDocumentProviderSchema';
+export { EDocumentEnvironmentSchema } from './EDocumentEnvironmentSchema';
+export { EDocumentIntegrationScopeSchema } from './EDocumentIntegrationScopeSchema';
 export { FinancialEventTypeSchema } from './FinancialEventTypeSchema';
 export { ClinicLegalTypeSchema } from './ClinicLegalTypeSchema';
 export { HotelbedsBookingStatusSchema } from './HotelbedsBookingStatusSchema';

@@ -11,7 +11,10 @@ import {
 import { AuthGuard, CapabilityGuard } from '@modules/identity/auth/auth/guards';
 import { GetContext, HasCapability, IGetContext } from '@common/decorators';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
-import { ConnectMetaAccountDto } from '@shared/modules/meta-ads/dto/commands';
+import {
+  ConnectMetaAccountDto,
+  MatchLeadToPatientDto,
+} from '@shared/modules/meta-ads/dto/commands';
 import { ConnectMetaAccountCommand } from '@modules/crm/meta-ads/application/commands/connect-meta-account/connect-meta-account.command';
 import { MatchLeadToPatientCommand } from '@modules/crm/meta-ads/application/commands/match-lead-to-patient/match-lead-to-patient.command';
 import { DisconnectMetaAccountCommand } from '@modules/crm/meta-ads/application/commands/disconnect-meta-account/disconnect-meta-account.command';
@@ -52,11 +55,15 @@ export class MetaAdsCommandController {
   @Put('leads/:leadId/match')
   matchLead(
     @Param('leadId', ParseUUIDPipe) leadId: string,
-    @Body('patientId', ParseUUIDPipe) patientId: string,
+    @Body() dto: MatchLeadToPatientDto,
     @GetContext() ctx: IGetContext
   ) {
     return this.commandBus.execute(
-      new MatchLeadToPatientCommand({ leadId, patientId, ctx })
+      new MatchLeadToPatientCommand({
+        leadId,
+        patientId: dto.patientId,
+        ctx,
+      })
     );
   }
 }

@@ -65,6 +65,31 @@ export class InstallmentNotRefundableException extends DomainException<{
   }
 }
 
+/**
+ * Taksit için kart sahibine parayı geri götüren bir girişim (iade/iptal) sağlayıcıya
+ * gitti ve sonucu kesinleşmedi. Aynı taksitte ikinci bir geri götüren yol (kart
+ * itirazı ya da ikinci iade) açılamaz: sağlayıcıda para zaten çıkmış olabilir ve
+ * ikisi birlikte aynı parayı kart sahibine iki kez götürür (kural 17/18).
+ *
+ * Kendiliğinden kapanmaz: girişim sonuçlanana (başarılı → taksit REFUNDED/CANCELLED,
+ * açık ret → damga kalkar) ya da sağlayıcı panelinde doğrulanana kadar sürer.
+ */
+export class InstallmentReversalInFlightException extends DomainException<{
+  installmentId: string;
+  requestedAt: string;
+}> {
+  public readonly errorCode =
+    ERROR_CODES.PAYMENT.INSTALLMENT_REVERSAL_IN_FLIGHT;
+  public override readonly httpStatus = HttpStatus.CONFLICT;
+
+  constructor(meta: { installmentId: string; requestedAt: string }) {
+    super(
+      'Bu taksit için bir iade/iptal girişimi sürüyor; sonuçlanmadan yeni bir geri ödeme yolu açılamaz.',
+      meta
+    );
+  }
+}
+
 /** Tahsil edilmiş/iade edilmiş taksit iptal edilemez — iade yolu kullanılır. */
 export class InstallmentNotCancellableException extends DomainException<{
   installmentId: string;

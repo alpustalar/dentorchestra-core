@@ -24,6 +24,11 @@ export class PartyQueryRepository
     return this.db.party.findUnique({ where: { id } });
   }
 
+  findByIds(clinicId: string, ids: string[]): Promise<IParty[]> {
+    if (ids.length === 0) return Promise.resolve([]);
+    return this.db.party.findMany({ where: { clinicId, id: { in: ids } } });
+  }
+
   findMany(
     filter: FindPartiesFilter,
     pagination: Pagination

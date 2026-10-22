@@ -2,6 +2,76 @@
 import type { EDocumentTypeType } from '@input-type-schemas/EDocumentTypeSchema';
 import type { CurrencyType } from '@input-type-schemas/CurrencySchema';
 import type { EDocumentStatusType } from '@input-type-schemas/EDocumentStatusSchema';
+import type {
+  EDocumentEnvironmentSchema,
+  EDocumentProviderSchema,
+} from '@shared/modules/e-document/schemas';
+import { z } from 'zod';
+
+export type EDocumentProvider = z.infer<typeof EDocumentProviderSchema>;
+export type EDocumentEnvironment = z.infer<typeof EDocumentEnvironmentSchema>;
+export type EDocumentIntegrationScope = 'CLINIC' | 'ORGANIZATION';
+
+export interface CreateEDocumentIntegrationConfigProps {
+  id?: string;
+  scope: EDocumentIntegrationScope;
+  provider: EDocumentProvider;
+  environment: EDocumentEnvironment;
+  credentialsCiphertext: string;
+  credentialHint: string | null;
+  clinicId: string | null;
+  organizationId: string | null;
+}
+
+export interface EDocumentIntegrationConfigData {
+  id: string;
+  scope: EDocumentIntegrationScope;
+  provider: EDocumentProvider;
+  environment: EDocumentEnvironment;
+  credentialsCiphertext: string;
+  credentialHint: string | null;
+  isActive: boolean;
+  lastTestedAt: Date | null;
+  lastTestSucceeded: boolean | null;
+  clinicId: string | null;
+  organizationId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EDocumentIntegrationView {
+  id: string;
+  scope: EDocumentIntegrationScope;
+  provider: EDocumentProvider;
+  environment: EDocumentEnvironment;
+  configured: true;
+  credentialHint: string | null;
+  inherited: boolean;
+  sourceId: string;
+  lastTestedAt: Date | null;
+  lastTestSucceeded: boolean | null;
+  updatedAt: Date;
+}
+
+export const NilveraCredentialsSchema = z.object({
+  provider: z.literal('NILVERA'),
+  apiKey: z.string().min(16),
+});
+export type NilveraCredentials = z.infer<typeof NilveraCredentialsSchema>;
+
+export const EDocumentCredentialsSchema = z.discriminatedUnion('provider', [
+  NilveraCredentialsSchema,
+]);
+export type EDocumentCredentials = z.infer<typeof EDocumentCredentialsSchema>;
+
+export interface ResolvedEDocumentIntegration {
+  configId: string;
+  scope: EDocumentIntegrationScope;
+  sourceId: string;
+  provider: EDocumentProvider;
+  environment: EDocumentEnvironment;
+  credentials: EDocumentCredentials;
+}
 
 // ==========================================
 // 1. YARDIMCI VE ALT SÖZLEŞMELER (SUB-CONTRACTS)
@@ -10,6 +80,12 @@ import type { EDocumentStatusType } from '@input-type-schemas/EDocumentStatusSch
 export interface PartyTaxInfo {
   taxId: string | null; // VKN veya TCKN
   name: string;
+  taxOffice?: string | null;
+  address?: string | null;
+  district?: string | null;
+  city?: string | null;
+  phone?: string | null;
+  email?: string | null;
   isEInvoiceUser?: boolean;
   alias?: string | null; // e-Fatura posta kutusu etiketi
 }
@@ -36,6 +112,7 @@ export interface EDocumentTotals {
 
 /** Çekirdeğin porta geçtiği belge isteği (doc 07 §3). Adapter'a özgü değildir. */
 export interface EDocumentRequest {
+  clinicId: string;
   type: EDocumentTypeType;
   invoiceId: string; // İç sistem faturası
   /**

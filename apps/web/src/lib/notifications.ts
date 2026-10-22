@@ -120,6 +120,7 @@ export const seedNotifications: StaffNotification[] = [
 
 export function resolveNotificationDeepLink(
   link: unknown,
+  organizationSlug?: string,
   clinicSlug?: string
 ) {
   if (!link || typeof link !== 'object')
@@ -129,7 +130,10 @@ export function resolveNotificationDeepLink(
     !['appointments', 'work-orders', 'announcements'].includes(value.page ?? '')
   )
     return { href: null, supported: false };
-  const clinicPrefix = clinicSlug ? `/${clinicSlug}` : '';
+  const clinicPrefix =
+    organizationSlug && clinicSlug
+      ? `/${organizationSlug}/${clinicSlug}`
+      : '';
   const href =
     value.page === 'appointments'
       ? `${clinicPrefix}/clinical/appointment${value.id ? `?appointmentId=${encodeURIComponent(value.id)}` : ''}`

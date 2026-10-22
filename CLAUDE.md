@@ -2784,7 +2784,15 @@ değildir**: `dedupeKey` mevcut kimliği sessizce döner ("zaten vardı" bilgisi
 yazma kilitsizdir; ikinci iade çağrısını engelleyen şey iade SATIRININ unique kısıtıdır. (d) Para
 hareketi başlatan satır sağlayıcı çağrısından ÖNCE kalıcı yazılır (kısa tx), çağrı tx DIŞINDA yapılır,
 sonuç ayrı kısa tx'te `PENDING && girişim eşleşiyor` koşuluyla yazılır (kural 3): araya giren akışın
-sonucu ezilmez.
+sonucu ezilmez. Kaynak satır zaten başka bir yolun (itiraz) tavanına bağlıysa (kural 17) damga ve
+tavan kapısı **aynı kısa tx'te, satır kilitliyken** çalışır; açık ret damgayı kaldırır, fırlatma
+(sonuç bilinmiyor) damgayı bırakır ve itirazı engellemeye devam eder (sanal POS, §97).
+(e) **Çağrı SONRASI yerel kapanış, çağrıdan ÖNCE bilinen bir ret ile karşılaşamaz.** Sağlayıcı parayı
+geri götürdükten sonra yerel kapanışı bir entity invariant'ı reddederse transaction geri sarılır ve
+"para gitti, kayıt yok" kalır: sanal POS iptali tahsil edilmiş taksidi `cancelInstallment`'a veriyordu,
+entity bunu bilerek reddediyordu — 2000+ birim test yeşildi çünkü kapanış komutu mock'luydu (§97).
+Kural: sağlayıcıyı çağıran her handler'ın **başarı yolu** gerçek DB'ye karşı en az bir kez uçtan uca
+koşar (kural 21) ve aynı ekonomik olayın (iade/iptal) yerel kapanışı **tek yerde** durur.
 
 **19. Geri alınamaz toplu yazma, önizlemesiz ve önizlemeden bağımsız bir hesapla çalışmaz.** Yıl sonu kapanışı
 (CLOSED'dan dönüş yok) örnek: (a) **Önizleme ile yazma AYNI saf planlayıcıyı çağırır** (`planYearEndClosing`);

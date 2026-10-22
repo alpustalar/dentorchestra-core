@@ -26,6 +26,14 @@ export const PaymentInstallmentSchema = z.object({
    * yeniden işlenmesi ikinci bir alacak doğurmasın).
    */
   recoversInstallmentId: z.string().nullable(),
+  /**
+   * Parayı kart sahibine geri götüren bir girişim (iade/iptal) sağlayıcıya GİTTİ ve
+   * sonucu kesinleşmedi (kural 18). SDK çağrısı transaction dışında yapıldığı için
+   * uçuştaki iade, aynı taksitte açılan bir itirazı kendi başına göremez; bu damga,
+   * çağrıdan ÖNCE ve ödeme satırı kilitliyken yazılır. Doluyken itiraz açılamaz.
+   * Sağlayıcı açıkça reddederse temizlenir; zaman aşımında (sonuç bilinmiyor) kalır.
+   */
+  reversalRequestedAt: z.coerce.date().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 })

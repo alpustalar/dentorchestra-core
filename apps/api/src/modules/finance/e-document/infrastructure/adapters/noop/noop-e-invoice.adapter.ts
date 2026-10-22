@@ -4,6 +4,7 @@ import {
   EDocumentStatusType as EDocumentStatus,
 } from '@input-type-schemas/EDocumentStatusSchema';
 import { EDocumentTypeSchema } from '@input-type-schemas/EDocumentTypeSchema';
+import type { EDocumentTypeType as EDocumentType } from '@input-type-schemas/EDocumentTypeSchema';
 import { EInvoicePort } from '@modules/finance/e-document/domain/ports/e-invoice.port';
 import {
   EDocumentRequest,
@@ -33,18 +34,30 @@ export class NoopEInvoiceAdapter implements EInvoicePort {
     });
   }
 
-  cancel(uuid: string, reason: string): Promise<void> {
+  cancel(input: {
+    clinicId: string;
+    documentType: EDocumentType;
+    uuid: string;
+    reason: string;
+  }): Promise<void> {
     this.logger.log(
-      `Entegratör kapalı — iptal no-op. uuid=${uuid}, neden=${reason}`
+      `Entegratör kapalı — iptal no-op. uuid=${input.uuid}, neden=${input.reason}`
     );
     return Promise.resolve();
   }
 
-  getStatus(): Promise<EDocumentStatus> {
+  getStatus(input: {
+    clinicId: string;
+    documentType: EDocumentType;
+    uuid: string;
+  }): Promise<EDocumentStatus> {
+    void input;
     return Promise.resolve(EDocumentStatusSchema.enum.INTERNAL);
   }
 
-  checkMailbox(): Promise<MailboxInfo> {
+  checkMailbox(clinicId: string, taxId: string): Promise<MailboxInfo> {
+    void clinicId;
+    void taxId;
     return Promise.resolve({ isEInvoiceUser: false });
   }
 }

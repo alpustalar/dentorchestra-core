@@ -39,7 +39,7 @@ export class InitiateMetaOAuthHandler implements ICommandHandler<
   ) {}
 
   async execute(command: InitiateMetaOAuthCommand): Promise<string> {
-    const { clinicId, ctx } = command;
+    const { clinicId, returnPath, ctx } = command.payload;
 
     // Kapsam kontrolünün TEK yeri burasıdır: callback aktörsüz çalışır (Meta'dan
     // gelen yönlendirme) ve kliniği state'ten okur. Burada doğrulanmazsa herhangi
@@ -58,7 +58,7 @@ export class InitiateMetaOAuthHandler implements ICommandHandler<
 
     await this.cacheService.metaOAuthState.set(
       generatedStateUUID.value,
-      JSON.stringify({ clinicId, userId: ctx.actor.userId })
+      JSON.stringify({ clinicId, userId: ctx.actor.userId, returnPath })
     );
 
     const appId = this.metaAdsConfig.appId;

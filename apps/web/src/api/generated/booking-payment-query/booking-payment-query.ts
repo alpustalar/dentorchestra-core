@@ -22,7 +22,9 @@ import type {
 
 import type {
   BookingPaymentUnbridged200,
-  BookingPaymentUnbridgedParams
+  BookingPaymentUnbridgedParams,
+  BookingPaymentUnresolvedRefunds200,
+  BookingPaymentUnresolvedRefundsParams
 } from '../model';
 
 import { orvalMutator } from '../../../lib/api/orval-mutator';
@@ -122,6 +124,99 @@ export function useBookingPaymentUnbridged<TData = Awaited<ReturnType<typeof boo
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getBookingPaymentUnbridgedQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+/**
+ * @summary Kapanmamış iadeler: doğrulanmamış, reddedilmiş ve takılmış (operatörün paneldeki listesi).
+ */
+export const bookingPaymentUnresolvedRefunds = (
+    params?: BookingPaymentUnresolvedRefundsParams,
+ signal?: AbortSignal
+) => {
+
+
+      return orvalMutator<BookingPaymentUnresolvedRefunds200>(
+      {url: `/api/v1/health-tourism/booking-payments/refunds/unresolved`, method: 'GET',
+        params, signal
+    },
+      );
+    }
+
+
+
+
+export const getBookingPaymentUnresolvedRefundsQueryKey = (params?: BookingPaymentUnresolvedRefundsParams,) => {
+    return [
+    `/api/v1/health-tourism/booking-payments/refunds/unresolved`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getBookingPaymentUnresolvedRefundsQueryOptions = <TData = Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError = ErrorType<unknown>>(params?: BookingPaymentUnresolvedRefundsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getBookingPaymentUnresolvedRefundsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>> = ({ signal }) => bookingPaymentUnresolvedRefunds(params, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type BookingPaymentUnresolvedRefundsQueryResult = NonNullable<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>>
+export type BookingPaymentUnresolvedRefundsQueryError = ErrorType<unknown>
+
+
+export function useBookingPaymentUnresolvedRefunds<TData = Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError = ErrorType<unknown>>(
+ params: undefined |  BookingPaymentUnresolvedRefundsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>,
+          TError,
+          Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBookingPaymentUnresolvedRefunds<TData = Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError = ErrorType<unknown>>(
+ params?: BookingPaymentUnresolvedRefundsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>,
+          TError,
+          Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useBookingPaymentUnresolvedRefunds<TData = Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError = ErrorType<unknown>>(
+ params?: BookingPaymentUnresolvedRefundsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Kapanmamış iadeler: doğrulanmamış, reddedilmiş ve takılmış (operatörün paneldeki listesi).
+ */
+
+export function useBookingPaymentUnresolvedRefunds<TData = Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError = ErrorType<unknown>>(
+ params?: BookingPaymentUnresolvedRefundsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof bookingPaymentUnresolvedRefunds>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getBookingPaymentUnresolvedRefundsQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

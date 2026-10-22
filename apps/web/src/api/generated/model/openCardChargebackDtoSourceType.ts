@@ -12,4 +12,5 @@ export type OpenCardChargebackDtoSourceType = typeof OpenCardChargebackDtoSource
 export const OpenCardChargebackDtoSourceType = {
   POS_TRANSACTION: 'POS_TRANSACTION',
   ONLINE_PAYMENT: 'ONLINE_PAYMENT',
+  BOOKING_PAYMENT: 'BOOKING_PAYMENT',
 } as const;

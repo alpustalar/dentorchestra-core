@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-require-imports */
 import {
   allowAllPolicyFactory,
   createFinanceDbHarness,
@@ -33,7 +34,15 @@ import {
   ChargebackSourceNotChargeableException,
   CollectionUnderChargebackException,
 } from '@modules/finance/bank/domain/exceptions/bank.exceptions';
-import { CompletedInstallmentNotFoundException } from '@modules/finance/payment/domain/exceptions/payment.exceptions';
+import {
+  CompletedInstallmentNotFoundException,
+  InstallmentReversalInFlightException,
+} from '@modules/finance/payment/domain/exceptions/payment.exceptions';
+import { BeginInstallmentReversalCommand } from '@modules/finance/payment/application/commands/begin-installment-reversal/begin-installment-reversal.command';
+import { BeginInstallmentReversalHandler } from '@modules/finance/payment/application/commands/begin-installment-reversal/begin-installment-reversal.handler';
+import { ReleaseInstallmentReversalCommand } from '@modules/finance/payment/application/commands/release-installment-reversal/release-installment-reversal.command';
+import { ReleaseInstallmentReversalHandler } from '@modules/finance/payment/application/commands/release-installment-reversal/release-installment-reversal.handler';
+import { IyzicoReversalFinalizer } from '@modules/finance/pos/virtual/application/services/iyzico-reversal-finalizer.service';
 import { RefundPaymentHandler } from './refund-payment.handler';
 import { RefundPaymentCommand } from './refund-payment.command';
 
@@ -73,10 +82,20 @@ describe('Sanal POS iadesi — gerçek DB', () => {
         harness.txManager
       )
     );
+    bus.register(
+      BeginInstallmentReversalCommand,
+      new BeginInstallmentReversalHandler(paymentRepo, harness.txManager)
+    );
+    bus.register(
+      ReleaseInstallmentReversalCommand,
+      new ReleaseInstallmentReversalHandler(paymentRepo, harness.txManager)
+    );
     const commandBus = {
       execute: (cmd: unknown) =>
         cmd instanceof EnsurePartyForPatientCommand ||
-        cmd instanceof MarkInstallmentAsRefundedCommand
+        cmd instanceof MarkInstallmentAsRefundedCommand ||
+        cmd instanceof BeginInstallmentReversalCommand ||
+        cmd instanceof ReleaseInstallmentReversalCommand
           ? bus.execute(cmd)
           : harness.commandBus.execute(cmd),
     } as never;
@@ -85,12 +104,16 @@ describe('Sanal POS iadesi — gerçek DB', () => {
       execute: async (query: unknown) => {
         if (query instanceof GetPaymentWithInstallmentsQuery) {
           return {
-            data: await paymentQueryRepo.findPaymentWithInstallments(query.paymentId),
+            data: await paymentQueryRepo.findPaymentWithInstallments(
+              query.paymentId
+            ),
           };
         }
         if (query instanceof GetInstallmentForLedgerQuery) {
           return {
-            data: await paymentQueryRepo.findInstallmentForLedger(query.installmentId),
+            data: await paymentQueryRepo.findInstallmentForLedger(
+              query.installmentId
+            ),
           };
         }
         throw new Error('Harness bu sorguyu bilmiyor');
@@ -104,6 +127,11 @@ describe('Sanal POS iadesi — gerçek DB', () => {
       new IyzicoTransactionCommandRepository(prisma),
       harness.txManager,
       commandBus,
+      new IyzicoReversalFinalizer(
+        new IyzicoTransactionCommandRepository(prisma),
+        harness.txManager,
+        commandBus
+      ),
       queryBus,
       allowAllPolicyFactory,
       new CardChargebackExposureGuard(chargebackRepo)
@@ -139,7 +167,9 @@ describe('Sanal POS iadesi — gerçek DB', () => {
   const collect = (amount: string) =>
     seedCollectedInstallment(harness, { ledger, patientId, amount });
   const refund = (paymentId: string) =>
-    refundHandler.execute(new RefundPaymentCommand(paymentId, '127.0.0.1', ctx));
+    refundHandler.execute(
+      new RefundPaymentCommand(paymentId, '127.0.0.1', ctx)
+    );
   const chargeback = (installmentId: string, amount: number) =>
     openChargeback.execute(
       new OpenCardChargebackCommand(
@@ -165,9 +195,10 @@ describe('Sanal POS iadesi — gerçek DB', () => {
 
     await refund(paymentId);
 
-    const installment = await harness.prisma.paymentInstallment.findUniqueOrThrow({
-      where: { id: installmentId },
-    });
+    const installment =
+      await harness.prisma.paymentInstallment.findUniqueOrThrow({
+        where: { id: installmentId },
+      });
     expect(installment.status).toBe('REFUNDED');
     const tx = await harness.prisma.iyzicoTransaction.findUniqueOrThrow({
       where: { installmentId },
@@ -177,7 +208,9 @@ describe('Sanal POS iadesi — gerçek DB', () => {
     const event = await harness.prisma.financialEvent.findFirstOrThrow({
       where: { type: 'PAYMENT_REFUNDED', sourceRefId: paymentId },
     });
-    await harness.postHandler.execute(new PostFinancialEventCommand(event.id, ctx));
+    await harness.postHandler.execute(
+      new PostFinancialEventCommand(event.id, ctx)
+    );
     expect(await balance('108')).toBe(before108 - 400);
     expect(provider.refund).toHaveBeenCalledTimes(1);
   });
@@ -191,9 +224,10 @@ describe('Sanal POS iadesi — gerçek DB', () => {
 
     await expect(refund(paymentId)).rejects.toThrow();
 
-    const installment = await harness.prisma.paymentInstallment.findUniqueOrThrow({
-      where: { id: installmentId },
-    });
+    const installment =
+      await harness.prisma.paymentInstallment.findUniqueOrThrow({
+        where: { id: installmentId },
+      });
     expect(installment.status).toBe('COMPLETED');
     expect(
       await harness.prisma.financialEvent.count({
@@ -232,11 +266,16 @@ describe('Sanal POS iadesi — gerçek DB', () => {
     );
   });
 
-  // BİLİNEN AÇIK (§88 ertelemesi, §96): iade yolu SDK çağrısından önce taksidi
-  // kilitlemiyor/işaretlemiyor. SDK uçuştayken açılan itiraz yakalanmaz ve para kart
-  // sahibine iki kez gider (bir kez sağlayıcı kesintisi, bir kez iade). `it.failing`:
-  // açık kapatıldığında bu test "beklenmedik geçti" diye kırılır ve normale çevrilir.
-  it.failing('SDK uçuştayken açılan itiraz iadeyi engellemeli: biri reddedilmeli', async () => {
+  const marker = async (installmentId: string) =>
+    (
+      await harness.prisma.paymentInstallment.findUniqueOrThrow({
+        where: { id: installmentId },
+      })
+    ).reversalRequestedAt;
+
+  // §96 #1 (§97'de kapandı): iade SDK çağrısından önce taksidi damgalar; uçuştayken açılmaya
+  // çalışılan itiraz damgayı görür ve reddedilir. Para kart sahibine iki kez gidemez.
+  it('SDK uçuştayken açılan itiraz reddedilir, iade tamamlanır (kural 17/18d)', async () => {
     const { paymentId, installmentId } = await collect('260.00');
     provider.refund.mockImplementation(
       () =>
@@ -252,6 +291,120 @@ describe('Sanal POS iadesi — gerçek DB', () => {
       ),
     ]);
 
+    expect(settled[0].status).toBe('fulfilled');
+    expect(settled[1].status).toBe('rejected');
+    expect((settled[1] as PromiseRejectedResult).reason).toBeInstanceOf(
+      InstallmentReversalInFlightException
+    );
+    expect(
+      await harness.prisma.cardChargeback.count({
+        where: { sourceId: installmentId },
+      })
+    ).toBe(0);
+  });
+
+  it('itiraz tavan kapısını geçemeyen iade damgayı BIRAKMAZ (geri sarılır)', async () => {
+    const { paymentId, installmentId } = await collect('120.00');
+    await chargeback(installmentId, 120);
+
+    await expect(refund(paymentId)).rejects.toBeInstanceOf(
+      CollectionUnderChargebackException
+    );
+    expect(await marker(installmentId)).toBeNull();
+  });
+
+  it('sağlayıcı iadeyi AÇIKÇA reddederse damga kalkar ve itiraz açılabilir', async () => {
+    const { paymentId, installmentId } = await collect('140.00');
+    provider.refund.mockResolvedValue({
+      status: 'failure',
+      errorMessage: 'refund rejected',
+    });
+
+    await expect(refund(paymentId)).rejects.toThrow();
+    expect(await marker(installmentId)).toBeNull();
+
+    await expect(chargeback(installmentId, 140)).resolves.toBeDefined();
+  });
+
+  it('SDK FIRLATIRSA (sonuç bilinmiyor) damga kalır: itiraz reddedilir, süre dolmadan yeniden deneme sağlayıcıya gitmez', async () => {
+    const { paymentId, installmentId } = await collect('170.00');
+    provider.refund.mockRejectedValue(new Error('socket hang up'));
+
+    await expect(refund(paymentId)).rejects.toThrow('socket hang up');
+    expect(await marker(installmentId)).not.toBeNull();
+
+    await expect(chargeback(installmentId, 170)).rejects.toBeInstanceOf(
+      InstallmentReversalInFlightException
+    );
+
+    provider.refund.mockClear();
+    await expect(refund(paymentId)).rejects.toBeInstanceOf(
+      InstallmentReversalInFlightException
+    );
+    expect(provider.refund).not.toHaveBeenCalled();
+  });
+
+  it('damga bayatladıktan sonra aynı iade yeniden denenebilir', async () => {
+    const { paymentId, installmentId } = await collect('180.00');
+    provider.refund.mockRejectedValueOnce(new Error('timeout'));
+    await expect(refund(paymentId)).rejects.toThrow('timeout');
+
+    await harness.prisma.paymentInstallment.update({
+      where: { id: installmentId },
+      data: { reversalRequestedAt: new Date(Date.now() - 11 * 60 * 1000) },
+    });
+
+    await expect(refund(paymentId)).resolves.not.toThrow();
+    const installment =
+      await harness.prisma.paymentInstallment.findUniqueOrThrow({
+        where: { id: installmentId },
+      });
+    expect(installment.status).toBe('REFUNDED');
+  });
+
+  it('sonucu bilinmeyen girişim, bayatlayınca değişmez taramasında görünür', async () => {
+    const { CHECKS } =
+      require('../../../../../../../../../scripts/finance-invariants.cjs') as {
+        CHECKS: { key: string; sql: string }[];
+      };
+    const scan = CHECKS.find(
+      (c) => c.key === 'sanal-pos-iade-sonucu-bilinmiyor'
+    );
+    if (!scan) throw new Error('tarama tanımlı değil');
+    const found = async (installmentId: string) =>
+      (
+        await harness.prisma.$queryRawUnsafe<{ installment_id: string }[]>(
+          scan.sql
+        )
+      ).some((r) => r.installment_id === installmentId);
+
+    const { paymentId, installmentId } = await collect('77.00');
+    provider.refund.mockRejectedValueOnce(new Error('timeout'));
+    await expect(refund(paymentId)).rejects.toThrow('timeout');
+
+    expect(await found(installmentId)).toBe(false); // taze damga: henüz bekleme süresi içinde
+    await harness.prisma.paymentInstallment.update({
+      where: { id: installmentId },
+      data: { reversalRequestedAt: new Date(Date.now() - 11 * 60 * 1000) },
+    });
+    expect(await found(installmentId)).toBe(true);
+  });
+
+  it('eşzamanlı iki iade: yalnız biri sağlayıcıya gider', async () => {
+    const { paymentId } = await collect('95.00');
+    provider.refund.mockImplementation(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(() => resolve({ status: 'success' }), 150)
+        )
+    );
+
+    const settled = await Promise.allSettled([
+      refund(paymentId),
+      refund(paymentId),
+    ]);
+
     expect(settled.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect(provider.refund).toHaveBeenCalledTimes(1);
   });
 });

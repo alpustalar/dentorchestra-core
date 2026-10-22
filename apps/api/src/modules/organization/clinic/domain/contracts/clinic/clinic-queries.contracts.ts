@@ -12,6 +12,32 @@ export interface ClinicManagerSummary {
   email: string;
 }
 
+/**
+ * Yetkili klinik dizini satırı (organizasyon-bazlı klinik seçici, grafik
+ * serisi etiketleri). `isPlatform` klinikleri çağıran tarafından zaten
+ * elenmiştir — bu read-model platformun kendi defter-sahibi şubesini hiç
+ * taşımaz.
+ */
+export interface ClinicDirectoryItem {
+  id: string;
+  organizationId: string;
+  name: string;
+  slug: string;
+  timezone: string;
+  status: GlobalStatus;
+}
+
+/** Dış e-belge sağlayıcısına taşınabilecek klinik iletişim kimliği. */
+export interface ClinicEDocumentProfile {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  city: string | null;
+  district: string | null;
+}
+
 /** Klinik detay okuma-modeli — organizasyon + yönetici listesi + Prisma sayaçları. */
 export interface ClinicDetails {
   id: string;

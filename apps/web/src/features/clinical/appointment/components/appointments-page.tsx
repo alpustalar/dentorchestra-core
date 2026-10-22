@@ -1,5 +1,7 @@
 'use client';
 
+import { SelectInput } from '@/components/ui/select-input';
+
 import * as React from 'react';
 import { useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -16,23 +18,23 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import ManagedSheet from '@/components/ui/managed-sheet';
-import { WaitingRoom } from './workspace/_components/waiting-room';
-import { ScheduleGrid } from './workspace/_components/schedule-grid';
+import { WaitingRoom } from '@/features/clinical/appointment/components/workspace/_components/waiting-room';
+import { ScheduleGrid } from '@/features/clinical/appointment/components/workspace/_components/schedule-grid';
 import {
   CALENDAR_TIMELINE,
   type CalendarDay,
   type CalendarSelection,
-} from './workspace/_components/calendar-selection';
-import { AppointmentList } from './workspace/_components/appointment-list';
-import { AppointmentDetails } from './workspace/_components/appointment-details';
+} from '@/features/clinical/appointment/components/workspace/_components/calendar-selection';
+import { AppointmentList } from '@/features/clinical/appointment/components/workspace/_components/appointment-list';
+import { AppointmentDetails } from '@/features/clinical/appointment/components/workspace/_components/appointment-details';
 import { AppointmentStatusSchema } from '@shared/generated-zod';
 import {
-  canResizeCalendarAppointment,
   type CalendarAppointment,
+  canResizeCalendarAppointment,
 } from '../calendar-appointment.types';
 import {
-  useCalendarAppointments,
   useCalendarAppointmentResize,
+  useCalendarAppointments,
 } from '../api/use-calendar-appointments';
 import { useAuth } from '@/data/auth/auth-context';
 import { ApiError } from '@/lib/api';
@@ -41,11 +43,15 @@ import { clinics } from '@/features/organization/clinic/data/mock-clinic';
 import { DateTimeManager } from '@shared/common';
 import { AppointmentSettingsSheet } from '@/features/clinical/appointment/components/appointment-settings-sheet';
 import { useClinicAppointmentSettings } from '../api/use-clinic-appointment-settings';
+import { DataLoadingBoundary, OfflineDataState } from '@/components/loading';
+import {
+  AppointmentDataSkeleton,
+  type AppointmentCalendarRange,
+  type AppointmentDataView,
+} from './appointment-skeletons';
 
 const dayNames = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum'];
 
-type View = 'calendar' | 'list' | 'waiting';
-type Range = 'day' | 'week';
 type Draft = {
   date: string;
   time: string;
@@ -57,9 +63,13 @@ const AppointmentsPage = () => {
   const calendarText = useTranslations('AppointmentCalendar');
   const router = useRouter();
   const { claims } = useAuth();
-  const params = useParams<{ locale: string; 'clinic-slug': string }>();
-  const [view, setView] = useState<View>('calendar');
-  const [range, setRange] = useState<Range>('day');
+  const params = useParams<{
+    locale: string;
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
+  const [view, setView] = useState<AppointmentDataView>('calendar');
+  const [range, setRange] = useState<AppointmentCalendarRange>('day');
   const [provider, setProvider] = useState('');
   const [clinic, setClinic] = useState('');
   const [resizeEnabled, setResizeEnabled] = useState(false);
@@ -272,7 +282,7 @@ const AppointmentsPage = () => {
               <span className="ml-1 text-sm font-medium">{dateLabel}</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <select
+              <SelectInput
                 value={provider}
                 onChange={(event) => setProvider(event.target.value)}
                 className="h-9 rounded-md border bg-background px-3 text-sm"
@@ -285,8 +295,8 @@ const AppointmentsPage = () => {
                     value={p.id}
                   >{`${p.providerTitleId} ${p.userId}`}</option>
                 ))}
-              </select>
-              <select
+              </SelectInput>
+              <SelectInput
                 value={clinic}
                 onChange={(event) => setClinic(event.target.value)}
                 className="h-9 rounded-md border bg-background px-3 text-sm"
@@ -298,7 +308,7 @@ const AppointmentsPage = () => {
                     {item.name}
                   </option>
                 ))}
-              </select>
+              </SelectInput>
               <div className="relative">
                 <Search
                   aria-hidden="true"
@@ -358,47 +368,55 @@ const AppointmentsPage = () => {
             </Button>
           </div>
 
-          {view === 'calendar' ? (
-            <ScheduleGrid
-              key={gridDays.map((day) => day.date).join(',')}
-              days={gridDays}
-              items={visible}
-              onRangeConfirm={(selection) =>
-                openCreate(
-                  DateTimeManager.minutesToHHMM(selection.startMinute),
-                  selection.date,
-                  selection.endMinute - selection.startMinute
-                )
-              }
-              onAppointmentClick={setSelected}
-              allowOverbooking={
-                appointmentSettings.data?.data.staffAllowOverbooking ?? false
-              }
-              resizeEnabled={resizeEnabled}
-              onResizeEnabledChange={setResizeEnabled}
-              slotDurationMinutes={calendarSlotDurationMinutes}
-              onSlotDurationMinutesChange={setCalendarSlotDurationMinutes}
-              canResizeAppointments={canResizeAppointments}
-              isSaving={resizeAppointment.isPending}
-              isRefreshing={calendarQuery.isFetching}
-              feedback={feedback}
-              onRefresh={() => {
-                if (saveLock.current) return;
-                resizeAppointment.reset();
-                void calendarQuery.refetch();
-              }}
-              onAppointmentResize={handleAppointmentResize}
-            />
-          ) : view === 'list' ? (
-            <AppointmentList items={visible} onSelect={setSelected} />
-          ) : (
-            <WaitingRoom
-              items={visible.filter(
-                (item) => item.status === AppointmentStatusSchema.enum.ARRIVED
-              )}
-              onSelect={setSelected}
-            />
-          )}
+          <DataLoadingBoundary
+            isLoading={calendarQuery.isLoading}
+            label={calendarText('loading')}
+            fallback={<AppointmentDataSkeleton view={view} range={range} />}
+            hasData={Boolean(calendarQuery.data)}
+            offlineFallback={<OfflineDataState />}
+          >
+            {view === 'calendar' ? (
+              <ScheduleGrid
+                key={gridDays.map((day) => day.date).join(',')}
+                days={gridDays}
+                items={visible}
+                onRangeConfirm={(selection) =>
+                  openCreate(
+                    DateTimeManager.minutesToHHMM(selection.startMinute),
+                    selection.date,
+                    selection.endMinute - selection.startMinute
+                  )
+                }
+                onAppointmentClick={setSelected}
+                allowOverbooking={
+                  appointmentSettings.data?.data.staffAllowOverbooking ?? false
+                }
+                resizeEnabled={resizeEnabled}
+                onResizeEnabledChange={setResizeEnabled}
+                slotDurationMinutes={calendarSlotDurationMinutes}
+                onSlotDurationMinutesChange={setCalendarSlotDurationMinutes}
+                canResizeAppointments={canResizeAppointments}
+                isSaving={resizeAppointment.isPending}
+                isRefreshing={calendarQuery.isFetching}
+                feedback={feedback}
+                onRefresh={() => {
+                  if (saveLock.current) return;
+                  resizeAppointment.reset();
+                  void calendarQuery.refetch();
+                }}
+                onAppointmentResize={handleAppointmentResize}
+              />
+            ) : view === 'list' ? (
+              <AppointmentList items={visible} onSelect={setSelected} />
+            ) : (
+              <WaitingRoom
+                items={visible.filter(
+                  (item) => item.status === AppointmentStatusSchema.enum.ARRIVED
+                )}
+                onSelect={setSelected}
+              />
+            )}
+          </DataLoadingBoundary>
 
           <ManagedSheet
             open={Boolean(selected || draft)}
@@ -527,7 +545,7 @@ const AppointmentsPage = () => {
               className="w-full"
               onClick={() =>
                 router.push(
-                  `/${params.locale}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
+                  `/${params.locale}/${params['organization-slug']}/${params['clinic-slug']}/crm/patient/${selectedRow[0] === 'Elif Yıldız' ? 'elif-yildiz' : 'james-miller'}`
                 )
               }
             >

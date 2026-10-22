@@ -230,6 +230,7 @@ export class Payment extends AggregateRoot {
           // Plan ilk açıldığında hiçbir taksit bir telafi değildir; telafi
           // taksidi yalnız `chargeBackInstallment` ile doğar.
           recoversInstallmentId: null,
+          reversalRequestedAt: null,
           createdAt: now,
           updatedAt: now,
         };
@@ -439,6 +440,7 @@ export class Payment extends AggregateRoot {
       paidAt: null,
       note: `Ters ibraz telafisi — vaka ${props.caseReference}`,
       recoversInstallmentId: installment.id,
+      reversalRequestedAt: null,
       createdAt: now,
       updatedAt: now,
     };

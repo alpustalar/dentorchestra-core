@@ -1,4 +1,6 @@
 import { QueryResponse } from '@shared/common/response/response.interface';
-import { Clinic } from '@shared';
+import { ClinicDirectoryItem } from '@modules/organization/clinic/domain/contracts/clinic';
 
-export type FindManyByOrganizationIdQueryResponse = QueryResponse<Clinic[]>;
+export type FindManyByOrganizationIdQueryResponse = QueryResponse<
+  ClinicDirectoryItem[]
+>;

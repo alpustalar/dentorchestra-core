@@ -95,6 +95,7 @@ export class CancelInvoiceHandler implements ICommandHandler<
       return needsIntegratorCancel
         ? {
             invoiceId: invoice.id.value,
+            documentType: invoice.documentType!,
             uuid: invoice.einvoiceUuid.value,
             clinicId: invoice.clinicId.value,
           }
@@ -107,6 +108,7 @@ export class CancelInvoiceHandler implements ICommandHandler<
       await this.commandBus.execute(
         new QueueEDocumentCancelCommand({
           invoiceId: integratorCancel.invoiceId,
+          documentType: integratorCancel.documentType,
           uuid: integratorCancel.uuid,
           reason: data.reason,
           clinicId: integratorCancel.clinicId,

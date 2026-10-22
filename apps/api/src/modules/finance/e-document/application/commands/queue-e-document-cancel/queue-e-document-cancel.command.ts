@@ -10,6 +10,7 @@ export class QueueEDocumentCancelCommand {
   constructor(
     public readonly payload: {
       readonly invoiceId: string;
+      readonly documentType: EDocumentType;
       /** Entegratördeki belge referansı (ETTN/UUID). */
       readonly uuid: string;
       readonly reason: string;
@@ -17,3 +18,4 @@ export class QueueEDocumentCancelCommand {
     }
   ) {}
 }
+import type { EDocumentTypeType as EDocumentType } from '@input-type-schemas/EDocumentTypeSchema';

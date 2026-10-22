@@ -36,11 +36,22 @@ export class GetPosTransactionByIdHandler implements IQueryHandler<
     // Sorgu bus üzerinden her modülden çağrılabiliyor: kapsam kontrolü burada da
     // yapılır ki tek bir çağıranın unutması başka bir kliniğin hasta/plan
     // kimliklerini sızdırmasın (RecordFinancialEvent ile aynı gerekçe).
-    this.policyFactory
-      .finance(ctx.actor, ctx.source)
-      .evaluator.check((p) => p.canAccessClinicFinances(summary.clinicId))
+    const { evaluator, policy } = this.policyFactory.finance(
+      ctx.actor,
+      ctx.source
+    );
+
+    evaluator
+      .check((p) => p.canAccessClinicFinances(summary.clinicId))
       .orThrow('pos.transaction.get');
 
-    return { data: summary };
+    return {
+      data: summary,
+      meta: {
+        serializationOptions: policy.getSerializationOptions({
+          clinicId: summary.clinicId,
+        }),
+      },
+    };
   }
 }

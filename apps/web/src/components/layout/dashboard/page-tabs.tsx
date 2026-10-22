@@ -8,10 +8,12 @@ import {
   useSelectedLayoutSegments,
 } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
-import { ChevronDown, RefreshCw, X } from 'lucide-react';
+import { Check, ChevronDown, RefreshCw, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { navGroups } from '@/constants/navigation/sidebar-nav';
 import { clinics } from '@/features/organization/clinic/data/mock-clinic';
+import { organizations } from '@/features/organization/organization/data/mock-organization';
 import { cn } from '@/lib/utils';
 
 type PageTab = {
@@ -21,22 +23,14 @@ type PageTab = {
 
 const STORAGE_KEY = 'dashboard-page-tabs';
 const SUPPORTED_LOCALES = new Set(['tr', 'en']);
-const CLINIC_SLUGS = new Set([
-  ...clinics.map((clinic) => clinic.slug),
-  'all-clinics',
-]);
+const ORGANIZATION_SLUGS = new Set(
+  organizations.map((organization) => organization.slug)
+);
+const CLINIC_SLUGS = new Set(clinics.map((clinic) => clinic.slug));
 
-function getTabLabel(
-  pathname: string,
-  translate: (key: string) => string,
-  clinicSlug: string
-) {
+function getTabLabel(pathname: string, translate: (key: string) => string) {
   const normalizedHref = normalizeHref(pathname);
-  const segments = normalizedHref.split('/').filter(Boolean);
-  const href =
-    segments.length > 0 && CLINIC_SLUGS.has(segments[0])
-      ? `/${segments.slice(1).join('/')}` || '/'
-      : normalizedHref;
+  const href = normalizedHref;
   const navRoutes = navGroups.flatMap((group) =>
     group.items.flatMap((item) => [
       { href: `/${item.href}`, translationKey: item.translationKey },
@@ -68,7 +62,10 @@ function getTabLabel(
   ]
     .filter((route) => route.href !== '/')
     .sort((left, right) => right.href.length - left.href.length)
-    .find(({ href: routeHref }) => href === routeHref || href.startsWith(`${routeHref}/`));
+    .find(
+      ({ href: routeHref }) =>
+        href === routeHref || href.startsWith(`${routeHref}/`)
+    );
 
   if (page) return translate(page.translationKey);
   if (href === '/') return translate('Navigation.items.overview');
@@ -86,15 +83,17 @@ function readStoredTabs(): PageTab[] {
 
     if (!Array.isArray(tabs)) return [];
 
-    return tabs.filter(
-      (tab): tab is PageTab =>
-        typeof tab === 'object' &&
-        tab !== null &&
-        'href' in tab &&
-        typeof tab.href === 'string' &&
-        'label' in tab &&
-        typeof tab.label === 'string'
-    ).map((tab) => ({ ...tab, href: normalizeHref(tab.href) }));
+    return tabs
+      .filter(
+        (tab): tab is PageTab =>
+          typeof tab === 'object' &&
+          tab !== null &&
+          'href' in tab &&
+          typeof tab.href === 'string' &&
+          'label' in tab &&
+          typeof tab.label === 'string'
+      )
+      .map((tab) => ({ ...tab, href: normalizeHref(tab.href) }));
   } catch {
     return [];
   }
@@ -103,99 +102,240 @@ function readStoredTabs(): PageTab[] {
 function normalizeHref(href: string) {
   const segments = href.split('/').filter(Boolean);
   if (segments.length > 0 && SUPPORTED_LOCALES.has(segments[0])) {
-    return `/${segments.slice(1).join('/')}` || '/';
+    segments.shift();
   }
-  return href || '/';
+  if (segments.length > 0 && ORGANIZATION_SLUGS.has(segments[0])) {
+    segments.shift();
+  }
+  if (segments.length > 0 && CLINIC_SLUGS.has(segments[0])) {
+    segments.shift();
+  }
+  return `/${segments.join('/')}` || '/';
 }
 
-function localizedHref(href: string, locale: string, clinicSlug: string) {
-  if (href === '/') return `/${locale}/${clinicSlug}`;
+function getSelectedPageHref(segments: string[]) {
+  const pageSegments = segments.filter(
+    (segment) => !(segment.startsWith('(') && segment.endsWith(')'))
+  );
+
+  return normalizeHref(`/${pageSegments.join('/')}`);
+}
+
+function localizedHref(
+  href: string,
+  locale: string,
+  organizationSlug: string,
+  clinicSlug: string
+) {
+  const clinicPath = `/${locale}/${organizationSlug}/${clinicSlug}`;
+  if (href === '/') return clinicPath;
 
   const path = href.startsWith('/') ? href : `/${href}`;
-  const firstSegment = path.split('/').filter(Boolean)[0];
-  return firstSegment && CLINIC_SLUGS.has(firstSegment)
-    ? `/${locale}${path}`
-    : `/${locale}/${clinicSlug}${path}`;
+  return `${clinicPath}${path}`;
 }
 
 export function PageTabs() {
   const pathname = usePathname();
   const router = useRouter();
   const locale = useLocale();
-  const params = useParams<{ 'clinic-slug': string }>();
+  const params = useParams<{
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
+  const organizationSlug = params['organization-slug'] ?? 'as-yazilim';
   const clinicSlug = params['clinic-slug'] ?? 'fethiye';
   const translate = useTranslations();
-  
+  const queryClient = useQueryClient();
+
   // Next.js segment hook'u (URL kırılımlarını dizi olarak verir)
   const segments = useSelectedLayoutSegments();
+  const pageHref = getSelectedPageHref(segments);
 
   const [tabs, setTabs] = React.useState<PageTab[]>([]);
   const [initialized, setInitialized] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [refreshingHref, setRefreshingHref] = React.useState<string | null>(
+    null
+  );
+  const [refreshedHref, setRefreshedHref] = React.useState<string | null>(null);
+  const [closeShortcut, setCloseShortcut] = React.useState('Alt W');
   const skipNextPathRef = React.useRef(false);
+  const pendingRefreshRef = React.useRef<string | null>(null);
+  const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const refreshedTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
 
   React.useEffect(() => {
     setTabs(readStoredTabs());
+    setCloseShortcut(
+      /Mac|iPhone|iPad|iPod/.test(navigator.userAgent) ? '⌥ W' : 'Alt W'
+    );
     setInitialized(true);
   }, []);
+
+  React.useEffect(
+    () => () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      if (refreshedTimerRef.current) clearTimeout(refreshedTimerRef.current);
+    },
+    []
+  );
 
   React.useEffect(() => {
     if (!initialized) return;
 
-    const href = normalizeHref(pathname);
+    const href = pageHref;
+    const routeHref = normalizeHref(pathname);
     if (skipNextPathRef.current) {
       skipNextPathRef.current = false;
       return;
     }
 
     setTabs((currentTabs) => {
-      const existingTab = currentTabs.find((tab) => tab.href === href);
-      const translatedTabs = currentTabs.map((tab) => ({
+      const pageTabs =
+        routeHref === href
+          ? currentTabs
+          : currentTabs.filter((tab) => tab.href !== routeHref);
+      const existingTab = pageTabs.find((tab) => tab.href === href);
+      const translatedTabs = pageTabs.map((tab) => ({
         ...tab,
-        label: getTabLabel(tab.href, translate, clinicSlug),
+        label: getTabLabel(tab.href, translate),
       }));
       const nextTabs = existingTab
         ? translatedTabs
-        : [
-            ...translatedTabs,
-            { href, label: getTabLabel(href, translate, clinicSlug) },
-          ];
+        : [...translatedTabs, { href, label: getTabLabel(href, translate) }];
 
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextTabs));
       return nextTabs;
     });
-  }, [clinicSlug, initialized, pathname, translate, segments]);
+  }, [initialized, pageHref, pathname, translate]);
 
-  const closeTab = (href: string) => {
-    const index = tabs.findIndex((tab) => tab.href === href);
-    const nextTabs = tabs.filter((tab) => tab.href !== href);
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextTabs));
-    setTabs(nextTabs);
+  const closeTab = React.useCallback(
+    (href: string) => {
+      const index = tabs.findIndex((tab) => tab.href === href);
+      const nextTabs = tabs.filter((tab) => tab.href !== href);
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(nextTabs));
+      setTabs(nextTabs);
 
-    if (normalizeHref(pathname) === href) {
-      const nextTab = nextTabs[Math.max(0, index - 1)] ?? nextTabs[0];
-      if (nextTab) {
-        router.push(localizedHref(nextTab.href, locale, clinicSlug));
-      } else {
-        router.push(localizedHref('/', locale, clinicSlug));
+      if (pageHref === href) {
+        const nextTab = nextTabs[Math.max(0, index - 1)] ?? nextTabs[0];
+        if (nextTab) {
+          router.push(
+            localizedHref(nextTab.href, locale, organizationSlug, clinicSlug)
+          );
+        } else {
+          router.push(localizedHref('/', locale, organizationSlug, clinicSlug));
+        }
       }
-    }
-  };
+    },
+    [clinicSlug, locale, organizationSlug, pageHref, router, tabs]
+  );
+
+  React.useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      const isEditing =
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT');
+
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        !event.repeat &&
+        event.code === 'KeyW' &&
+        !isEditing
+      ) {
+        event.preventDefault();
+        const activeHref = pageHref;
+        if (tabs.some((tab) => tab.href === activeHref)) closeTab(activeHref);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [closeTab, pageHref, tabs]);
 
   const closeAllTabs = () => {
     skipNextPathRef.current = true;
     sessionStorage.removeItem(STORAGE_KEY);
     setTabs([]);
     setMenuOpen(false);
-    router.push(localizedHref('/', locale, clinicSlug));
+    router.push(localizedHref('/', locale, organizationSlug, clinicSlug));
   };
+
+  const finishRefreshAnimation = React.useCallback((href: string) => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    if (refreshedTimerRef.current) clearTimeout(refreshedTimerRef.current);
+
+    refreshTimerRef.current = setTimeout(() => {
+      setRefreshingHref(null);
+      setRefreshedHref(href);
+      refreshedTimerRef.current = setTimeout(() => {
+        setRefreshedHref(null);
+      }, 1000);
+    }, 600);
+  }, []);
+
+  const refreshTab = React.useCallback(
+    async (href: string) => {
+      setMenuOpen(false);
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      if (refreshedTimerRef.current) clearTimeout(refreshedTimerRef.current);
+      setRefreshedHref(null);
+      setRefreshingHref(href);
+      const isActive = pageHref === href;
+      await queryClient.invalidateQueries({
+        refetchType: isActive ? 'active' : 'none',
+      });
+
+      if (isActive) {
+        router.refresh();
+        finishRefreshAnimation(href);
+        return;
+      }
+
+      pendingRefreshRef.current = href;
+      router.push(localizedHref(href, locale, organizationSlug, clinicSlug));
+    },
+    [
+      clinicSlug,
+      finishRefreshAnimation,
+      locale,
+      organizationSlug,
+      pageHref,
+      queryClient,
+      router,
+    ]
+  );
+
+  React.useEffect(() => {
+    const href = pageHref;
+    if (pendingRefreshRef.current !== href) return;
+
+    pendingRefreshRef.current = null;
+    router.refresh();
+    finishRefreshAnimation(href);
+  }, [finishRefreshAnimation, pageHref, router]);
 
   const refreshCurrentTab = () => {
     setMenuOpen(false);
-    router.refresh();
+    void refreshTab(pageHref);
   };
 
   if (!initialized || tabs.length === 0) return null;
+
+  const activeHref = pageHref;
+  const activeTabLabel =
+    tabs.find((tab) => tab.href === activeHref)?.label ??
+    getTabLabel(activeHref, translate);
 
   return (
     <nav
@@ -204,13 +344,13 @@ export function PageTabs() {
     >
       <div className="flex min-w-0 flex-1 items-end gap-1 overflow-x-auto px-3 md:px-5">
         {tabs.map((tab) => {
-          const isActive = tab.href === normalizeHref(pathname);
+          const isActive = tab.href === activeHref;
 
           return (
             <div
               key={tab.href}
               className={cn(
-                'group flex h-9 max-w-56 min-w-32 items-center gap-2 rounded-t-md border border-b-0 px-3 text-sm transition-colors',
+                'group relative flex h-9 max-w-56 min-w-32 items-center rounded-t-md border border-b-0 pl-3 pr-14 text-sm transition-colors',
                 isActive
                   ? 'border-border bg-muted/40 text-foreground'
                   : 'border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -219,7 +359,14 @@ export function PageTabs() {
               <button
                 type="button"
                 onClick={() =>
-                  router.push(localizedHref(tab.href, locale, clinicSlug))
+                  router.push(
+                    localizedHref(
+                      tab.href,
+                      locale,
+                      organizationSlug,
+                      clinicSlug
+                    )
+                  )
                 }
                 className="min-w-0 flex-1 truncate text-left"
                 aria-current={isActive ? 'page' : undefined}
@@ -229,18 +376,43 @@ export function PageTabs() {
               </button>
               <button
                 type="button"
-                onClick={() => closeTab(tab.href)}
-                aria-label={translate('Navigation.closePage', { page: tab.label })}
-                className="flex size-5 shrink-0 items-center justify-center rounded hover:bg-muted"
+                onClick={() => void refreshTab(tab.href)}
+                aria-label={`${translate('Navigation.refreshTab')}: ${tab.label}`}
+                className="absolute right-6 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
               >
-                <X className="size-3.5" />
+                {refreshedHref === tab.href ? (
+                  <Check className="size-3.5 text-green-600" />
+                ) : (
+                  <RefreshCw
+                    className={cn(
+                      'size-3.5',
+                      refreshingHref === tab.href && 'animate-spin'
+                    )}
+                  />
+                )}
               </button>
+              <button
+                type="button"
+                onClick={() => closeTab(tab.href)}
+                aria-label={translate('Navigation.closePage', {
+                  page: tab.label,
+                })}
+                className="absolute right-0.5 top-0.5 flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+              {isActive && (
+                <span
+                  aria-hidden="true"
+                  className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-primary shadow-[0_0_8px_var(--primary)]"
+                />
+              )}
             </div>
           );
         })}
       </div>
 
-      <div className="relative flex h-full shrink-0 items-center border-l border-border bg-background px-2">
+      <div className="relative flex h-full shrink-0 items-center bg-background px-2">
         <button
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
@@ -248,7 +420,7 @@ export function PageTabs() {
           aria-label={translate('Navigation.tabMenu')}
           className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
         >
-            <ChevronDown className="size-4" />
+          <ChevronDown className="size-4" />
         </button>
         {menuOpen && (
           <div className="absolute right-2 top-10 z-50 w-64 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg">
@@ -259,7 +431,14 @@ export function PageTabs() {
                   type="button"
                   onClick={() => {
                     setMenuOpen(false);
-                    router.push(localizedHref(tab.href, locale, clinicSlug));
+                    router.push(
+                      localizedHref(
+                        tab.href,
+                        locale,
+                        organizationSlug,
+                        clinicSlug
+                      )
+                    );
                   }}
                   className="w-full truncate rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
                 >
@@ -275,6 +454,22 @@ export function PageTabs() {
             >
               <RefreshCw className="size-4" />
               {translate('Navigation.refreshTab')}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                closeTab(activeHref);
+              }}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+            >
+              <X className="size-4" />
+              <span className="flex-1">
+                {translate('Navigation.closePage', { page: activeTabLabel })}
+              </span>
+              <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                {closeShortcut}
+              </kbd>
             </button>
             <button
               type="button"

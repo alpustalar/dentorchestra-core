@@ -21,6 +21,7 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  PosTransactionFindById200,
   PosTransactionStalePending200,
   PosTransactionStalePendingParams,
   PosTransactionUnbridged200,
@@ -211,6 +212,92 @@ export function usePosTransactionUnbridged<TData = Awaited<ReturnType<typeof pos
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getPosTransactionUnbridgedQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const posTransactionFindById = (
+    id: string,
+ signal?: AbortSignal
+) => {
+
+
+      return orvalMutator<PosTransactionFindById200>(
+      {url: `/api/v1/pos/transactions/${id}`, method: 'GET', signal
+    },
+      );
+    }
+
+
+
+
+export const getPosTransactionFindByIdQueryKey = (id: string,) => {
+    return [
+    `/api/v1/pos/transactions/${id}`
+    ] as const;
+    }
+
+
+export const getPosTransactionFindByIdQueryOptions = <TData = Awaited<ReturnType<typeof posTransactionFindById>>, TError = ErrorType<unknown>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof posTransactionFindById>>, TError, TData>>, }
+) => {
+
+const {query: queryOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getPosTransactionFindByIdQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof posTransactionFindById>>> = ({ signal }) => posTransactionFindById(id, signal);
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof posTransactionFindById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type PosTransactionFindByIdQueryResult = NonNullable<Awaited<ReturnType<typeof posTransactionFindById>>>
+export type PosTransactionFindByIdQueryError = ErrorType<unknown>
+
+
+export function usePosTransactionFindById<TData = Awaited<ReturnType<typeof posTransactionFindById>>, TError = ErrorType<unknown>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof posTransactionFindById>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof posTransactionFindById>>,
+          TError,
+          Awaited<ReturnType<typeof posTransactionFindById>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePosTransactionFindById<TData = Awaited<ReturnType<typeof posTransactionFindById>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof posTransactionFindById>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof posTransactionFindById>>,
+          TError,
+          Awaited<ReturnType<typeof posTransactionFindById>>
+        > , 'initialData'
+      >, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function usePosTransactionFindById<TData = Awaited<ReturnType<typeof posTransactionFindById>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof posTransactionFindById>>, TError, TData>>, }
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+
+export function usePosTransactionFindById<TData = Awaited<ReturnType<typeof posTransactionFindById>>, TError = ErrorType<unknown>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof posTransactionFindById>>, TError, TData>>, }
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getPosTransactionFindByIdQueryOptions(id,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

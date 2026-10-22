@@ -1,10 +1,23 @@
-import common from './common.json';
-import navigation from './navigation.json';
-import auth from './auth.json';
-import notifications from './notifications.json';
-import appointment from './appointment.json';
-import patients from './patients.json';
-import dashboard from './dashboard.json';
+import navigation from './navigation';
+import auth from './auth';
+import notifications from './notifications';
+
+import patients from './patients';
+import dashboard from './dashboard';
+import financeAccounting from './finance-accounting';
+import financeBank from './finance-bank';
+import financeCashRegister from './finance-cash-register';
+import financeLedger from './finance-ledger';
+import financeParty from './finance-party';
+import financePaymentPos from './finance-payment-pos';
+import financeInvoice from './finance-invoice';
+import financeEDocument from './finance-e-document';
+import financePayroll from './finance-payroll';
+import crmMetaAds from './crm-meta-ads';
+import identityRoles from './identity-roles';
+import connectivity from './connectivity';
+import common from './common';
+import appointment from './appointment';
 
 export const enMessages = {
   ...common,
@@ -14,4 +27,16 @@ export const enMessages = {
   ...appointment,
   ...patients,
   ...dashboard,
+  ...financeAccounting,
+  ...financeBank,
+  ...financeCashRegister,
+  ...financeLedger,
+  ...financeParty,
+  ...financePaymentPos,
+  ...financeInvoice,
+  ...financeEDocument,
+  ...financePayroll,
+  ...crmMetaAds,
+  ...identityRoles,
+  ...connectivity,
 } as const;

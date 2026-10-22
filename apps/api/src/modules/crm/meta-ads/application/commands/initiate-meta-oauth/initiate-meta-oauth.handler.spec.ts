@@ -29,7 +29,7 @@ describe('InitiateMetaOAuthHandler — klinik kapsamı', () => {
     ...over,
   });
 
-  const run = (a: ActorContext, clinicId: string) => {
+  const run = (a: ActorContext, clinicId: string, returnPath = '/crm/meta-ads') => {
     const stateSet = jest.fn().mockResolvedValue(undefined);
     const metaApi = {
       buildOAuthUrl: jest.fn().mockReturnValue('https://facebook.com/dialog'),
@@ -49,7 +49,9 @@ describe('InitiateMetaOAuthHandler — klinik kapsamı', () => {
       stateSet,
       metaApi,
       execute: () =>
-        handler.execute(new InitiateMetaOAuthCommand(clinicId, ctx)),
+        handler.execute(
+          new InitiateMetaOAuthCommand({ clinicId, returnPath, ctx })
+        ),
     };
   };
 
@@ -77,6 +79,7 @@ describe('InitiateMetaOAuthHandler — klinik kapsamı', () => {
     expect(JSON.parse(payload as string)).toEqual({
       clinicId: CLINIC,
       userId: 'user-1',
+      returnPath: '/crm/meta-ads',
     });
   });
 

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { E_DOCUMENT_JOBS, QUEUES } from '@common/constants';
+import type { EDocumentTypeType as EDocumentType } from '@input-type-schemas/EDocumentTypeSchema';
 
 /**
  * e-Belge gönderimini kuyruğa alan producer (doc 07 §5). e-belge "outbound" olduğu
@@ -47,6 +48,7 @@ export class EDocumentProducer {
 
 export interface CancelJobInput {
   invoiceId: string;
+  documentType: EDocumentType;
   /** Entegratördeki belge referansı (ETTN/UUID). */
   uuid: string;
   reason: string;

@@ -50,6 +50,7 @@ export * from './modules/messaging/interfaces';
 export * from './modules/messaging/contracts';
 export * from './modules/meta-ads/schemas';
 export * from './modules/meta-ads/interfaces';
+export * from './modules/meta-ads/contracts';
 export * from './modules/organization/schemas';
 export * from './modules/organization/interfaces';
 export * from './modules/patients/schemas';

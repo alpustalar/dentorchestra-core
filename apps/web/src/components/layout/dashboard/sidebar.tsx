@@ -59,11 +59,17 @@ function SidebarMain() {
   const { state, toggleSidebar, isHovered } = useSidebar();
   const pathname = usePathname();
   const router = useRouter();
-  const params = useParams<{ locale: string; 'clinic-slug': string }>();
+  const params = useParams<{
+    locale: string;
+    'organization-slug': string;
+    'clinic-slug': string;
+  }>();
   const isCollapsed = state === 'collapsed' && !isHovered;
   const isHoverExpanded = state === 'collapsed' && isHovered;
   const locale = params.locale ?? 'en';
+  const organizationSlug = params['organization-slug'] ?? 'as-yazilim';
   const clinicSlug = params['clinic-slug'] ?? 'fethiye';
+  const clinicPath = `/${locale}/${organizationSlug}/${clinicSlug}`;
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
   const toggleMenu = (key: string) => {
@@ -72,8 +78,8 @@ function SidebarMain() {
   };
 
   const isRouteActive = (href: string) => {
-    if (!href) return pathname === `/${locale}/${clinicSlug}`;
-    const target = `/${locale}/${clinicSlug}/${href}`;
+    if (!href) return pathname === clinicPath;
+    const target = `${clinicPath}/${href}`;
     return pathname === target || pathname.startsWith(`${target}/`);
   };
 
@@ -185,8 +191,8 @@ function SidebarMain() {
                           onClick={() => {
                             router.push(
                               itemModule
-                                ? `/${locale}/${clinicSlug}/${itemModule}`
-                                : `/${locale}/${clinicSlug}`
+                                ? `${clinicPath}/${itemModule}`
+                                : clinicPath
                             );
                             if (hasChildren) toggleMenu(item.translationKey);
                           }}
@@ -227,7 +233,7 @@ function SidebarMain() {
                                     isActive={isChildActive}
                                     onClick={() =>
                                       router.push(
-                                        `/${locale}/${clinicSlug}/${child.href}`
+                                        `${clinicPath}/${child.href}`
                                       )
                                     }
                                     className="cursor-pointer"

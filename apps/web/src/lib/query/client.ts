@@ -24,6 +24,7 @@ export function makeQueryClient(): QueryClient {
       queries: {
         staleTime: 60_000,
         retry: shouldRetry,
+        refetchOnReconnect: true,
       },
       mutations: {
         retry: false,

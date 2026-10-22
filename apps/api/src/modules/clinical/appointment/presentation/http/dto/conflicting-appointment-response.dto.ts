@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Expose, Type } from 'class-transformer';
 import { AppointmentStatusType, AppointmentStatusSchema } from '@input-type-schemas/AppointmentStatusSchema';
-import { AppointmentsResponseGroups } from '@modules/clinical/appointment/domain/contracts/appointment';
+import { AppointmentsResponseGroups } from '@shared/modules/appointment/constants';
 
 const { INTERNAL, MANAGEMENT, PROVIDER_DATA_OWNER, ADMIN } =
   AppointmentsResponseGroups;

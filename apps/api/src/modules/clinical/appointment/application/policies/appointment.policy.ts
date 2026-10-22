@@ -5,7 +5,7 @@ import { SerializationOptionsResponse } from '@common/interfaces/serialization-p
 import {
   AppointmentResponseGroup,
   AppointmentsResponseGroups,
-} from '@modules/clinical/appointment/domain/contracts/appointment';
+} from '@shared/modules/appointment/constants';
 
 export class AppointmentPolicy extends ClinicPolicy {
   constructor(actor: ActorContext, source: ExecutionSource) {

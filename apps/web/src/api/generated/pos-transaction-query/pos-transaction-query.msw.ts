@@ -6,6 +6,10 @@
  * OpenAPI spec version: 1
  */
 import {
+  faker
+} from '@faker-js/faker';
+
+import {
   HttpResponse,
   http
 } from 'msw';
@@ -14,6 +18,7 @@ import type {
 } from 'msw';
 
 import type {
+  PosTransactionFindById200,
   PosTransactionStalePending200,
   PosTransactionUnbridged200
 } from '../model';
@@ -22,6 +27,8 @@ import type {
 export const getPosTransactionStalePendingResponseMock = (): PosTransactionStalePending200 => ({})
 
 export const getPosTransactionUnbridgedResponseMock = (): PosTransactionUnbridged200 => ({})
+
+export const getPosTransactionFindByIdResponseMock = (overrideResponse: Partial<Extract<PosTransactionFindById200, object>> = {}): PosTransactionFindById200 => ({data: {kind: faker.helpers.arrayElement(['SALE','VOID','REFUND'] as const), status: faker.helpers.arrayElement(['PENDING','SUCCESS','FAILED','CANCELLED','TIMEOUT'] as const), provider: faker.helpers.arrayElement(['PAX','IYZICO_TERMINAL'] as const), id: faker.string.alpha({length: {min: 10, max: 20}}), clinicId: faker.string.alpha({length: {min: 10, max: 20}}), patientId: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), paymentId: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), completedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null]), amount: faker.string.alpha({length: {min: 10, max: 20}}), currency: faker.string.alpha({length: {min: 10, max: 20}})}, meta: faker.helpers.arrayElement([{pagination: faker.helpers.arrayElement([{total: faker.number.float({fractionDigits: 2}), page: faker.number.float({fractionDigits: 2}), limit: faker.number.float({fractionDigits: 2}), totalPages: faker.number.float({fractionDigits: 2})}, undefined])}, undefined]), serialization: faker.helpers.arrayElement([{groups: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, undefined]), ...overrideResponse})
 
 
 export const getPosTransactionStalePendingMockHandler = (overrideResponse?: PosTransactionStalePending200 | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<PosTransactionStalePending200> | PosTransactionStalePending200), options?: RequestHandlerOptions) => {
@@ -47,7 +54,20 @@ export const getPosTransactionUnbridgedMockHandler = (overrideResponse?: PosTran
       })
   }, options)
 }
+
+export const getPosTransactionFindByIdMockHandler = (overrideResponse?: PosTransactionFindById200 | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<PosTransactionFindById200> | PosTransactionFindById200), options?: RequestHandlerOptions) => {
+  return http.get('*/api/v1/pos/transactions/:id', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getPosTransactionFindByIdResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getPosTransactionQueryMock = () => [
   getPosTransactionStalePendingMockHandler(),
-  getPosTransactionUnbridgedMockHandler()
+  getPosTransactionUnbridgedMockHandler(),
+  getPosTransactionFindByIdMockHandler()
 ]

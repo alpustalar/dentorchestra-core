@@ -1,0 +1,136 @@
+const financeEDocument = {
+  FinanceEDocument: {
+    eyebrow: 'Finans · e-belge operasyonları',
+    demoData: 'Örnek veri',
+    title: 'E-belge merkezi',
+    description:
+      'Satış faturalarının iç belge durumunu ve yayınlanabildiği ölçüde dış e-belge izini tek ekrandan takip edin.',
+    noSession: 'E-belgeleri görmek için oturum açın.',
+    noScope: 'Yetkili organizasyon ve klinik kapsamı bulunamadı.',
+    totalLabel: 'Toplam belge adayı',
+    loadError: 'E-belge kaynak kayıtları yüklenemedi.',
+    integrationUnavailableTitle:
+      'Dış e-belge durumu henüz API tarafından yayınlanmıyor',
+    integrationUnavailableDescription:
+      'Belge tipi, entegratör durumu, UUID, indirme ve yeniden deneme bilgileri mevcut web sözleşmesinde yok. İç faturalar gösterilir; dış gönderim başarılı kabul edilmez ve işlem aksiyonu sunulmaz.',
+    unknown: 'Bilinmiyor',
+    summary: {
+      total: 'Toplam kayıt',
+      inProgress: 'İşlemde',
+      delivered: 'Teslim edildi',
+      failed: 'Başarısız',
+    },
+    listTitle: 'Belge kayıtları',
+    listDescription:
+      'İç fatura ve dış e-belge durumları ayrı gösterilir. Canlı ortamda dış durum yalnız API yayınladığında görünür.',
+    searchPlaceholder: 'Fatura numarasına göre ara',
+    search: 'Ara',
+    loading: 'Belge kayıtları yükleniyor…',
+    empty: 'Bu klinik için belge kaydı bulunamadı.',
+    noResults: 'Aramayla eşleşen belge bulunamadı.',
+    invoiceNumber: 'Fatura no',
+    issuedAt: 'Kesim tarihi',
+    documentType: 'Belge tipi',
+    invoiceStatus: 'İç fatura',
+    eDocumentStatus: 'Dış e-belge',
+    amount: 'Tutar',
+    actions: 'İşlemler',
+    view: 'İncele',
+    unassigned: 'Numara bekleniyor',
+    notIssued: 'Henüz kesilmedi',
+    masked: 'Görüntüleme yetkisi yok',
+    previous: 'Önceki',
+    next: 'Sonraki',
+    page: '{page}. / {totalPages}. sayfa',
+    detailTitle: 'E-belge detayı',
+    detailDescription:
+      'İç fatura ve dış entegratör izi birbirinden ayrılmıştır.',
+    detailLoading: 'Belge detayı yükleniyor…',
+    detailError: 'Belge detayı yüklenemedi.',
+    grandTotal: 'Genel toplam',
+    externalTraceTitle: 'Dış entegratör izi',
+    uuid: 'E-belge UUID',
+    providerReference: 'Entegratör referansı',
+    notAvailable: 'Mevcut değil',
+    detailUnavailable:
+      'Bu faturanın dış e-belge durumu mevcut API yanıtında yer almıyor. Bu nedenle gönderim, indirme veya yeniden deneme aksiyonu güvenle sunulamıyor.',
+    integration: {
+      title: 'Entegrasyon ayarları',
+      description:
+        'Nilvera bağlantısını klinik için ayrı kurun veya organizasyon hesabını şubelere miras bırakın.',
+      configured: 'Bağlı',
+      notConfigured: 'Bağlı değil',
+      scopeLabel: 'Ayar kapsamı',
+      scopeClinic: 'Bu klinik',
+      scopeOrganization: 'Organizasyon',
+      noScope: 'Entegrasyon ayarları için yetkili klinik kapsamı bulunamadı.',
+      loading: 'Entegrasyon ayarları yükleniyor…',
+      inheritedDescription:
+        'Bu klinik organizasyonun Nilvera bağlantısını kullanıyor. Kliniğe özel bir anahtar kaydederseniz organizasyon ayarını ezer.',
+      emptyDescription:
+        'Bu kapsamda kayıtlı bir dış e-belge bağlantısı bulunmuyor.',
+      providerLabel: 'Sağlayıcı',
+      environmentLabel: 'Ortam',
+      credentialLabel: 'API anahtarı',
+      maskedCredential: 'Güvenli biçimde saklanıyor',
+      testStatusLabel: 'Bağlantı durumu',
+      lastTestedLabel: 'Son test',
+      sourceLabel: 'Kullanılan kapsam',
+      never: 'Henüz test edilmedi',
+      testPassed: 'Bağlantı doğrulandı',
+      testFailed: 'Bağlantı başarısız',
+      notTested: 'Test bekleniyor',
+      testConnection: 'Bağlantıyı test et',
+      remove: 'Bağlantıyı kaldır',
+      confirmRemove: 'Kaldırmayı onayla',
+      connectTitle: 'Nilvera hesabını bağla',
+      connectDescription:
+        'Nilvera test veya canlı ortamından aldığınız API anahtarını girin.',
+      rotateTitle: 'Bağlantıyı güncelle',
+      rotateDescription:
+        'Yeni anahtar kaydedildiğinde eski anahtarın yerini alır ve bağlantı testi sıfırlanır.',
+      apiKeyLabel: 'Yeni API anahtarı',
+      apiKeyPlaceholder: 'En az 16 karakter',
+      apiKeyValidation: 'API anahtarı en az 16 karakter olmalıdır.',
+      securityNote:
+        'Anahtar yalnız gönderim sırasında kullanılır, şifreli saklanır ve bu ekrana tekrar gönderilmez.',
+      connect: 'Bağlantıyı kaydet',
+      rotateCredential: 'Anahtarı yenile',
+      saveSuccess: 'Nilvera bağlantısı kaydedildi.',
+      testSuccess: 'Nilvera bağlantısı başarıyla doğrulandı.',
+      removeSuccess: 'E-belge bağlantısı kaldırıldı.',
+      operationError:
+        'İşlem tamamlanamadı. Yetkinizi ve bağlantı bilgilerini kontrol edin.',
+      readyDescription:
+        'Bağlantı doğrulandı. Yeni faturalar bu kapsam için Nilvera üzerinden gönderilebilir.',
+      failedDescription:
+        'Son bağlantı testi başarısız oldu. Ortam ve API anahtarını kontrol edip yeniden deneyin.',
+      environment: {
+        TEST: 'Test',
+        PRODUCTION: 'Canlı',
+      },
+    },
+    documentTypes: {
+      E_FATURA: 'E-Fatura',
+      E_ARSIV: 'E-Arşiv',
+      INTERNAL: 'İç belge',
+      UNAVAILABLE: 'Yayınlanmıyor',
+    },
+    invoiceStatuses: {
+      PENDING: 'Bekliyor',
+      ISSUED: 'Kesildi',
+      FAILED: 'Başarısız',
+      CANCELLED: 'İptal edildi',
+    },
+    eDocumentStatuses: {
+      ACCEPTED: 'Kabul edildi',
+      FAILED: 'Başarısız',
+      INTERNAL: 'İç belge',
+      QUEUED: 'Kuyrukta',
+      SENT: 'Gönderildi',
+      UNAVAILABLE: 'Yayınlanmıyor',
+    },
+  },
+} as const;
+
+export default financeEDocument;

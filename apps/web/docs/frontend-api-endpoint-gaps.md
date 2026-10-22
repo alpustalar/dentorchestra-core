@@ -55,7 +55,7 @@ endpoint is implemented and exposed.
 | Panel / data                                                       | Existing HTTP support                                                                                                            | Result                                                                                                                                                         |
 | ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Greeting / current user                                            | `GET /api/v1/users/details/{userIdOrEmail}`; self-profile also exists at `GET /api/v1/users/me`                                  | Available; the greeting already uses the first operation.                                                                                                      |
-| Clinic names/slugs/timezones for chart series and clinic selection | `GET /api/v1/users/me/context` supplies clinic IDs; internal `FindManyByOrganizationIdQuery` supplies clinic records             | No authorized clinic directory HTTP endpoint; see the exposure request below.                                                                                  |
+| Clinic names/slugs/timezones for chart series and clinic selection | `GET /api/v1/clinics?organizationId` (now authorized/exposed)                                                                    | Available; see the exposure record below. Frontend still needs to switch off mock clinic metadata and regenerate Orval.                                        |
 | Monthly income KPI, comparison, today's collections                | `GET /api/v1/finance/finance-ledger/clinic/{clinicId}/summary?dateFrom&dateTo`                                                   | Available as completed ledger income, separated by currency; current/previous periods can use two requests. Billed/accrual revenue is a different metric.      |
 | Monthly income by clinic                                           | The same finance summary, requested per authorized clinic/month                                                                  | Data available; no batched monthly series operation. See deferred optimization below.                                                                          |
 | Active patient count                                               | `GET /api/v1/patients?clinicId&status=ACTIVE&page=1&limit=1`, using `meta.pagination.total`                                      | Current count available; historical growth / last-30-day comparison missing.                                                                                   |
@@ -64,7 +64,7 @@ endpoint is implemented and exposed.
 | Payment method distribution                                        | Finance summary and provider-revenue reports exist                                                                               | No clinic/period/method aggregate.                                                                                                                             |
 | Recent payments / transactions                                     | Clinic ledger list; POS `stale-pending` / `unbridged` reconciliation lists                                                       | No general recent-transaction projection covering all methods and pending/failed attempts.                                                                     |
 | POS terminal list and live state                                   | `GET /api/v1/pos/devices/{clinicId}`                                                                                             | List available; bank/model and online/busy/offline telemetry absent.                                                                                           |
-| POS transaction completion                                         | POS initiation routes exist; `GetPosTransactionByIdQuery` exists internally                                                      | Transaction status read is not exposed over HTTP.                                                                                                              |
+| POS transaction completion                                         | `GET /api/v1/pos/transactions/{id}` (now exposed)                                                                                | Available; see the exposure record below. Frontend still needs to replace the `setTimeout` simulation with real polling and regenerate Orval.                  |
 | Omnichannel preview / unread badge                                 | `GET /api/v1/messaging/clinics/{clinicId}/conversations` and `/{conversationId}/messages`                                        | Conversations available; clinic-wide unread aggregate missing, previews require extra calls, country unsupported; Facebook/email are not implemented channels. |
 | Health-tourism patient flow                                        | Separate hotel, transfer, and flight booking endpoints                                                                           | No patient journey read model combining country, treatment package, workflow stage, and sale value.                                                            |
 | Active treatment processes across the clinic                       | `FindPatientPackagesQuery` exists for one patient; no HTTP exposure                                                              | No clinic-wide list/use case. The earlier single-patient request below does not cover this panel.                                                              |
@@ -92,10 +92,10 @@ endpoint is implemented and exposed.
   only to management/financial/admin groups. A hidden threshold is not zero.
 - The clinic selector and revenue series still use mock clinic metadata.
   `GET /api/v1/users/me/context` supplies authorized identifiers, not clinic
-  names/slugs/timezones, and `ClinicQueryController` currently exposes only
-  appointment settings. An authorized directory HTTP operation is missing;
-  see its request below. The chart must eventually build series from that
-  operation instead of the three hardcoded mock branch names.
+  names/slugs/timezones. `ClinicQueryController` now also exposes
+  `GET /api/v1/clinics?organizationId` (see the exposure record below); the
+  chart and selector still need to switch from the three hardcoded mock
+  branch names to that operation once Orval is regenerated.
 
 ## Endpoint requests
 
@@ -423,29 +423,45 @@ series: [{ month, clinicId, currency, amount }] } }`, with decimal-string money
 
 ## Existing use cases awaiting HTTP exposure
 
-### Authorized clinic directory for overview context — `Proposed`
+### Authorized clinic directory for overview context — `Available`
 
 - **Frontend location:** Overview chart clinic legend, appointment clinic
   labels, and the shared `ClinicSelector` supplying the overview's scope.
 - **User action:** Open/switch the selected clinic and compare authorized
   branches using their real names and slugs.
-- **Endpoint:** Proposed `GET /api/v1/clinics?organizationId={uuid}` (or an
-  actor-scoped clinic-options operation with no client organization selector).
-- **Authorization:** Clinic-read capability plus explicit actor organization/
-  clinic-access policy. Return only the permitted clinic subset, not every
-  branch merely because it shares an organization.
-- **Request:** Optional validated organization UUID within the actor's scope;
-  define staff-with-one-clinic, multi-clinic manager, and organization-owner
-  behavior. Administrative platform clinics need explicit visibility rules.
-- **Response:** `{ data: [{ id, organizationId, name, slug, timezone, status,
-isPlatform }] }` with a minimal plain DTO and stable ordering.
-- **Existing API support:** Clinic module `FindManyByOrganizationIdQuery` /
-  `FindManyByOrganizationIdHandler` and repository
-  `findManyByOrganizationId()` already return clinics, but the query has no
-  actor context/authorization and is not exposed by `ClinicQueryController`.
-  The existing self-context endpoint returns IDs only; the user-detail query
-  does not load the directory. A scoped wrapper/policy check and minimal
-  response projection are required before exposure.
+- **Endpoint:** `GET /api/v1/clinics?organizationId={uuid}`. `organizationId`
+  is optional; when omitted it defaults to the actor's own
+  `IGetContext.actor.organizationId`.
+- **Authorization:** `CAPABILITIES.CLINIC.read` plus an explicit
+  `OrganizationPolicy.actorCanAccessTargetOrganization` check in the handler
+  (own organization or an owned organization). Neither the request nor the
+  actor's context resolving to an organization throws
+  `OrganizationScopeRequiredException` (400). A denied organization throws
+  `ForbiddenException` (403) before any clinic row is read.
+- **Request:** Optional `organizationId` (UUID) validated by
+  `FindClinicsByOrganizationFilterDto` / `FindClinicsByOrganizationSchema`
+  (`@shared/modules/clinic`).
+- **Response:** `{ data: ClinicDirectoryItem[] }` with `id`, `organizationId`,
+  `name`, `slug`, `timezone`, `status`. `isPlatform` clinics are filtered out
+  in the handler — the platform's own ledger-owning branch never appears in
+  this tenant-facing directory, so the field is intentionally absent rather
+  than returned and ignored by the frontend.
+- **Existing API support (implemented):** `FindManyByOrganizationIdQuery` /
+  `FindManyByOrganizationIdHandler`
+  (`apps/api/src/modules/organization/clinic/application/queries/find-many-by-organization-id/`)
+  now take `ctx: IGetContext`, run the organization-access policy check, and
+  map to the new `ClinicDirectoryItem` read model
+  (`domain/contracts/clinic/clinic-queries.contracts.ts`). Exposed by
+  `ClinicQueryController.findDirectory` (`GET /api/v1/clinics`) with
+  `ClinicDirectoryResponseDto`. The one pre-existing internal caller
+  (`SoftDeleteManyUsersByOrganizationIdHandler`, an `@InternalOnly()` cascade)
+  was updated to pass a system `IGetContext`
+  (`SYSTEM_ACTOR` + `ExecutionSources.INTERNAL_CASCADE`), which bypasses the
+  policy check as intended for that system-initiated path. Unit-tested in
+  `find-many-by-organization-id.handler.spec.ts`.
+- **Still open:** OpenAPI/Orval regeneration and wiring the frontend
+  `ClinicSelector`/overview chart to the generated operation instead of mock
+  clinic metadata.
 - **Frontend behavior:** Replace mock name/slug/timezone lookups; resolve the
   route/selected clinic against authorized records, clear stale cross-clinic
   caches, and show empty/denied/retry states without falling back to mock
@@ -455,33 +471,41 @@ isPlatform }] }` with a minimal plain DTO and stable ordering.
   the chart can resolve its permitted series; OpenAPI/Orval expose the final
   operation.
 
-### POS transaction status read — `Proposed`
+### POS transaction status read — `Available`
 
 - **Frontend location:** Overview `PaymentsPanel`, pending POS collection state.
 - **User action:** After initiating a POS transaction, inspect its actual state
   until completion, failure, or an unresolved pending timeout.
-- **Endpoint:** Proposed `GET /api/v1/pos/transactions/{transactionId}`.
-- **Authorization:** POS-transaction read capability and the existing handler's
-  clinic finance-access policy; validate the transaction UUID.
-- **Request:** Transaction UUID returned by
-  `POST /api/v1/pos/devices/{deviceId}/transactions`; no request body.
+- **Endpoint:** `GET /api/v1/pos/transactions/{id}`.
+- **Authorization:** `CAPABILITIES.POSTRANSACTION.read` plus the existing
+  handler's `FinancePolicy.canAccessClinicFinances(summary.clinicId)` check,
+  evaluated against the transaction's own clinic (not a client-supplied one).
+- **Request:** `id` is the transaction UUID returned by the existing POS
+  initiation commands; no request body.
 - **Response:** `{ data: { id, clinicId, kind, status, provider,
 patientId: string | null, paymentId: string | null, amount: string,
-currency, completedAt: string | null } | null }` using the existing sanitized
-  transaction summary and an explicit decimal-string serializer. Define the
-  not-found response; add a sanitized failure reason or observation timestamp
-  only if required. Never serialize raw provider request/response payloads.
-- **Existing API support:** `GetPosTransactionByIdQuery` /
-  `GetPosTransactionByIdHandler` and repository `findSummaryById` exist, with
-  clinic authorization, but no HTTP controller dispatches the query. Initiation
-  returns `PENDING`, not guaranteed successful collection.
+currency, completedAt: string | null } | null }`. `amount` is serialized as a
+  decimal string (`@Type(() => String)` on the `Decimal` field, never `Number`).
+  Not found resolves to `{ data: null }`. Raw provider request/response
+  payloads are never included — the DTO only carries the sanitized
+  `PosTransactionSummary` fields.
+- **Existing API support (implemented):** `GetPosTransactionByIdQuery` /
+  `GetPosTransactionByIdHandler` already existed with clinic authorization;
+  the handler now also sets `meta.serializationOptions` via
+  `FinancePolicy.getSerializationOptions({ clinicId })` so the response DTO's
+  grouped fields (`kind`/`status`/`provider`/`paymentId`/`completedAt` behind
+  `INTERNAL|FINANCIAL|MANAGEMENT|ADMIN`; `amount`/`currency` behind
+  `FINANCIAL|MANAGEMENT|ADMIN`) actually apply instead of passing through
+  unfiltered. Exposed by `PosTransactionQueryController.findById`
+  (`GET /pos/transactions/:id`, registered after the `stale-pending` and
+  `unbridged` static routes) with the new `PosTransactionStatusResponseDto`.
+  Unit-tested in `get-pos-transaction-by-id.handler.spec.ts`.
 - **Frontend behavior:** Poll with a bounded policy while pending, stop on final
   state, and show unresolved timeouts distinctly. The current `setTimeout`
   simulation must not display "Kart okutuldu, onaylandı" merely because time
   passed or the initiation command was accepted.
-- **Acceptance criteria:** The initiated transaction is readable only within
-  authorized scope; success/failure reflect persisted provider results;
-  unresolved pending does not become success; OpenAPI/Orval expose the query.
+- **Still open:** OpenAPI/Orval regeneration and replacing the frontend's
+  `setTimeout` simulation with real polling against this endpoint.
 
 ### Related collection action prerequisites
 
@@ -493,6 +517,50 @@ and workflow contracts must be reviewed before public exposure. Creating a
 pending payment or recording a cash-session movement is not equivalent to
 settling the patient's installment. These write workflows are a related backend
 integration task, not evidence that a read endpoint is missing.
+The book-aware continuation of this same prerequisite backlog is
+[OCB-09](#ocb-09-safe-manual-patient-collection-and-payment-prerequisites--proposed);
+it is not a separate, duplicate collection API project.
+
+### POS collection command contracts — `Proposed`
+
+- **Frontend location:** Cari detail payment drawer and
+  `/finance/pos/{physical,virtual}` settings pages.
+- **User action:** Collect a card payment for a concrete appointment, invoice,
+  installment, treatment charge, or general party balance and receive a typed
+  result that can be reconciled without charging twice.
+- **Endpoint:** Keep the existing Iyzico checkout and terminal-sale routes, but
+  publish their real response DTOs in OpenAPI. Add the missing request body DTO
+  to `POST /api/v1/pos/devices/{deviceId}/transactions`; reuse the transaction
+  status read proposed above. Extend the collection contract with one validated
+  allocation target instead of accepting an unpersisted free-text purpose.
+- **Authorization:** Existing payment/POS-transaction create capabilities plus
+  clinic finance access. The server resolves and validates every appointment,
+  payment, invoice, installment, charge, and party against the same clinic/book.
+- **Request:** Typed amount/currency plus a discriminated allocation such as
+  `{ kind: APPOINTMENT|INSTALLMENT|INVOICE|TREATMENT_CHARGE|PARTY_BALANCE,
+referenceId?, description? }`. Require `referenceId` for concrete kinds;
+  allow a bounded description only for general party balance. Include an
+  idempotency key and the selected patient/party. PAX initiation needs the same
+  body fields currently present only in `InitiatePosTransactionCommand.input`.
+- **Response:** Virtual checkout returns typed `{ paymentPageUrl,
+conversationId }`. Physical commands return `{ posTransactionId, status,
+approved, providerReference?, maskedCardNumber?, errorCode? }`; money remains
+  decimal-string at the HTTP boundary. Never expose raw provider payloads.
+- **Existing API support:** Iyzico virtual and terminal handlers already create
+  payments and drive payment/ledger/accounting bridges. Their controller/OpenAPI
+  metadata currently collapses results to `{}` or `void`. The generic device
+  initiation operation loses its body in generated Orval code because the
+  controller uses an inline `Omit<...>` type. No persisted purpose/allocation
+  contract exists beyond optional appointment/payment links.
+- **Frontend behavior:** The current drawer uses the supported patient and
+  optional appointment links and never offers cash/bank as completed flows.
+  Iyzico Terminal is selectable; PAX remains configuration-only until its body
+  and status contracts are generated. Pending is never presented as success.
+- **Acceptance criteria:** Generated clients contain request and response
+  models without frontend casts; every successful collection has one explicit
+  accounting purpose/allocation; retries are idempotent; pending transactions
+  are queryable; provider failure does not create a successful collection;
+  payment, cari ledger, and accounting references reconcile to one transaction.
 
 ### Patient active treatment packages — `Proposed`
 
@@ -576,3 +644,612 @@ integration task, not evidence that a read endpoint is missing.
 - **Acceptance criteria:** Opening the sheet shows the selected clinic's saved
   values; saving changes persists them for that clinic and a subsequent read
   returns the new values.
+
+## Organization / Clinic AccountingBook planning — `Proposed`
+
+This section is a planning backlog for company and clinic accounting, linked to
+[the backend AccountingBook model proposal](../../api/documents/finans/13-organization-clinic-defter-plani.md).
+It does not describe implemented endpoints or authorize runtime/backend changes
+as part of the frontend work. All new fields, routes, capabilities, and response
+models below remain **Proposed** until the backend model, authorization, OpenAPI,
+and generated Orval operations are implemented together.
+
+### Shared contract and scope rules
+
+- `accountingBookId` is the canonical single-book field in requests, records,
+  responses, and query keys. `accountingBookIds` is reserved for explicit
+  multi-book reads. A company's own book and each clinic-owned book remain
+  identifiable; a consolidated view is not a writable book.
+- `sourceClinicId` preserves the originating operational clinic, even when
+  posting belongs to an organization-owned book. `costCenterId` is a separate
+  reporting dimension on relevant lines. Neither field changes legal book
+  ownership or grants access to another book.
+- Selected financial scope lives in the URL/Zustand separately from the
+  operational clinic. There is no proposed server-side "switch active tenant"
+  command or arbitrary header that overrides authorization. Each API validates
+  the explicit scope against the actor and the referenced records.
+- Reads return `QueryResponse<T>` with plain, serializable read models,
+  `meta.pagination` for paginated lists, and the existing
+  `serialization.groups` contract. Domain entities, Decimal objects, provider
+  blobs, and unrestricted personal data do not cross the HTTP boundary.
+- Proposed money fields use decimal strings, for example `"1250.00"`, with an
+  explicit currency. Exchange rates are decimal strings with separately defined
+  precision. Date/time fields use the agreed ISO/timezone contract. Existing
+  number-valued APIs need an explicit compatibility migration, not a frontend
+  cast that changes their meaning.
+- Versioned mutations require `expectedVersion`; successful updates return only
+  the new `{ version }` or the minimum workflow metadata. Creates normally
+  return a string ID, simple actions `void`. A `409` keeps the form data and
+  triggers a fresh read; it never silently overwrites a newer configuration or
+  repeats a money movement. Idempotency is separate from optimistic versioning.
+- Capability names introduced here are tentative and currently unseeded. An
+  existing module capability remains necessary, but a selected book, shared
+  organization, affiliation, franchise contract, or response group is not by
+  itself permission to read or write finances.
+- Existing controller/resource namespaces must be extended after the backend
+  model change. Do not create a parallel `/accounting/books/{id}/invoices`,
+  `/book-bank`, or `/company-accounting/reports` API alongside the current
+  invoice, bank, cash, payment, and accounting resources.
+
+### OCB-01 Authorized book directory and financial scope selection — `Proposed`
+
+- **Frontend location:** Shared finance scope selector; company accounting
+  workspace; clinic finance pages and report filters. Route names are finalized
+  by the companion frontend plan, not by introducing a second clinic selector.
+- **User action:** Choose an authorized organization-owned or clinic-owned book,
+  inspect its owner/currency/status, or choose an explicitly permitted read-only
+  consolidation while keeping the operational clinic context visible.
+- **Endpoint:** Proposed `GET /api/v1/accounting/books` and
+  `GET /api/v1/accounting/books/{accountingBookId}`. Optional directory filters
+  are `ownerType`, validated `organizationId`, and `status`; they only narrow
+  the actor's authorized result set. Selecting a result makes no API mutation.
+- **Authorization:** Tentative `accountingbook.read` plus book access policy.
+  Directory results contain only readable books and allowed report scopes.
+  Independent/franchise books require explicit grants; organization management
+  must not automatically expand the permitted set.
+- **Request:** Bounded pagination/search where the directory can be large;
+  UUID validation on every identifier. A detail request accepts a single book
+  UUID. Never derive access by replacing the actor's clinic ID with that UUID.
+- **Response:** Directory `QueryResponse<{ books: AccountingBookOption[],
+consolidationOptions: AuthorizedConsolidationOption[] }>`; detail
+  `QueryResponse<AccountingBookView | null>`. Plain book options contain `id`,
+  `ownerType`, owner identifiers, a display label, `functionalCurrency`, `timezone`,
+  `status`, `version`, and permitted action identifiers. Consolidation options
+  explicitly list permitted `accountingBookIds` and supported report actions;
+  they grant no mutations. Do not expose legal/tax/contact fields in a minimal
+  selector DTO. Pagination, if used, must identify which collection it pages.
+- **Existing API support:** No `AccountingBook` model, directory query, or book
+  policy was found in the current implementation. The earlier
+  [authorized clinic directory request](#authorized-clinic-directory-for-overview-context--proposed)
+  remains the source for clinic names/slugs/timezones; `users/me/context`
+  supplies operational IDs rather than a book directory. Reuse those clinic
+  records when displaying provenance; do not request a duplicate directory.
+- **Frontend behavior:** Store only the selected validated scope in URL/Zustand;
+  namespace query keys by actor, book(s), filters, and response permissions.
+  Cancel/reset stale reads and money forms on scope change. Missing/revoked
+  scope shows a choose-scope or access-denied state, never an invented default
+  book. Consolidation disables write actions.
+- **Acceptance criteria:** Organization and clinic owners see only their granted
+  books; a franchise affiliation alone reveals none; a removed grant invalidates
+  cached selection; every subsequent read/write sends and authorizes explicit
+  scope; unauthorized book UUIDs cannot be queried directly; OpenAPI/Orval
+  expose the final plain contracts.
+
+### OCB-02 Versioned clinic finance configuration — `Proposed`
+
+- **Frontend location:** Clinic finance setup and the company's clinic finance
+  configuration history.
+- **User action:** Inspect the effective accounting mode/routing and schedule an
+  authorized future configuration revision, with its reason and effective date.
+- **Endpoint:** Proposed
+  `GET /api/v1/clinics/{clinicId}/finance-configurations?effectiveAt={iso}` and
+  `POST /api/v1/clinics/{clinicId}/finance-configurations/revisions`.
+  Use a typed `ClinicFinanceConfiguration` resource; do not add routing fields
+  to the existing general clinic settings PATCH.
+- **Authorization:** Tentative `clinicfinanceconfiguration.read` / `.update`
+  with clinic configuration-management policy and explicit authorization for
+  every referenced target book. Reading operational clinic data is insufficient
+  to alter accounting ownership or route money into another owner's book.
+- **Request:** Revision body includes `expectedVersion`, `effectiveFrom`,
+  `reason`, and the typed configuration fields defined by the backend proposal,
+  including the effective `accountingBookId` where applicable. Validate that
+  its mode/owner/affiliation combination is legal. Client-supplied organization
+  IDs are verified, not trusted. No arbitrary JSON settings bag or reassignment
+  of historic events, invoices, payments, or journal entries is allowed.
+- **Response:** Read `QueryResponse<{ clinicId, version,
+effective: ClinicFinanceConfigurationView | null,
+revisions: ClinicFinanceConfigurationRevisionView[] }>` with effective dates,
+  book reference, typed mode, status, and audit metadata according to response
+  groups. Revision command returns minimum metadata `{ version,
+configurationRevisionId }`; these are workflow/version outputs, not a full
+  clinic or book entity.
+- **Existing API support:** Clinic/organization finance settings entities and
+  internal reads exist, but they do not implement a versioned AccountingBook
+  routing model. General clinic `PATCH /clinics/{id}` is not this use case.
+  New backend commands, temporal validation, persistence, and policy are needed
+  before controller exposure.
+- **Frontend behavior:** Show current, scheduled, and historic revisions
+  distinctly. Preview effective ownership/provenance consequences before
+  submission. A conflict retains the draft and reloads the latest version;
+  server validation explains incompatible mode/book/effective-date choices.
+  An `effectiveAt` historical read resolves the applicable stored routing
+  version; source-document drilldown shows the version actually sealed on that
+  document/event. Neither operation reassigns historic records to today's book.
+- **Acceptance criteria:** Concurrent edits produce a conflict; overlapping
+  incompatible effective revisions are rejected; backdating cannot reroute
+  posted history; routing at an economic event's date is deterministic and
+  persisted; switching configuration does not alter another owner's grants;
+  subsequent reads return the accepted version.
+
+### OCB-03 Effective-dated clinic / organization affiliation — `Proposed`
+
+- **Frontend location:** Organization clinic relationships and clinic ownership/
+  affiliation history, linked from finance setup.
+- **User action:** Inspect the clinic's relationship to an organization, record
+  an approved change, or end a relationship at an explicit effective date.
+- **Endpoint:** Proposed
+  `GET /api/v1/clinics/{clinicId}/organization-affiliations`,
+  `POST /api/v1/clinics/{clinicId}/organization-affiliations`, and
+  `POST /api/v1/clinics/{clinicId}/organization-affiliations/{affiliationId}/end`.
+  These are additions to clinic controllers, not book-finance data aliases.
+- **Authorization:** Tentative `clinicaffiliation.read` / `.manage`; mutation
+  policy checks the clinic and related organization and the required ownership
+  authority. A relationship read does not confer book-detail access.
+- **Request:** Create carries the typed relationship from the backend model,
+  target organization, `effectiveFrom`, optional `effectiveTo`, `reason`, and
+  `expectedVersion` of the clinic affiliation aggregate. End carries
+  `effectiveTo`, `reason`, and `expectedVersion`. Prohibit ambiguous overlaps;
+  use an explicit approval/consent workflow if the final ownership model needs
+  both parties. Configuration changes remain separate linked commands.
+- **Response:** Read `QueryResponse<ClinicOrganizationAffiliationView[]>` with
+  immutable relationship/revision IDs, clinic/organization references, effective
+  interval, relationship type, status, and version. Create returns the new
+  affiliation ID; end returns `{ version }`. Restricted legal/actor metadata is
+  group-filtered. Plain references replace relation-rich domain entities.
+- **Existing API support:** No `ClinicOrganizationAffiliation` temporal model or
+  matching use case exists. Current scalar organization relationships do not
+  provide revision history or independent franchise financial authorization.
+- **Frontend behavior:** Show a timeline and the effective relationship for the
+  selected date; distinguish a legal/operational relationship from access to
+  financial records. Refresh the book directory after an authorized change but
+  do not assume a new book has become readable.
+- **Acceptance criteria:** Relationship changes preserve old provenance;
+  ending an affiliation never moves historic book entries; affiliation-only
+  actors cannot query another book; concurrency and date-overlap conflicts
+  remain visible; all changes have effective dates and audit reasons.
+
+### OCB-04 Franchise agreements and explicit financial access policy — `Proposed`
+
+- **Frontend location:** Company franchise agreement list/detail, fee rules and
+  sharing permissions; clinic agreement detail.
+- **User action:** Create an agreement, publish a versioned amendment, terminate
+  it, and explicitly grant/revoke the permitted financial reports or actions.
+- **Endpoint:** Proposed
+  `GET|POST /api/v1/organizations/{organizationId}/franchise-agreements`,
+  `GET /api/v1/organizations/{organizationId}/franchise-agreements/{agreementId}`,
+  `POST .../{agreementId}/revisions`, and `POST .../{agreementId}/terminate`.
+  Explicit book access is proposed as
+  `GET|POST /api/v1/accounting/books/{accountingBookId}/access-grants` and
+  `POST .../access-grants/{grantId}/revoke`; keep an agreement reference on a
+  grant when it is the basis for access.
+- **Authorization:** Tentative `franchiseagreement.read` / `.manage` and
+  `accountingbook.access.manage`, with authority from the actual book owner.
+  Existing organization admin rights cannot silently grant full access to an
+  independent franchisee's customer, payroll, cash, or journal data. An
+  agreement's commercial relationship and its access grants are separate.
+- **Request:** Agreement fields include parties, effective interval, currency,
+  typed fee basis, decimal-string fixed fee/rate where applicable, reporting
+  frequency, `reason`, and `expectedVersion` for revisions/termination. Grant
+  fields include authorized principal, actions/report types, time/provenance
+  restrictions, effective interval, optional agreement ID, and owner-approved
+  delegation limits. Amendment/revoke requires the current `expectedVersion`.
+  Fee calculation/posting and intercompany settlement are separate backend use
+  cases; saving an agreement must not itself fabricate a payable or transfer.
+- **Response:** Paginated lists and detail use `QueryResponse` plain
+  agreement/grant views with version and effective intervals. Creates return
+  IDs; amendments/termination/revocation return minimum `{ version }` metadata.
+  Commercial amounts and identifiable principals follow explicit finance/
+  management response groups; no hidden amount becomes zero.
+- **Existing API support:** No franchise agreement, versioned fee-rule, or
+  explicit book grant model/use case was found. Existing policies are clinic/
+  organization based and require the backend model change; this is not a
+  controller-only task or a new use for the ordinary settings PATCH.
+- **Frontend behavior:** Show exactly which reports/actions an agreement
+  permits and their validity; distinguish expired access from absent data.
+  Explain fee basis/currency without presenting a saved rule as a posted fee.
+  Permission changes invalidate directory/report caches and in-flight forms.
+- **Acceptance criteria:** A franchisor cannot read an independent clinic's
+  full book without a valid grant; grants cannot exceed the issuer's authority;
+  revocation/expiry applies server-side even with cached IDs; an amendment
+  preserves historic fee definitions; conflicts do not overwrite newer rules;
+  any derived franchise charge is a separate traceable event in each owner's
+  book, with no silent netting across books.
+
+### OCB-05 Book-scoped operational lists and financial reports — `Proposed`
+
+- **Frontend location:** Company/clinic finance overview, receivables/payables,
+  parties, invoices, cash/bank, payroll, ledger, and accounting reports.
+- **User action:** Filter existing financial resources by the selected book,
+  source clinic, cost center, and reporting period; request an authorized
+  multi-book management comparison where the report supports it.
+- **Endpoint:** Extend the following existing resources after the backend model;
+  these rows are scope extensions, not claims of new current functionality.
+
+  | Existing resource                                                                                                        | Proposed scope/read extension                                                                                                                                                 |
+  | ------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `GET /api/v1/accounting/periods`, `/chart-of-accounts`, `/chart-of-accounts/drift`, `/tax-parameters`                    | Explicit `accountingBookId`; book-owned periods/accounts/tax policy rather than mandatory actor clinic                                                                        |
+  | `GET /api/v1/accounting/journal-entries`, `/financial-events`, `/financial-events/unposted`                              | `accountingBookId`, period/date/status/source filters; preserve immutable provenance                                                                                          |
+  | `GET /api/v1/accounting/reports/{trial-balance,ledger,journal,income-statement,balance-sheet,cash-flow,vat-declaration}` | Single-book scope first; optional `sourceClinicId` / `costCenterId` only where the report can honor them; explicit multi-book management reports where semantically supported |
+  | `GET /api/v1/invoices`, `/purchase-invoices`, `/parties`                                                                 | `accountingBookId`, validated business filters and pagination; return source clinic separately                                                                                |
+  | `GET /api/v1/cash/registers`, `/cash/sessions`, `/bank/accounts`, `/bank/statements`, `/bank/card-chargebacks`           | `accountingBookId` with source-clinic/currency/status filters where applicable; validate all linked treasury records                                                          |
+  | `GET /api/v1/payment/reports/ar-aging`, `/payment/reports/provider-revenue`                                              | Replace implicit actor-clinic-only scope with explicit authorized book and optional source clinic; preserve metric/currency definitions                                       |
+  | `GET /api/v1/finance/finance-ledger/clinic/{clinicId}` and `/summary`; patient ledger routes                             | Retain as clinic/customer subledger projections with validated `accountingBookId`; an organization book total comes from accounting reports, not a fake clinic ID             |
+  | `GET /api/v1/bank/provider-settlements` and `/{settlementId}`                                                            | New list/detail queries on the existing settlement resource; the current resource only has POST                                                                               |
+  | `GET /api/v1/payroll/accruals` and `/{accrualId}`                                                                        | New book-scoped list/detail projection; the current accrual resource only has POST                                                                                            |
+
+- **Authorization:** Existing resource read capabilities remain required
+  (`journalentry.read`, `account.read`, `accountingperiod.read`,
+  `financialevent.read`, `invoice.read`, `purchaseinvoice.read`, `party.read`,
+  cash/bank/payment capabilities), plus book policy. Tentative settlement/payroll
+  read capabilities need final seeding. Multi-book requests authorize each
+  requested book; no silently partial result that looks like a full company
+  total. An allowed aggregate grant does not imply entry-level access.
+- **Request:** A single `accountingBookId` or, only on supported read operations,
+  explicit bounded `accountingBookIds`; mutually exclusive scope inputs.
+  Optional `sourceClinicId`, `costCenterId`, dates, currency, period/status,
+  pagination, and stable sorting must be defined per resource. Reject
+  incompatible old `clinicId`/organization inputs during the compatibility
+  transition. Never interpret arbitrary org IDs as a readable book set.
+- **Response:** `QueryResponse<PlainListItem[]>` with pagination or a plain
+  report object. Include resolved scope, period/as-of basis, currency and
+  provenance in report metadata. Consolidated totals explicitly enumerate
+  included books, eliminations/conversion policy if any, and whether the result
+  is a management aggregate. Do not sum currencies or claim that adding
+  independent books produces a single statutory VAT/balance-sheet filing.
+- **Existing API support:** The listed controllers and their clinic-oriented
+  queries exist except the new settlement/payroll reads. No book-scoped query,
+  cost-center line dimension, or authorized consolidation model currently
+  exists. `GetPurchaseInvoicesHandler`, tax parameters, and payment reports
+  still depend on the actor's clinic; adding a frontend header is insufficient.
+- **Frontend behavior:** Reuse existing tables, filters, and generated hooks
+  after their contracts change. Keep hidden amounts distinct from zero, label
+  cash collections separately from accrual revenue, and preserve drilldown
+  scope. A multi-book scope presents read actions only. Invalidated filters or
+  a forbidden book show an explicit state rather than fallback data.
+- **Acceptance criteria:** Single-book report totals reconcile to the same
+  book's posted entries; source-clinic/cost-center subtotals reconcile to that
+  scope; direct UUID and bulk access respect grants; every context-derived
+  endpoint is migrated or explicitly unavailable for company scope; existing
+  paths remain canonical; compatibility and new operations are documented in
+  OpenAPI and regenerated Orval types.
+
+### OCB-06 Book-authorized journal entry detail and source drilldown — `Proposed`
+
+- **Frontend location:** Journal list/report row detail drawer, reversal trace,
+  and an invoice/payment's accounting detail link.
+- **User action:** Open an entry and inspect its debit/credit lines, book owner,
+  operational source, cost centers, financial event, and reversal relationship.
+- **Endpoint:** Proposed addition to the existing controller:
+  `GET /api/v1/accounting/journal-entries/{entryId}?accountingBookId={uuid}`.
+  Extend existing `POST /api/v1/accounting/journal-entries/{entryId}/reverse`
+  with book authorization/version semantics after the model change; do not
+  introduce a second reverse route under books.
+- **Authorization:** `journalentry.read` plus entry book detail access;
+  reversal remains `journalentry.delete` plus book write/reversal policy and
+  period checks. An aggregate-only franchisor grant cannot open entry lines or
+  the source patient's detail.
+- **Request:** Validated entry/book UUIDs; reverse body carries `reason`,
+  effective reversal date as allowed by the domain, and `expectedVersion` of
+  the mutable reversal guard/state. Validate scope using the stored entry.
+- **Response:** `QueryResponse<JournalEntryDetailView | null>` containing plain
+  header, `accountingBookId`, `sourceClinicId`, period, entry number/date/status,
+  currency, source event/document references, and lines with account references,
+  `costCenterId`, decimal-string debit/credit amounts, and allowed party labels.
+  Reverse returns only the created reversal ID/minimum existing workflow
+  metadata. Restricted audit/party fields remain serialized by groups.
+- **Existing API support:** `JournalQueryController` only exposes a list and
+  `JournalEntryResponseDto` only supplies a header; current journal reports have
+  lines but are not a single-entry detail operation. No matching book-authorized
+  detail use case was found. The existing reversal command is reused and must
+  retain immutable source events and posted entries.
+- **Frontend behavior:** Render a balanced line table and accessible source
+  links only when separately authorized. Posted rows have no edit/delete form;
+  corrections navigate the explicit reversal workflow. Conflicts refresh state
+  without automatically retrying reversal.
+- **Acceptance criteria:** Direct entry access cannot cross books; line totals
+  match the header/report; source links preserve scope; a reversal appears as a
+  separate linked entry and cannot rewrite its source event; serializer output
+  contains no domain entity or Decimal object.
+
+### OCB-07 Purchase invoice detail, filters, and payable position — `Proposed`
+
+- **Frontend location:** Purchase invoices / operating expenses list, supplier
+  account, invoice detail drawer, and the supplier-payment allocation form.
+- **User action:** Find a supplier bill by period/status/number, inspect its
+  expense account and VAT, and see paid/outstanding amounts and linked payments.
+- **Endpoint:** Extend existing `GET /api/v1/purchase-invoices` with a validated
+  filter DTO; add `GET /api/v1/purchase-invoices/{invoiceId}`. Reuse existing
+  POST, match/unmatch, and cancel routes with explicit book/source/cost-center
+  contracts after backend migration.
+- **Authorization:** `purchaseinvoice.read` and book/party access policy;
+  record/match/cancel retain their distinct create/update/delete capabilities.
+  No direct ID access through an otherwise authorized supplier in another book.
+- **Request:** Required `accountingBookId`; optional `supplierId`,
+  `sourceClinicId`, `costCenterId`, date interval, status, invoice-number search,
+  currency, purchase-order matching filter, page/limit/sort. New bill dimensions
+  such as due date, lines/mixed VAT, attachments, and allocated payments require
+  their backend models first. Mutations on versioned invoice/payment position
+  carry `expectedVersion`.
+- **Response:** List/detail `QueryResponse` plain models with invoice and book
+  IDs, source clinic, supplier summary, invoice/date/due date, status, currency,
+  decimal-string net/VAT/gross/paid/outstanding totals, version, purchase-order
+  reference, account/cost-center references, and cancellation trail. Detail
+  includes immutable allocation/payment/reversal references after allocation is
+  implemented; paginated history is defined if it can grow. Group-filtered
+  amounts are absent rather than fabricated zeros.
+- **Existing API support:** `GetPurchaseInvoicesQuery` only lists the actor's
+  clinic with pagination; there is no detail/filter/allocation query. The
+  record command already supports an optional purchase order and a single
+  expense account + VAT total, so non-stock operating bills can use it. New
+  records are immediately `RECORDED`; enum values `DRAFT`, `PAID`, and
+  `PARTIALLY_PAID` do not prove that draft/payment workflows exist.
+- **Frontend behavior:** Show recorded bills as immutable financial facts with
+  explicit cancel/correct actions; derive payable badges only from the server's
+  allocation position. Preserve filters when returning from a supplier detail.
+  Do not offer draft editing, mixed-rate lines, or attachments until supported.
+- **Acceptance criteria:** Filters/pagination work server-side within one book;
+  detail opens after creation without scanning list pages; paid + outstanding
+  reconciles to the server's invoice position; cancelled/reversed allocations
+  remain traceable; balances do not rely on client-side event reconstruction.
+
+### OCB-08 Supplier payment allocation and explicit correction — `Proposed`
+
+- **Frontend location:** Supplier payment form, purchase invoice detail, and
+  supplier account payment history.
+- **User action:** Pay one or several recorded bills, allocate an existing
+  eligible payment/advance where supported, or reverse an incorrectly recorded
+  payment/allocation through a traceable correction.
+- **Endpoint:** Extend the existing
+  `POST /api/v1/accounting/financial-events/supplier-payments` for a recorded
+  payment with allocations. Proposed allocation-only action on the same
+  resource: `POST /api/v1/accounting/financial-events/supplier-payments/{paymentEventId}/allocations`.
+  Proposed correction:
+  `POST /api/v1/accounting/financial-events/supplier-payments/{paymentEventId}/reverse`.
+  Supplier/invoice detail reads above should supply allocation history; avoid
+  a duplicate `/purchase-invoices/{id}/pay` money-movement endpoint.
+- **Authorization:** Existing `financialevent.create` plus explicit supplier
+  payment/book write policy; tentative dedicated supplier-payment/allocation
+  update/reverse capabilities require backend agreement. Treasury source and
+  each invoice/party must belong to the authorized owner/book.
+- **Request:** `accountingBookId`, `partyId`, decimal-string amount/currency,
+  payment method/date/reference, idempotency key, concrete treasury source
+  (`cashSessionId` for cash or `bankAccountId` for bank), source/cost-center
+  dimensions where valid, and `allocations: [{ invoiceId, amount,
+expectedVersion }]`. Allocation-only requests include the payment position's
+  `expectedVersion`; reversal carries expected version, date, and reason.
+  Validate total allocations against payment and outstanding amounts under
+  locks. Advance/unallocated remainder is allowed only by an explicit contract.
+- **Response:** Create returns the payment/financial-event ID. Allocation and
+  correction return minimum `{ version }` or the created reversal ID, not an
+  edited event body or a list of entities. Fresh invoice/supplier reads provide
+  updated balances; any minimum workflow output follows the command response
+  rules. A conflict or idempotent replay must be distinguishable in OpenAPI.
+- **Existing API support:** `RecordSupplierPaymentCommand` records an immutable
+  `PAYMENT_MADE` event for a party. It has no invoice allocations, treasury
+  record linkage, payment-position version, or `PAID/PARTIALLY_PAID` transitions.
+  Allocation and supplier-payment reversal use cases were not found; these
+  need backend business/persistence work, not just new controller methods.
+- **Frontend behavior:** Load eligible invoices and current balances from the
+  server; show the allocation total/remainder before submit. On `409`, keep the
+  form and refresh positions. Retry uncertain network results with the same
+  idempotency key and re-read; never issue a second independent payment. A
+  recorded event has a correction action, not edit/delete fields.
+- **Acceptance criteria:** Concurrent allocations cannot overpay a bill or
+  consume a payment twice; cross-book/party/currency allocations fail;
+  duplicates return the original result; cash payment updates custody and
+  accounting once; reversing reopens the relevant payable position with a new
+  linked event and preserves the original; no duplicate expense is posted by
+  both a bill payment and a cash `EXPENSE` movement.
+
+### OCB-09 Safe manual patient collection and payment prerequisites — `Proposed`
+
+- **Frontend location:** Patient account / payment plan, appointment collection
+  form, and the overview payment panel's real patient/installment selection.
+- **User action:** Read/create an authorized payment plan and record an actual
+  cash or bank collection against the selected installment with a concrete
+  custody/bank source and receipt reference.
+- **Endpoint:** Proposed reads on the existing payment resource:
+  `GET /api/v1/payment?accountingBookId&patientId&appointmentId&status&page&limit`,
+  `GET /api/v1/payment/{paymentId}?accountingBookId`, and
+  `GET /api/v1/payment/by-appointment/{appointmentId}?accountingBookId`.
+  Proposed plan action: `POST /api/v1/payment/plans`.
+  Proposed manual action: `POST /api/v1/payment/collections`. These names remain
+  design proposals, not currently generated operations.
+- **Authorization:** Existing `payment.read` / `.create` / `.update` as
+  appropriate, explicit book/clinic/patient access, and the treasury-source
+  permission. New collection policy validates the selected installment using
+  its persisted owner/book; a client patient UUID or a permitted cash session
+  alone cannot settle another clinic's patient account.
+- **Request:** Reads carry validated identifiers and bounded filters. Plan
+  input uses shared Zod-infer types, explicit book/source clinic, patient,
+  optional appointment/provider, currency and decimal-string installments with
+  due dates/methods. Manual collection carries `accountingBookId`, `paymentId`,
+  `installmentId`, `expectedVersion`, amount/currency, accepted cash/bank
+  method, `cashSessionId` or `bankAccountId`, collection date/reference, and an
+  idempotency key. No gateway token, raw provider payload, or fake POS success
+  flag is accepted. Partial collection requires an explicit collection/allocation
+  model; until then the contract must reject partial amounts rather than mark
+  an entire installment completed.
+- **Response:** Reads use `QueryResponse<PaymentListItem[]>` / a plain payment
+  detail with pagination, installments, current due/outstanding/collected
+  amounts, version, source references, and decimal-string money. Plan create
+  returns an ID. Collection returns only minimum workflow metadata, such as
+  `{ collectionId, version }`; detail is refreshed via QueryResponse. Expose
+  permitted financial fields through the established response groups.
+- **Existing API support:** `GetPaymentByAppointmentIdQuery`,
+  `GetPaymentWithInstallmentsQuery`, `CreatePaymentCommand`,
+  `CreatePaymentPlanCommand`, and `MarkInstallmentAsPaidCommand` exist
+  internally. The current presentation module exposes reports only. Internal
+  reads/plan creation do not yet satisfy the full context/policy/versioned
+  public contract; a general list and safe manual custody/accounting collection
+  workflow are missing. `RecordCashMovementCommand` alone does not settle a
+  patient installment. Do not expose internal mark-paid as an unrestricted
+  endpoint. This extends the existing
+  [related collection action prerequisites](#related-collection-action-prerequisites)
+  record with book/version/custody requirements; it is the same backlog, not
+  an additional independent payment API.
+- **Frontend behavior:** Keep operational clinic/patient and selected book
+  visible; disable invalid source/method choices; show a receipt/result only
+  after persisted success. Use server balances; retain form data on conflict.
+  On ambiguous network failure, resolve/retry the same idempotent operation
+  before allowing another attempt. Refresh payment, patient subledger, custody,
+  invoices, and reconciliation queries after confirmed collection.
+- **Acceptance criteria:** One collection updates installment/payment position,
+  cash custody or bank attribution, patient subledger, and financial-event
+  bridge exactly once or rolls back as defined; concurrent requests cannot
+  double-collect; sealed periods/closed sessions/currency mismatches fail at the
+  write boundary; plan creation alone is never displayed as money received.
+  Existing card actions continue through their provider workflows and reuse
+  [the existing POS status-read request](#pos-transaction-status-read--proposed),
+  not a duplicate collection polling/status API. Pending/timeout/failed POS
+  states never become a manual success after elapsed time.
+
+### OCB-10 Sales invoice accounting and e-document detail — `Proposed`
+
+- **Frontend implementation note (2026-10-21):** The e-document workspace now
+  uses the existing invoice list/detail queries and keeps internal invoice state
+  separate from external delivery state. In live mode, unavailable document
+  type/status/UUID/provider fields are explicitly marked as unpublished; send,
+  download, and retry controls remain absent until the contract below exists.
+  Nilvera integration settings are now connected separately: clinic and
+  organization configuration, inheritance, masked credential state, connection
+  test, credential rotation, and removal use the published e-document integration
+  endpoints. Secrets are never rehydrated into the form.
+
+- **Frontend location:** Sales invoice list/detail and accounting source links.
+- **User action:** Inspect the actual internal invoice, its book/source and
+  totals, payment/appointment links, e-document status, and cancellation trace.
+- **Endpoint:** Extend existing `GET /api/v1/invoices`,
+  `GET /api/v1/invoices/{id}`, and `GET /api/v1/invoices/by-payment/{paymentId}`
+  with explicit `accountingBookId`, business filters, and enriched read models.
+  Reuse existing backfill/cancel routes with book policy and version handling;
+  do not introduce parallel company invoice operations.
+- **Authorization:** Existing `invoice.read`, `.create` for backfill and
+  `.delete` for cancellation, plus book and source-link access policy.
+- **Request:** List filters include book, optional source clinic, patient,
+  number, invoice/e-document status, date interval, currency, and pagination.
+  Detail identifiers must resolve to the requested authorized book. A versioned
+  cancellation includes `expectedVersion` and reason; it does not imply a cash
+  refund or cancellation of a provider transaction.
+- **Response:** `QueryResponse` plain list/detail models with book and source
+  IDs, invoice number, currency and decimal-string totals, payment/appointment
+  references, separate business/e-document states, document type, integration
+  reference/UUID where permitted, version, and cancellation trail. Add a
+  document download link only when a real authorized storage/provider endpoint
+  exists. Hide raw integration payloads.
+- **Existing API support:** Listing/detail/by-payment/backfill/cancel exist, but
+  the actively used `InvoiceViewResponseDto` omits invoice number, payment/
+  appointment links, and e-document fields. The broader unused
+  `InvoiceResponseDto` is not evidence the API returns them. E-document routing
+  now resolves clinic/organization credentials and includes a Nilvera send/status
+  adapter. The invoice read models still omit the external document fields needed
+  by this proposal; no authorized download or operator retry API was found.
+- **Frontend behavior:** Show internal document and external submission states
+  separately; no "sent"/"download official invoice" action is fabricated from
+  an internal invoice. Financial correction, invoice cancellation, collection
+  refund, and provider void remain separate traceable actions.
+- **Acceptance criteria:** A detail opens with the same number/totals as its
+  list; links preserve book authorization; internal documents are never marked
+  as externally delivered; cancellation preserves accounting/reversal history;
+  unsupported integration actions remain unavailable until published APIs exist.
+
+### OCB-11 Party balance and statement projection — `Proposed`
+
+- **Frontend location:**
+  `/{locale}/{organization-slug}/{clinic-slug}/finance/party`, party detail
+  drawer and future receivables/payables workspaces.
+- **User action:** Open a customer, patient, supplier, or employee party card
+  and inspect its server-calculated balance and traceable statement by date and
+  currency.
+- **Endpoint:** Proposed
+  `GET /api/v1/parties/{partyId}/balance?dateTo&accountingBookId` and
+  `GET /api/v1/parties/{partyId}/statement?dateFrom&dateTo&currency&page&limit&accountingBookId`.
+  A single detail endpoint may embed the balance only if its as-of date,
+  currency, and calculation basis remain explicit; the statement stays
+  independently paginated.
+- **Authorization:** `party.read` plus finance/book access to the resolved
+  party. Amount fields use the established financial serialization group. The
+  server resolves the party's clinic/book and rejects cross-tenant IDs rather
+  than trusting a client clinic ID.
+- **Request:** Validated party and book UUIDs, optional inclusive date range,
+  one currency for statement filtering, stable ordering, and bounded
+  pagination. Define whether unposted events are excluded; default to posted
+  accounting facts and report the basis in metadata.
+- **Response:** `QueryResponse` plain read models. Balance contains `asOf`,
+  `currency`, decimal-string `debit`, `credit`, and signed `balance` with an
+  explicit debtor/creditor semantic. Statement rows contain stable entry/line
+  IDs, posting date, document/reference, description, debit, credit, running
+  balance, currency, source type/reference, and reversal status. Currencies
+  are returned separately and never summed.
+- **Existing API support:** Party list/detail queries expose identity, roles,
+  and receivable/payable account links. Patient finance-ledger reads cover only
+  patient payment events, while the accounting ledger report is account-code
+  based and does not filter by `partyId`. No party balance/statement query or
+  repository projection was found; this requires backend read-model work, not
+  a frontend reconstruction from unrelated lists.
+- **Frontend behavior:** The current party screen shows identity and account
+  linkage only and explicitly marks balance/statement unavailable. Once the
+  generated operations exist, show per-currency balances, loading/empty/error
+  states, paginated movements, and links to authorized source documents. An
+  omitted financial field is restricted/unknown, never zero.
+- **Acceptance criteria:** Balance reconciles to the same posted statement as
+  of the requested date; running balances are stable across pages; reversals
+  remain visible and net correctly; debtor/creditor sign is unambiguous;
+  cross-book access is rejected; currencies are not combined; no client-side
+  summation is required to determine the authoritative balance.
+
+### Role catalog and role-capability management — `Proposed`
+
+- **Frontend location:**
+  `/{locale}/{organization-slug}/{clinic-slug}/identity/role`, implemented by
+  `src/features/identity/role/components/roles-workspace.tsx`.
+- **User action:** List the roles available in the current management scope,
+  inspect their priority/scope/capabilities, and eventually create a custom
+  role or update its capability assignments.
+- **Endpoint:** Proposed `GET /api/v1/roles?page&limit&search&scope`,
+  `GET /api/v1/roles/{roleId}`, `POST /api/v1/roles`,
+  `PATCH /api/v1/roles/{roleId}`, and
+  `PUT /api/v1/roles/{roleId}/capabilities`. System-role mutation may instead
+  remain deployment-managed and reject write operations explicitly.
+- **Authorization:** `role.read` for list/detail and `role.create` /
+  `role.update` plus explicit platform or organization ownership policy for
+  writes. A manager must never assign a role or capability above their own
+  authority or outside their organization/clinic scope.
+- **Request:** List accepts bounded pagination, normalized search, and an
+  explicit scope filter. Create/update accepts a localized display name,
+  unique slug, priority constrained below the actor, scope type, and optional
+  optimistic-lock version. Capability replacement accepts validated canonical
+  `module:action` keys and expected version; unknown or retired keys fail as a
+  validation error.
+- **Response:** `QueryResponse` plain role read models containing `id`, `name`,
+  `slug`, `priority`, `isSystemRole`, scope metadata, `version`, and canonical
+  capabilities grouped or groupable by module. List metadata is paginated;
+  restricted roles are omitted rather than partially exposed.
+- **Existing API support:** `GetRoleByIdQuery` and `GetRoleBySlugQuery` exist,
+  backed by `IRoleQueryRepository`, but no role HTTP controller or generated
+  frontend operation was found. There is no list query and no role create,
+  update, delete, or role-capability mutation use case. User-specific
+  capability grant/revoke endpoints do not replace role management. The
+  current UI therefore reads the deployment-owned `rolesCreateManyInputs`
+  catalog and is intentionally read-only.
+- **Frontend behavior:** Until these operations exist, show the system catalog
+  with search, scope, priority, and capability inspection but no fake save or
+  delete controls. Once available, add independent loading/empty/error states,
+  invalidate role and actor-context queries after writes, show concurrency and
+  forbidden errors clearly, and prevent editing system roles when the API
+  marks them immutable.
+- **Acceptance criteria:** The list reflects only authorized roles; capability
+  changes survive reload and affect newly resolved actor contexts; system-role
+  immutability is enforced server-side; privilege escalation and cross-tenant
+  assignment are rejected; concurrent edits return a conflict; OpenAPI and
+  generated Orval hooks cover every supported operation.

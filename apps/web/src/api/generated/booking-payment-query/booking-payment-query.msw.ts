@@ -6,6 +6,10 @@
  * OpenAPI spec version: 1
  */
 import {
+  faker
+} from '@faker-js/faker';
+
+import {
   HttpResponse,
   http
 } from 'msw';
@@ -14,11 +18,14 @@ import type {
 } from 'msw';
 
 import type {
-  BookingPaymentUnbridged200
+  BookingPaymentUnbridged200,
+  BookingPaymentUnresolvedRefunds200
 } from '../model';
 
 
 export const getBookingPaymentUnbridgedResponseMock = (): BookingPaymentUnbridged200 => ({})
+
+export const getBookingPaymentUnresolvedRefundsResponseMock = (overrideResponse: Partial<Extract<BookingPaymentUnresolvedRefunds200, object>> = {}): BookingPaymentUnresolvedRefunds200 => ({data: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({kind: faker.helpers.arrayElement(['CANCELLATION','BOOKING_FAILED','UNCLAIMED_CHARGE'] as const), origin: faker.helpers.arrayElement(['LIVE','LEGACY'] as const), provider: faker.helpers.arrayElement(['IYZICO','STRIPE'] as const), currency: faker.helpers.arrayElement(['TRY','USD','EUR','GBP'] as const), status: faker.helpers.arrayElement(['PENDING','CONFIRMED','FAILED','UNCONFIRMED'] as const), id: faker.string.alpha({length: {min: 10, max: 20}}), bookingPaymentId: faker.string.alpha({length: {min: 10, max: 20}}), clinicId: faker.string.alpha({length: {min: 10, max: 20}}), chargeProviderRef: faker.string.alpha({length: {min: 10, max: 20}}), amount: faker.string.alpha({length: {min: 10, max: 20}}), attemptCount: faker.number.float({fractionDigits: 2}), idempotencyKey: faker.string.alpha({length: {min: 10, max: 20}}), failureReason: faker.helpers.arrayElement([faker.string.alpha({length: {min: 10, max: 20}}), null]), requestedAt: faker.helpers.arrayElement([faker.date.past().toISOString().slice(0, 19) + 'Z', null]), stale: faker.datatype.boolean()})), meta: faker.helpers.arrayElement([{pagination: faker.helpers.arrayElement([{total: faker.number.float({fractionDigits: 2}), page: faker.number.float({fractionDigits: 2}), limit: faker.number.float({fractionDigits: 2}), totalPages: faker.number.float({fractionDigits: 2})}, undefined])}, undefined]), serialization: faker.helpers.arrayElement([{groups: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => (faker.string.alpha({length: {min: 10, max: 20}})))}, undefined]), ...overrideResponse})
 
 
 export const getBookingPaymentUnbridgedMockHandler = (overrideResponse?: BookingPaymentUnbridged200 | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<BookingPaymentUnbridged200> | BookingPaymentUnbridged200), options?: RequestHandlerOptions) => {
@@ -32,6 +39,19 @@ export const getBookingPaymentUnbridgedMockHandler = (overrideResponse?: Booking
       })
   }, options)
 }
+
+export const getBookingPaymentUnresolvedRefundsMockHandler = (overrideResponse?: BookingPaymentUnresolvedRefunds200 | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<BookingPaymentUnresolvedRefunds200> | BookingPaymentUnresolvedRefunds200), options?: RequestHandlerOptions) => {
+  return http.get('*/api/v1/health-tourism/booking-payments/refunds/unresolved', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getBookingPaymentUnresolvedRefundsResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getBookingPaymentQueryMock = () => [
-  getBookingPaymentUnbridgedMockHandler()
+  getBookingPaymentUnbridgedMockHandler(),
+  getBookingPaymentUnresolvedRefundsMockHandler()
 ]

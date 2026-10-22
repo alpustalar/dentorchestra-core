@@ -1,7 +1,8 @@
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
 import { TSQueryBus } from '@common/cqrs/type-safe-query-bus';
 import InstallmentStatusSchema from '@input-type-schemas/InstallmentStatusSchema';
-import { MarkInstallmentAsRefundedCommand } from '@modules/finance/payment/application/commands/mark-installment-as-refunded/mark-installment-as-refunded.command';
+import { BeginInstallmentReversalCommand } from '@modules/finance/payment/application/commands/begin-installment-reversal/begin-installment-reversal.command';
+import { ReleaseInstallmentReversalCommand } from '@modules/finance/payment/application/commands/release-installment-reversal/release-installment-reversal.command';
 import { GetPaymentWithInstallmentsQuery } from '@modules/finance/payment/application/queries/get-payment-with-installments/get-payment-with-installments.query';
 import { IyzicoResultGuard } from '@src/domain/value-objects/iyzico-result-guard.vo';
 import {
@@ -26,6 +27,7 @@ import {
   IYZICO_PROVIDER,
 } from '@src/infrastructure/payment/pos/virtual/providers/iyzico/interfaces/iyzico.provider.interface';
 import { TransactionManager } from '@src/infrastructure/persistence/prisma/transaction';
+import { IyzicoReversalFinalizer } from '@modules/finance/pos/virtual/application/services/iyzico-reversal-finalizer.service';
 import { RefundPaymentCommand } from './refund-payment.command';
 import { RefundPaymentCommandResponse } from './refund-payment.response';
 import { Currency, UUID } from '@src/domain/value-objects';
@@ -34,11 +36,6 @@ import {
   IPolicyFactory,
   POLICY_FACTORY,
 } from '@modules/platform/policy/staff/domain/interfaces/policy-factory.interface';
-import { EnsurePartyForPatientCommand } from '@modules/finance/party/application/commands/ensure-party-for-patient/ensure-party-for-patient.command';
-import { RecordFinancialEventCommand } from '@modules/finance/accounting/financial-events/application/commands/record-financial-event/record-financial-event.command';
-import { FinancialEventTypeSchema, PartyRoleSchema } from '@shared';
-import { FINANCIAL_EVENT_SOURCE_MODULES } from '@modules/finance/shared/domain/constants/financial-event-source-modules.constant';
-import { FinancialEventDedupeKeys } from '@modules/finance/shared/domain/constants/financial-event-dedupe-keys.constant';
 
 @CommandHandler(RefundPaymentCommand)
 export class RefundPaymentHandler implements ICommandHandler<
@@ -52,6 +49,7 @@ export class RefundPaymentHandler implements ICommandHandler<
     private readonly iyzicoCommandRepo: IIyzicoTransactionCommandRepository,
     private readonly txManager: TransactionManager,
     private readonly commandBus: TSCommandBus,
+    private readonly finalizer: IyzicoReversalFinalizer,
     private readonly queryBus: TSQueryBus,
     @Inject(POLICY_FACTORY)
     private readonly policyFactory: IPolicyFactory,
@@ -85,25 +83,10 @@ export class RefundPaymentHandler implements ICommandHandler<
     if (!completedInstallment)
       throw new CompletedInstallmentNotFoundException();
 
-    // Kart itirazı da aynı taksidin aynı tutarına dokunur: açık ya da kaybedilmiş
-    // bir itiraz varken iade/iptal parayı kart sahibine İKİ KEZ götürürdü (bir kez
-    // sağlayıcı kesintisi, bir kez bizim iademiz). Kontrol dış SDK çağrısından
-    // ÖNCE — sonra olsaydı para çoktan hareket etmişti.
-    // Not: bu yolda taksit satırı kilitlenmiyor ve PENDING işareti yok; SDK
-    // uçuştayken kaydedilen bir itiraz yakalanmaz (§88 ertelemesi).
-    const completedAmount = new Decimal(completedInstallment.amount.toString());
-    await this.chargebackExposureGuard.assertReversalWithinCollection({
-      sourceType: CardChargebackSourceSchema.enum.ONLINE_PAYMENT,
-      sourceId: completedInstallment.id,
-      collectedAmount: completedAmount,
-      // COMPLETED taksit henüz iade edilmemiştir (iade → REFUNDED durumuna geçer).
-      alreadyReversedAmount: new Decimal(0),
-      requestedAmount: completedAmount,
-    });
-
     // İade çağrısı için dış referans (paymentTransactionId). Okuma command repo'dan:
     // kayıt az önce yazılmış olabilir, replica gecikmesi iadeyi "kayıt yok" diye
     // reddederdi. Kilit burada anlamsız — SDK çağrısı transaction dışında olmalı.
+    // Damgadan ÖNCE okunur: kayıt yoksa damga atılmamış olmalı (geri alınmaz kalırdı).
     const iyzicoTx = await this.iyzicoCommandRepo.findByInstallmentId(
       completedInstallment.id
     );
@@ -114,8 +97,32 @@ export class RefundPaymentHandler implements ICommandHandler<
       );
     }
 
+    // Kart itirazı da aynı taksidin aynı tutarına dokunur: açık ya da kaybedilmiş
+    // bir itiraz varken iade/iptal parayı kart sahibine İKİ KEZ götürürdü (bir kez
+    // sağlayıcı kesintisi, bir kez bizim iademiz). Kapı SDK çağrısından ÖNCE, ödeme
+    // satırı kilitliyken çalışır ve aynı kısa transaction'da taksit "geri götüren
+    // girişim sürüyor" diye damgalanır: SDK uçuştayken açılmaya çalışılan itiraz
+    // damgayı görür ve reddedilir (kural 18d). Kapı reddederse damga geri sarılır.
+    const completedAmount = new Decimal(completedInstallment.amount.toString());
+    await this.txManager.run(async () => {
+      await this.commandBus.execute(
+        new BeginInstallmentReversalCommand(completedInstallment.id, ctx)
+      );
+      await this.chargebackExposureGuard.assertReversalWithinCollection({
+        sourceType: CardChargebackSourceSchema.enum.ONLINE_PAYMENT,
+        sourceId: completedInstallment.id,
+        collectedAmount: completedAmount,
+        // COMPLETED taksit henüz iade edilmemiştir (iade → REFUNDED durumuna geçer).
+        alreadyReversedAmount: new Decimal(0),
+        requestedAmount: completedAmount,
+      });
+    });
+
     const generatedConversationUUID = UUID.generate();
 
+    // SDK FIRLATIRSA (zaman aşımı, bağlantı kopması) sonuç BİLİNMİYOR: iade sağlayıcıda
+    // başarılı olmuş olabilir. Damga kasıtlı olarak kalır — itirazı engellemeye devam
+    // eder; aynı yolun yeniden denemesi `REVERSAL_RETRY_AFTER_MINUTES` sonra açılır.
     const sdkResult = await this.iyzicoProvider.refund({
       locale: 'TR',
       conversationId: generatedConversationUUID.value,
@@ -125,107 +132,27 @@ export class RefundPaymentHandler implements ICommandHandler<
       currency: Currency.enum.TRY,
     });
 
-    IyzicoResultGuard.create({
+    const outcome = IyzicoResultGuard.create({
       status: sdkResult.status,
       errorMessage: sdkResult.errorMessage,
-    })
-      .isSuccess()
-      .orThrow();
+    }).isSuccess();
 
-    await this.txManager.outboxRun(async () => {
-      // SDK çağrısı sürerken callback/webhook aynı kaydı güncellemiş olabilir;
-      // yukarıdaki kopyayı geri yazmak onu ezerdi. Kilitli ve taze okunur.
-      const lockedTx =
-        await this.iyzicoCommandRepo.findByInstallmentIdForUpdate(
-          completedInstallment.id
-        );
-      if (!lockedTx) {
-        throw new IyzicoPaymentRecordNotFoundException(
-          'Bu ödeme için iyzico işlem transaction kaydı bulunamadı.'
-        );
-      }
-
-      lockedTx.markAsRefunded({ rawResponse: sdkResult });
-      await this.iyzicoCommandRepo.update(lockedTx);
-
+    if (!outcome.isValid) {
+      // Sağlayıcı AÇIKÇA reddetti: para gitmedi, damga kalkar.
       await this.commandBus.execute(
-        new MarkInstallmentAsRefundedCommand({
-          installmentId: completedInstallment.id,
-          ctx,
-        })
+        new ReleaseInstallmentReversalCommand(completedInstallment.id, ctx)
       );
+      outcome.orThrow();
+    }
 
-      // PaymentRefundedEvent burada YAYINLANMAZ: yukarıdaki
-      // MarkInstallmentAsRefundedCommand → Payment.refundInstallment() zaten
-      // raise ediyor. İkinci kez yayınlamak CARİ defter ters kaydını
-      // (RefundLedgerEntriesCommand) iki kez tetikliyordu.
-      //
-      // Çift taraflı defter ayrı bir yoldur: yukarıdaki olay cari defteri
-      // (finance-ledger) düzeltir, yevmiye için ekonomik olay YAZILMALIDIR.
-      // Bu satır eklenene kadar iade yevmiyeye hiç ulaşmıyordu: 108'de hiç
-      // gelmeyecek para, 120'de kapanmış görünen bir borç kalıyordu.
-      await this.recordPaymentRefunded({
-        patientId: payment.patientId,
-        clinicId: payment.clinicId,
-        installmentId: completedInstallment.id,
-        paymentId,
-        amount: completedInstallment.amount.toString(),
-      });
+    await this.finalizer.finalize({
+      installmentId: completedInstallment.id,
+      paymentId,
+      clinicId: payment.clinicId,
+      patientId: payment.patientId,
+      amount: completedInstallment.amount.toString(),
+      rawResponse: sdkResult,
+      ctx,
     });
   }
-
-  /**
-   * İadeyi çift taraflı deftere köprüler: hastanın carisini garanti eder ve
-   * `PAYMENT_REFUNDED` ekonomik olayını yazar (120 / 108).
-   *
-   * Hata YUTULMAZ — tahsilat köprüsüyle (bkz. `handle-payment-callback`) aynı
-   * tercih: aynı `outboxRun` içindeyiz, köprü patlarsa iade işaretlemesi de geri
-   * sarılır ve yerel durum ile defter **birlikte** eski hâlinde kalır. Yarısını
-   * yazıp diğerini alarmla bırakmak, iade edilmiş bir taksitin defterde hâlâ
-   * tahsilat görünmesi demekti — bu turun kapattığı hatanın aynısı.
-   */
-  private async recordPaymentRefunded(
-    input: RecordPaymentRefundedInput
-  ): Promise<void> {
-    const ctx = ExecutionContextFactory.createInternal();
-
-    const { partyId } = await this.commandBus.execute(
-      new EnsurePartyForPatientCommand(
-        input.patientId,
-        input.clinicId,
-        PartyRoleSchema.enum.CUSTOMER,
-        ctx
-      )
-    );
-
-    await this.commandBus.execute(
-      new RecordFinancialEventCommand(
-        {
-          clinicId: input.clinicId,
-          type: FinancialEventTypeSchema.enum.PAYMENT_REFUNDED,
-          payload: {
-            // Sanal POS iadesi her zaman karttan geri gider → 108.
-            method: 'POS_CARD',
-            amount: input.amount,
-            partyId,
-            reference: input.installmentId,
-          },
-          sourceModule: FINANCIAL_EVENT_SOURCE_MODULES.PAYMENT,
-          sourceRefId: input.paymentId,
-          dedupeKey: FinancialEventDedupeKeys.payment_refunded(
-            input.installmentId
-          ),
-        },
-        ctx
-      )
-    );
-  }
-}
-
-interface RecordPaymentRefundedInput {
-  patientId: string;
-  clinicId: string;
-  installmentId: string;
-  paymentId: string;
-  amount: string;
 }

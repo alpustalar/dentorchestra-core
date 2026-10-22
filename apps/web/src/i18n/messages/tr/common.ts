@@ -1,0 +1,47 @@
+export default {
+  Common: {
+    save: 'Kaydet',
+    cancel: 'İptal',
+    delete: 'Sil',
+    edit: 'Düzenle',
+    search: 'Ara',
+    searchPlaceholder: 'Hasta, lead veya işlem ara...',
+    loading: 'Yükleniyor',
+    confirm: 'Onayla',
+    appTitle: 'MED ERP',
+    appSubtitle: 'Yönetim Paneli',
+    toggleExpand: 'Menüyü genişlet',
+    toggleCollapse: 'Menüyü daralt',
+    clinicManager: 'Klinik Yöneticisi',
+    allClinics: 'Tüm klinikler',
+    userProfile: '{name} ({role})',
+    userFallback: 'Kullanıcı',
+    selectRole: 'Rol seç',
+    changeRole: 'Rol değiştir',
+    roleSwitcherInfo:
+      'Bu seçim yalnızca klinik sahibi veya şirket sahibi için kullanılabilir.',
+    roles: {
+      admin: 'Sistem Yöneticisi',
+      organizationOwner: 'Organizasyon Sahibi',
+      branchManager: 'Bölge / Şube Müdürü',
+      clinicOwner: 'Klinik Sahibi / Mesul Müdür',
+      provider: 'Doktor',
+      assistant: 'Hemşire / Asistan',
+      accountant: 'Muhasebe / Finans Sorumlusu',
+      receptionist: 'Resepsiyonist / Ön Büro',
+      inventoryManager: 'Depo / Stok Sorumlusu',
+      staff: 'Destek Personeli',
+    },
+    roleScopes: {
+      platform: 'Platform yönetimi',
+      organization: 'Organizasyon yönetimi',
+      branches: 'Şube yönetimi',
+      clinic: 'Klinik operasyonları',
+    },
+    platformAdministration: {
+      title: 'Platform yönetimi',
+      description:
+        'Sistem rolleri, platform yetkileri ve ortak klinik yapılandırmalarını yönetin.',
+    },
+  },
+} as const;

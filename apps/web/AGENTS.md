@@ -24,6 +24,45 @@ Global dizinleri asla kirletmeyin. Aşağıdaki hiyerarşiye uyun:
 - React bileşenleri, hook'lar, yardımcı araçlar (utilities) ve action'lar `kebab-case` dosya adlandırması kullanmalıdır.
 - Next.js App Router dosyaları standart adlandırmalara uymalıdır (`page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`).
 
+## 3a. Feature Klasörü İç Organizasyonu — KURAL
+
+Bir feature bileşeni (`features/{module}/components/{name}.tsx`) form şeması, parsing/hesap mantığı,
+localStorage gibi birden fazla sorumluluğu tek dosyada topladığında (Single Responsibility ihlali) şu
+katmanlara bölünür — hiçbiri `components/` içinde kalmaz:
+
+```
+features/{module}/{feature}/
+  components/
+    {feature}-workspace.tsx      # Orkestratör — sadece akış/adım/wiring, iş mantığı yok
+    {feature}-foo-card.tsx       # Flat: aynı özelliğin tüm alt bileşenleri components/ içinde düz durur
+    index.ts                     # Barrel — SADECE orkestratörü dışa açar
+    wizard-steps/                # Yalnız adım/alt-görünüm gibi anlamlı bir alt kümeyse ayrı klasör açılabilir
+      step-0-meta.tsx
+  schemas/
+    {feature}.schema.ts          # Zod şema + ondan infer edilen tipler + varsayılan değerler
+  utils/
+    {feature}-parser.util.ts     # Parsing / hesaplama / normalizasyon fonksiyonları
+    {feature}-storage.util.ts    # localStorage gibi yan etkili yardımcılar
+  hooks/
+    use-{feature}.ts             # Form + state + türetilmiş veri + handler'lar burada toplanır
+```
+
+**`components/` altında asla tekrar `_components/` (ya da başka bir genel "diğerleri" klasörü)
+açılmaz** — bu anti-pattern'dir. Aynı özelliğin alt bileşenleri `components/` içinde düz (flat)
+durur; `components/index.ts` barrel'ı **yalnızca o feature'ın orkestratör bileşenini** dışa açar
+(`export { FooWorkspace } from './foo-workspace';`). Sayfa (`page.tsx`) veya başka bir üst katman
+sadece bu barrel'dan orkestratörü import eder; feature'ın alt bileşenlerini dışarıdan hiçbir dosya
+doğrudan import etmez — onları yalnızca feature'ın kendi orkestratörü/ebeveyn bileşeni kullanır.
+
+Birden fazla sayfa/özellikte genel amaçlı kullanılma ihtimali olan yardımcı fonksiyonlar (ör. para
+yuvarlama, tarih biçimleme) feature'a özel `utils/` içinde değil, `features/{module}/shared/utils/`
+içinde ya da gerçekten modül-bağımsızsa global `lib/` içinde tutulur.
+
+Referans örnek: `features/finance/bank/` (bank-statement-import-wizard bölünmesi — `schemas/
+bank-statement-import.schema.ts`, `utils/bank-statement-parser.util.ts`, `utils/
+bank-statement-mapping-storage.util.ts`, `hooks/use-bank-statement-import.ts`, `components/
+wizard-steps/`).
+
 ## 4. Backend Yanıt Kontratı ve Tip Tanımlamaları
 
 NestJS backend'i, liste ve tekil yanıtları `MixinTransformInterceptor` aracılığıyla sarar; bu yapı `packages/shared/common/response/response.interface.ts` ile uyumludur:
@@ -125,3 +164,13 @@ kriterleri bulunmalıdır.
   türetilmelidir. Doğum tarihi gibi gerçekten sabit tarihsel veriler bu kuralın
   dışındadır.
 ```
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

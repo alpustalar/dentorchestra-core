@@ -9,6 +9,7 @@ describe('NoopEInvoiceAdapter (entegratör kapalı fallback, doc 07 §1)', () =>
   const adapter: EInvoicePort = new NoopEInvoiceAdapter();
 
   const request: EDocumentRequest = {
+    clinicId: 'clinic-1',
     type: EDocumentTypeSchema.enum.E_ARSIV,
     invoiceId: 'inv-1',
     idempotencyKey: 'inv-1',
@@ -38,11 +39,24 @@ describe('NoopEInvoiceAdapter (entegratör kapalı fallback, doc 07 §1)', () =>
   });
 
   it('cancel / getStatus / checkMailbox güvenli default döner', async () => {
-    await expect(adapter.cancel('uuid-1', 'neden')).resolves.toBeUndefined();
-    await expect(adapter.getStatus('uuid-1')).resolves.toBe(
-      EDocumentStatusSchema.enum.INTERNAL
-    );
-    await expect(adapter.checkMailbox('1234567890')).resolves.toEqual({
+    await expect(
+      adapter.cancel({
+        clinicId: 'clinic-1',
+        documentType: EDocumentTypeSchema.enum.E_ARSIV,
+        uuid: 'uuid-1',
+        reason: 'neden',
+      })
+    ).resolves.toBeUndefined();
+    await expect(
+      adapter.getStatus({
+        clinicId: 'clinic-1',
+        documentType: EDocumentTypeSchema.enum.E_ARSIV,
+        uuid: 'uuid-1',
+      })
+    ).resolves.toBe(EDocumentStatusSchema.enum.INTERNAL);
+    await expect(
+      adapter.checkMailbox('clinic-1', '1234567890')
+    ).resolves.toEqual({
       isEInvoiceUser: false,
     });
   });

@@ -1,12 +1,12 @@
 'use client';
 
-import * as React from 'react';
+import React from 'react';
 import { useTranslations } from 'next-intl';
 import { Check, X } from 'lucide-react';
 import { DateTimeManager } from '@shared/common';
 import {
-  canResizeCalendarAppointment,
   type CalendarAppointment,
+  canResizeCalendarAppointment,
 } from '@/features/clinical/appointment/calendar-appointment.types';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,13 @@ import { appointmentStatus } from '@/features/clinical/appointment/data/mock-app
 import { CalendarRangeHandles } from './calendar-range-handles';
 import {
   CALENDAR_TIMELINE,
-  createCalendarSelection,
-  dragCalendarSelection,
-  createSlotSelection,
-  getCalendarSlots,
-  resizeCalendarSelection,
   type CalendarDay,
   type CalendarSelection,
+  createCalendarSelection,
+  createSlotSelection,
+  dragCalendarSelection,
+  getCalendarSlots,
+  resizeCalendarSelection,
   type SelectionEdge,
 } from './calendar-selection';
 
@@ -563,7 +563,7 @@ export function ScheduleDayColumn({
           )}
           <div
             data-calendar-interactive
-            className="pointer-events-auto absolute right-1 z-40 flex items-center gap-0.5 rounded-lg border bg-background/95 p-0.5 shadow-sm"
+            className="pointer-events-auto absolute right-1 z-40 flex items-center gap-0.5 rounded-full border bg-background/95 p-0.5 shadow-sm"
             style={{ top: actionsTop }}
             onPointerDown={(event) => event.stopPropagation()}
           >
@@ -571,7 +571,7 @@ export function ScheduleDayColumn({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-8"
+              className="size-7 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive/70"
               aria-label={t('clearSelection')}
               title={t('clearSelection')}
               disabled={actionsDisabled}
@@ -580,12 +580,13 @@ export function ScheduleDayColumn({
                 onSelectionChange(null);
               }}
             >
-              <X className="size-4" aria-hidden="true" />
+              <X className="size-3.5" aria-hidden="true" />
             </Button>
             <Button
               type="button"
               size="icon"
-              className="size-8"
+              variant="ghost"
+              className="size-7 rounded-full text-primary"
               aria-label={t('confirmSelection')}
               title={t('confirmSelection')}
               disabled={actionsDisabled}
@@ -594,7 +595,7 @@ export function ScheduleDayColumn({
                 onRangeConfirm(activeSelection);
               }}
             >
-              <Check className="size-4" aria-hidden="true" />
+              <Check className="size-3.5" aria-hidden="true" />
             </Button>
           </div>
         </div>

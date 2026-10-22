@@ -26,6 +26,7 @@ export function toInstallmentCreateData(inst: PaymentInstallment) {
     paidAt: inst.paidAt,
     note: inst.note,
     recoversInstallmentId: inst.recoversInstallmentId,
+    reversalRequestedAt: inst.reversalRequestedAt,
   };
 }
 
@@ -79,6 +80,16 @@ export class PaymentCommandRepository
       include: { installments: { orderBy: { installmentNo: 'asc' } } },
     });
     return raw ? new Payment(raw) : null;
+  }
+
+  async setReversalRequestedAt(params: {
+    installmentId: string;
+    requestedAt: Date | null;
+  }): Promise<void> {
+    await this.db.paymentInstallment.update({
+      where: { id: params.installmentId },
+      data: { reversalRequestedAt: params.requestedAt },
+    });
   }
 
   async create(entity: Payment): Promise<Payment> {

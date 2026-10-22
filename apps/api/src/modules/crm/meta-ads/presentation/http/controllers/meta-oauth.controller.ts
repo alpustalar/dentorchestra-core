@@ -14,6 +14,9 @@ import { HandleMetaOAuthCallbackCommand } from '@modules/crm/meta-ads/applicatio
 import { InitiateMetaOAuthCommand } from '@modules/crm/meta-ads/application/commands/initiate-meta-oauth/initiate-meta-oauth.command';
 import { ENV } from '@common/constants/env.constant';
 import { TSCommandBus } from '@common/cqrs/type-safe-command-bus';
+import { InitiateMetaOAuthDto } from '@shared/modules/meta-ads/dto/commands';
+
+const DEFAULT_RETURN_PATH = '/meta-ads/connected';
 
 const { METAADACCOUNT } = CAPABILITIES;
 
@@ -34,13 +37,15 @@ export class MetaOAuthController {
   @HasCapability(METAADACCOUNT.create)
   @Get('authorize')
   async authorize(
-    @Query('clinicId') clinicId: string,
+    @Query() dto: InitiateMetaOAuthDto,
     @GetContext() ctx: IGetContext
   ) {
-    if (!clinicId) throw new BadRequestException('clinicId zorunludur.');
-
     const url = await this.commandBus.execute(
-      new InitiateMetaOAuthCommand(clinicId, ctx)
+      new InitiateMetaOAuthCommand({
+        clinicId: dto.clinicId,
+        returnPath: dto.returnPath ?? DEFAULT_RETURN_PATH,
+        ctx,
+      })
     );
     return { url };
   }
@@ -56,12 +61,15 @@ export class MetaOAuthController {
     if (!code || !state)
       throw new BadRequestException('code ve state zorunludur.');
 
-    await this.commandBus.execute(
+    const result = await this.commandBus.execute(
       new HandleMetaOAuthCallbackCommand(code, state)
     );
 
     const webBaseUrl =
       this.config.get<string>(ENV.ORIGIN) ?? 'http://localhost:3000';
-    return { url: `${webBaseUrl}/meta-ads/connected`, statusCode: 302 };
+    return {
+      url: `${webBaseUrl}${result.returnPath}?connected=1`,
+      statusCode: 302,
+    };
   }
 }

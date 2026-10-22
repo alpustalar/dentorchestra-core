@@ -637,6 +637,21 @@ const CHECKS = [
        ORDER BY f."created_at" DESC
        LIMIT 50`,
   },
+  {
+    key: 'sanal-pos-iade-sonucu-bilinmiyor',
+    title: 'Sonucu doğrulanmamış sanal POS iade/iptal girişimi',
+    why: "İade/iptal çağrısı zaman aşımına uğradığında para sağlayıcıda çıkmış olabilir; taksit COMPLETED kalır ve damga (reversal_requested_at) bayatlar. Damga doluyken kart itirazı açılamaz ve otomatik yeniden denenmez (kural 18). Sağlayıcı panelinde iade kaydını `paymentTransactionId`/`paymentId` ile arayın: iade gittiyse taksit elle REFUNDED yapılmalı ve PAYMENT_REFUNDED olayı yazılmalı, gitmediyse yeniden deneyin. Eşik `REVERSAL_RETRY_AFTER_MINUTES` (10 dk).",
+    sql: `
+      SELECT i."id" AS installment_id, i."payment_id", p."clinic_id",
+             i."amount"::text AS amount, i."reversal_requested_at"
+        FROM "payment_installments" i
+        JOIN "payments" p ON p."id" = i."payment_id"
+       WHERE i."status" = 'COMPLETED'
+         AND i."reversal_requested_at" IS NOT NULL
+         AND i."reversal_requested_at" < now() - interval '10 minutes'
+       ORDER BY i."reversal_requested_at"
+       LIMIT 50`,
+  },
 ];
 
 async function main() {
