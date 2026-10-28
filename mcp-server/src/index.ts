@@ -6,7 +6,7 @@ import { allTools, executeTool } from './tools';
 // MCP Server Tanımı
 const server = new Server(
   {
-    name: 'mederp-mcp-server',
+    name: 'dentorchestra-mcp-server',
     version: '1.1.0',
   },
   {
@@ -58,7 +58,7 @@ async function run() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    'MedErp Modüler MCP Server başarıyla STDIO üzerinde çalışıyor...'
+    'Dentorchestra Modüler MCP Server başarıyla STDIO üzerinde çalışıyor...'
   );
 }
 
