@@ -1,4 +1,4 @@
-import type { ServiceWindowClosedMeta } from '@core-crm/shared/client';
+import type { ServiceWindowClosedMeta } from '@dentorchestra/shared/client';
 
 import { ApiError } from '@/lib/api';
 

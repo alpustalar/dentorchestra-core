@@ -1,4 +1,4 @@
-import type { GetPatients, PaginationInput } from '@core-crm/shared/client';
+import type { GetPatients, PaginationInput } from '@dentorchestra/shared/client';
 
 /**
  * Hastalar organizasyon kapsamlı (klinik opsiyonel), bu yüzden anahtarın kökünde

@@ -7,7 +7,7 @@ import type { User } from 'firebase/auth';
 import {
   meEndpoints,
   type ActorContextResponse,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 import { api } from '@/lib/api';
 

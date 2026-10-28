@@ -5,7 +5,7 @@ import {
   metaAdsEndpoints,
   type MetaLeadResponse,
   type PaginationInput,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 import { api, apiWithMeta } from '@/lib/api';
 

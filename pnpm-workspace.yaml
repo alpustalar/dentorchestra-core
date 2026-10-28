@@ -4,7 +4,7 @@ packages:
 
 # apps/web'den taşındı. Orada ayrı bir pnpm-workspace.yaml durduğu sürece pnpm
 # apps/web'i kendi başına bir workspace kökü sayıyor ve monorepo'dan koparıyordu:
-# `pnpm add` oradan çalıştırıldığında `@core-crm/shared@workspace:*` çözülemiyordu.
+# `pnpm add` oradan çalıştırıldığında `@dentorchestra/shared@workspace:*` çözülemiyordu.
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

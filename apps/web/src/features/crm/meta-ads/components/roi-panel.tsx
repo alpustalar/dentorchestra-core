@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from 'next-intl';
 import { TrendingDown, TrendingUp } from 'lucide-react';
-import type { AgencyRoiReport } from '@core-crm/shared/client';
+import type { AgencyRoiReport } from '@dentorchestra/shared/client';
 
 import {
   Card,

@@ -1,4 +1,4 @@
-# @core-crm/nest-kernel
+# @dentorchestra/nest-kernel
 
 Backend uygulamalarının (`apps/api`, `apps/messaging`) paylaştığı **NestJS'e bağlı**
 ortak çekirdek: tip-güvenli CQRS bus'ları, `ExecutionContext`/`GetContext`, `AggregateRoot`
@@ -44,7 +44,7 @@ bir şeye uzanmak derleme hatası verir, sessiz bir bağımlılık değil.
 ## Standalone tip-kontrolü
 
 ```bash
-pnpm --filter @core-crm/nest-kernel typecheck
+pnpm --filter @dentorchestra/nest-kernel typecheck
 ```
 
 Paket `apps/api`'ye hiç erişmeden derlenir. Bu bir süsleme değil, ayrılmanın ön koşuluydu:

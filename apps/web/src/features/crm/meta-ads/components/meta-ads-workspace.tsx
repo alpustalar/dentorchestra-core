@@ -10,7 +10,7 @@ import type {
   MetaAdAccountResponse,
   MetaLeadResponse,
   MetaReportResponse,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 import { Badge } from '@/components/ui/badge';
 import { useAuth as useMockAuth } from '@/data/auth/auth-context';

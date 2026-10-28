@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { MessageResponse } from '@core-crm/shared/client';
+import type { MessageResponse } from '@dentorchestra/shared/client';
 import dayjs from 'dayjs';
 
 import { Skeleton } from '@/components/ui/skeleton';

@@ -5,7 +5,7 @@ import {
   appointmentEndpoints,
   type CancelAppointment,
   type ScheduleAppointment,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 import { api } from '@/lib/api';
 

@@ -1,5 +1,5 @@
 {
-  "name": "@core-crm/messaging",
+  "name": "@dentorchestra/messaging",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.105.0",
-    "@core-crm/nest-kernel": "workspace:*",
-    "@core-crm/shared": "workspace:*",
+    "@dentorchestra/nest-kernel": "workspace:*",
+    "@dentorchestra/shared": "workspace:*",
     "@nestjs-modules/ioredis": "^2.0.2",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",

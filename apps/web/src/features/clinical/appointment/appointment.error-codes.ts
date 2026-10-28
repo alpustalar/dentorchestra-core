@@ -1,6 +1,6 @@
 /**
  * Backend'in `ERROR_CODES` sabiti `nest-kernel`'de yaşıyor ve tarayıcıya açık
- * değil (`@core-crm/shared/client` yalnız şema/tip/arayüz taşır). Frontend'in
+ * değil (`@dentorchestra/shared/client` yalnız şema/tip/arayüz taşır). Frontend'in
  * özel olarak ele aldığı kodlar bu yüzden burada, tek yerde sabitlenir —
  * bileşenlerin içine serpiştirilmiş çıplak string'ler yerine.
  */

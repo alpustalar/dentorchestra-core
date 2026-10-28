@@ -5,7 +5,7 @@ import type {
   ParamsOf,
   QueryOf,
   ResponseOf,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 import { ApiError, toApiError } from './error';
 import { type ApiResult, normalizeEnvelope } from './envelope';
 import { getTokenProvider } from './token-provider';

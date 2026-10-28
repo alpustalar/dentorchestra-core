@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ConversationResponse } from '@core-crm/shared/client';
+import type { ConversationResponse } from '@dentorchestra/shared/client';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

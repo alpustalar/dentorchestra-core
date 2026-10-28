@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { metaAdsEndpoints } from '@core-crm/shared/client';
+import { metaAdsEndpoints } from '@dentorchestra/shared/client';
 
 import { api } from '@/lib/api';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ConversationResponse } from '@core-crm/shared/client';
+import type { ConversationResponse } from '@dentorchestra/shared/client';
 import dayjs from 'dayjs';
 
 import { Badge } from '@/components/ui/badge';

@@ -3,7 +3,7 @@ import type {
   MetaAdAccountResponse,
   MetaLeadResponse,
   MetaReportResponse,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 /** `NEXT_PUBLIC_API_MOCKING=enabled` iken gösterilen sabit örnek veri. */
 

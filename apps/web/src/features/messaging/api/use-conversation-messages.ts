@@ -4,7 +4,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   messagingEndpoints,
   type PaginationInput,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 import { apiWithMeta } from '@/lib/api';
 

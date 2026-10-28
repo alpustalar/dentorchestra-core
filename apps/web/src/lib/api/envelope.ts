@@ -1,4 +1,4 @@
-import type { PaginationMeta } from '@core-crm/shared/client';
+import type { PaginationMeta } from '@dentorchestra/shared/client';
 
 /**
  * Backend üç ayrı şekil döndürüyor — hepsi normalize edilip tek tipe indirilir.

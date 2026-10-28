@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import type { MetaLeadResponse } from '@core-crm/shared/client';
+import type { MetaLeadResponse } from '@dentorchestra/shared/client';
 
 import {
   Card,

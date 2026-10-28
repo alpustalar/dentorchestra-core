@@ -1,3 +1,3 @@
-import type { Patient } from '@core-crm/shared/client';
+import type { Patient } from '@dentorchestra/shared/client';
 
 export type PatientStatus = Patient['status'];

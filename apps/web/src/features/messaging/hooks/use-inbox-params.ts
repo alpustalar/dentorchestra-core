@@ -6,7 +6,7 @@ import type {
   ConversationStatusValue,
   GetConversations,
   PaginationInput,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 const PAGE_SIZE = 30;
 

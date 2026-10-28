@@ -1,4 +1,4 @@
-import type { GetConversations, PaginationInput } from '@core-crm/shared/client';
+import type { GetConversations, PaginationInput } from '@dentorchestra/shared/client';
 
 /**
  * Mesaj listesi konuşmanın **altında** duruyor: bir mesaj gönderildiğinde hem o

@@ -2173,7 +2173,7 @@ Prisma schema and migrations are in a non-standard location:
 
 ### Shared Package
 
-The `@core-crm/shared` package contains:
+The `@dentorchestra/shared` package contains:
 
 - **Generated Zod schemas**: Auto-generated from Prisma schema via `zod-prisma-types`
 - **Module-specific schemas**: Hand-written validation schemas (e.g., `packages/shared/modules/clinic/schemas/`)

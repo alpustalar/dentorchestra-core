@@ -12,10 +12,10 @@ const nextConfig: NextConfig = {
   // Let Next.js trace files from the monorepo root so shared packages are included.
   outputFileTracingRoot: path.join(__dirname, '../../'),
 
-  // `@core-crm/shared` ham TypeScript yayınlıyor (`"main": "index.ts"`).
+  // `@dentorchestra/shared` ham TypeScript yayınlıyor (`"main": "index.ts"`).
   // Next.js node_modules içindeki ham .ts'i varsayılan olarak derlemez; bu
   // olmadan paketten yapılan ilk import derleme hatasıyla düşer.
-  transpilePackages: ['@core-crm/shared'],
+  transpilePackages: ['@dentorchestra/shared'],
 };
 
 export default withNextIntl(nextConfig);

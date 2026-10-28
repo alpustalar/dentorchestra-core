@@ -1,4 +1,4 @@
-import type { PaginationInput } from '@core-crm/shared/client';
+import type { PaginationInput } from '@dentorchestra/shared/client';
 
 /** `yyyy-mm-dd` sınırlar — finance-ledger-workspace ile aynı tarih aralığı şekli. */
 export interface DateRange {

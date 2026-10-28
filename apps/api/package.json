@@ -1,5 +1,5 @@
 {
-  "name": "@core-crm/api",
+  "name": "@dentorchestra/api",
   "version": "0.0.1",
   "description": "",
   "author": "",
@@ -39,8 +39,8 @@
     "@bull-board/api": "^7.1.5",
     "@bull-board/express": "^7.1.5",
     "@bull-board/nestjs": "^7.1.5",
-    "@core-crm/nest-kernel": "workspace:*",
-    "@core-crm/shared": "workspace:*",
+    "@dentorchestra/nest-kernel": "workspace:*",
+    "@dentorchestra/shared": "workspace:*",
     "@duffel/api": "^4.28.0",
     "@logtail/node": "^0.5.6",
     "@logtail/winston": "^0.5.6",

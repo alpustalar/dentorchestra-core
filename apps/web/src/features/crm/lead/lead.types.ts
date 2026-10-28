@@ -1,4 +1,4 @@
-import type { Lead } from '@core-crm/shared/client';
+import type { Lead } from '@dentorchestra/shared/client';
 
 /**
  * Enum tipleri modelin kendisinden türetilir, `generated-zod`un enum

@@ -1,7 +1,7 @@
 'use client';
 
 import { useLocale, useTranslations } from 'next-intl';
-import type { MetaReportResponse } from '@core-crm/shared/client';
+import type { MetaReportResponse } from '@dentorchestra/shared/client';
 
 import {
   Card,

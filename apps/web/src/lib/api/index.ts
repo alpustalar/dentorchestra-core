@@ -8,7 +8,7 @@ export {
 } from './token-provider';
 
 /*
- * Sözleşme katmanı `@core-crm/shared/client`te yaşıyor — endpoint kayıtları
+ * Sözleşme katmanı `@dentorchestra/shared/client`te yaşıyor — endpoint kayıtları
  * (URL, metod, gövde şeması) frontend'e değil, paylaşılan sözleşmeye ait.
  * Kolaylık olsun diye buradan da yeniden dışa açılıyor.
  */
@@ -21,4 +21,4 @@ export {
   type ParamsOf,
   type QueryOf,
   type ResponseOf,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';

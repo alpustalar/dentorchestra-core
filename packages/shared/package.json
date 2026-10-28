@@ -1,5 +1,5 @@
 {
-  "name": "@core-crm/shared",
+  "name": "@dentorchestra/shared",
   "version": "0.0.1",
   "private": true,
   "main": "index.ts",

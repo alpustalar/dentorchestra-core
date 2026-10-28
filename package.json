@@ -1,5 +1,5 @@
 {
-  "name": "@core-crm/root",
+  "name": "@dentorchestra/root",
   "private": true,
   "packageManager": "pnpm@10.26.0",
   "description": "Core CRM Monorepo",

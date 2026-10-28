@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { GetPatients, PaginationInput } from '@core-crm/shared/client';
+import type { GetPatients, PaginationInput } from '@dentorchestra/shared/client';
 
 import type { PatientStatus } from '../patient.types';
 

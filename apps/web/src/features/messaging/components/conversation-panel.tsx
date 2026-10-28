@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import type { ConversationResponse } from '@core-crm/shared/client';
+import type { ConversationResponse } from '@dentorchestra/shared/client';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

@@ -3,7 +3,7 @@
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
 import { Loader2, Plug, Unplug } from 'lucide-react';
-import type { MetaAdAccountResponse } from '@core-crm/shared/client';
+import type { MetaAdAccountResponse } from '@dentorchestra/shared/client';
 
 import {
   Card,

@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import type { GetLeads, PaginationInput } from '@core-crm/shared/client';
+import type { GetLeads, PaginationInput } from '@dentorchestra/shared/client';
 
 import type { LeadSource, LeadStatus } from '../lead.types';
 

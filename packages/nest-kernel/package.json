@@ -1,9 +1,9 @@
 {
-  "name": "@core-crm/nest-kernel",
+  "name": "@dentorchestra/nest-kernel",
   "version": "0.0.1",
   "private": true,
   "dependencies": {
-    "@core-crm/shared": "workspace:*",
+    "@dentorchestra/shared": "workspace:*",
     "@nestjs-modules/ioredis": "^2.0.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

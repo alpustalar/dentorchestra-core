@@ -8,7 +8,7 @@ import {
   ROLE_SLUGS,
   rolesCreateManyInputs,
 } from '@shared/datasets';
-import type { ActorContextResponse } from '@core-crm/shared/client';
+import type { ActorContextResponse } from '@dentorchestra/shared/client';
 import type { Role } from '@shared/generated-zod/modelSchema';
 import { formatCapabilityToString } from '@/lib/auth/capability.utils';
 

@@ -1,5 +1,5 @@
 /**
- * Tarayıcı-güvenli giriş noktası — `@core-crm/shared/client`.
+ * Tarayıcı-güvenli giriş noktası — `@dentorchestra/shared/client`.
  *
  * Kök barrel (`./index.ts`) backend içindir ve `dto/` üzerinden `nestjs-zod`
  * çeker (164 dosya); frontend onu import ettiği an NestJS bağımlılıkları tarayıcı

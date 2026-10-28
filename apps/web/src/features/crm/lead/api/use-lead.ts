@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { leadEndpoints } from '@core-crm/shared/client';
+import { leadEndpoints } from '@dentorchestra/shared/client';
 
 import { api } from '@/lib/api';
 

@@ -1,4 +1,4 @@
-import { Patient } from '@core-crm/shared/client';
+import { Patient } from '@dentorchestra/shared/client';
 import { DateTimeManager } from '@shared/common';
 
 const currentYear = DateTimeManager.currentYear();

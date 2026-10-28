@@ -10,7 +10,7 @@
     // Paket içindeki dosyalar birbirine `@common/*` / `@src/*` ile bakar (tüketen
     // app'lerdeki adlandırmayla aynı). Burada bu alias'lar paketin KENDİ src'sine
     // bağlanır — böylece paket, bir app'in tsconfig'i olmadan da tek başına
-    // tip-kontrolünden geçirilebilir (`pnpm --filter @core-crm/nest-kernel typecheck`).
+    // tip-kontrolünden geçirilebilir (`pnpm --filter @dentorchestra/nest-kernel typecheck`).
     "paths": {
       "@common/*": ["src/common/*"],
       "@src/*": ["src/*"],

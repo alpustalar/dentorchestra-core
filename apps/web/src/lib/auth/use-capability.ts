@@ -1,6 +1,6 @@
 'use client';
 
-import type { ActorContextResponse } from '@core-crm/shared/client';
+import type { ActorContextResponse } from '@dentorchestra/shared/client';
 
 import { useAuth } from './auth-provider';
 

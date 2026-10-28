@@ -44,10 +44,10 @@ importers:
       '@bull-board/nestjs':
         specifier: ^7.1.5
         version: 7.1.5(@bull-board/api@7.1.5(@bull-board/ui@7.1.5))(@nestjs/bull-shared@11.0.4(@nestjs/common@11.1.14(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14))(@nestjs/common@11.1.14(class-transformer@0.5.1)(class-validator@0.14.3)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.14)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@core-crm/nest-kernel':
+      '@dentorchestra/nest-kernel':
         specifier: workspace:*
         version: link:../../packages/nest-kernel
-      '@core-crm/shared':
+      '@dentorchestra/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@duffel/api':
@@ -291,10 +291,10 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.105.0
         version: 0.105.0(zod@4.3.6)
-      '@core-crm/nest-kernel':
+      '@dentorchestra/nest-kernel':
         specifier: workspace:*
         version: link:../../packages/nest-kernel
-      '@core-crm/shared':
+      '@dentorchestra/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@nestjs-modules/ioredis':
@@ -406,7 +406,7 @@ importers:
       '@base-ui/react':
         specifier: ^1.5.0
         version: 1.9.0(@types/react@19.2.14)(date-fns@4.1.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@core-crm/shared':
+      '@dentorchestra/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@hookform/resolvers':
@@ -524,7 +524,7 @@ importers:
 
   packages/nest-kernel:
     dependencies:
-      '@core-crm/shared':
+      '@dentorchestra/shared':
         specifier: workspace:*
         version: link:../shared
       '@nestjs-modules/ioredis':

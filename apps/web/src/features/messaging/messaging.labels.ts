@@ -2,7 +2,7 @@ import type {
   ConversationStatusValue,
   MessageChannelValue,
   MessageStatusValue,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 export const CHANNEL_LABELS: Record<MessageChannelValue, string> = {
   WHATSAPP: 'WhatsApp',

@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { appointmentEndpoints } from '@core-crm/shared/client';
+import { appointmentEndpoints } from '@dentorchestra/shared/client';
 import dayjs from 'dayjs';
 
 import { api } from '@/lib/api';

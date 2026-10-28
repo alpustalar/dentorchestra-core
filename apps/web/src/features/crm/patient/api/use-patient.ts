@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { patientEndpoints } from '@core-crm/shared/client';
+import { patientEndpoints } from '@dentorchestra/shared/client';
 
 import { apiWithMeta } from '@/lib/api';
 

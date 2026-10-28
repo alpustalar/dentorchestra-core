@@ -5,7 +5,7 @@ import {
   type GetPatients,
   type PaginationInput,
   patientEndpoints,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 import { apiWithMeta } from '@/lib/api';
 

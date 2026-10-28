@@ -1,4 +1,4 @@
-import type { Appointment } from '@core-crm/shared/client';
+import type { Appointment } from '@dentorchestra/shared/client';
 
 /**
  * Enum tipi modelin kendisinden türetilir (Lead diliminde olduğu gibi):

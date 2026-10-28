@@ -1,4 +1,4 @@
-import type { GetLeads, PaginationInput } from '@core-crm/shared/client';
+import type { GetLeads, PaginationInput } from '@dentorchestra/shared/client';
 
 /**
  * Invalidation'ın öngörülebilir olması için anahtarlar hiyerarşik kurulur:

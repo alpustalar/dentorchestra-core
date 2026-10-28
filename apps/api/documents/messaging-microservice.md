@@ -297,7 +297,7 @@ uygulama açılışı + `dist/packages/nest-kernel` üretimi.
 
 **3.2 Paketler Prisma'dan koparıldı ✅ (2026-08-08)** — engel çözüldü.
 
-Sorun: `@core-crm/shared`'ın `generated-zod` çıktısı `@prisma/client`'ı import ediyordu,
+Sorun: `@dentorchestra/shared`'ın `generated-zod` çıktısı `@prisma/client`'ı import ediyordu,
 ama üretilmiş client npm paketinde değil `apps/api/generated/prisma` içinde yaşıyor. Yani
 shared'ı tüketen hiçbir paket app'lerden bağımsız derlenemiyordu.
 
@@ -316,7 +316,7 @@ ikisini de kabul eder ve generator'ın alan/model mesajını korur.
 | 44 üretilmiş dosya | Prisma'sız (40 model + 4 input şeması) |
 | Boru hattı | `prisma generate` → `zod:clean` → 0 Prisma import'u (baştan sona doğrulandı) |
 | Guard | Dönüşüm eşleşmezse script **sesli patlar** — jenerator çıktısı değişirse sessizce geri gelmesin |
-| `pnpm --filter @core-crm/nest-kernel typecheck` | ✅ 0 hata, `apps/api`'ye erişmeden |
+| `pnpm --filter @dentorchestra/nest-kernel typecheck` | ✅ 0 hata, `apps/api`'ye erişmeden |
 | Regresyon | `apps/api` tsc 0 · 644 test · `apps/web` tsc 0 |
 
 **3.3 Auth ✅ (2026-08-08)** — messaging artık `@modules/identity/auth`'tan hiçbir şey
@@ -348,7 +348,7 @@ aynı çekirdek servisine devredildi (kopya yok). 6 kalıcı test:
 
 **3.4 `apps/messaging` iskeleti ✅ (2026-08-08)** — servis ayakta: kendi
 `main.ts`/`tsconfig`/`package.json`'ı, kendi Mongo veritabanı, kendi env sözleşmesi.
-Doğrulandı: `pnpm --filter @core-crm/messaging typecheck` 0 hata; `nest start` →
+Doğrulandı: `pnpm --filter @dentorchestra/messaging typecheck` 0 hata; `nest start` →
 `Nest application successfully started`, port **8081** dinliyor (api 8080).
 
 **Alias'lar tek hedef — kasıtlı fark.** `apps/api`'de `@common/*` önce kendi `src`'ine,

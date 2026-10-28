@@ -21,7 +21,7 @@ export interface ApiErrorBody {
 
 /**
  * `meta` bilinçli olarak jenerik: her domain exception'ı kendi tipli payload'ını
- * taşır ve o tip `@core-crm/shared/client` üzerinden **aynı arayüzden** gelir
+ * taşır ve o tip `@dentorchestra/shared/client` üzerinden **aynı arayüzden** gelir
  * (ör. `SlotConflictMeta`). Böylece hata anında akıllı UI kurulabilir:
  *
  * ```ts

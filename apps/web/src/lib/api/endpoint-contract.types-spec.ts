@@ -15,7 +15,7 @@ import {
   defineEndpoint,
   meEndpoints,
   type ActorContextResponse,
-} from '@core-crm/shared/client';
+} from '@dentorchestra/shared/client';
 
 import { api, apiWithMeta } from './client';
 
