@@ -2,6 +2,13 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, } from '@modelcontextprotocol/sdk/types.js';
 import { allTools, executeTool } from './tools';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Sırlar mcp-server/.env'den okunur (git'e girmez). Yol çalışma dizininden değil
+// dosya konumundan çözülür: sunucu proje kökünden ya da Claude Desktop'tan başlatılabilir.
+// Gerçek ortam değişkeni .env'den önceliklidir. quiet: STDIO kanalına log karışmasın.
+dotenv.config({ path: path.resolve(__dirname, '../.env'), quiet: true });
 
 // MCP Server Tanımı
 const server = new Server(
